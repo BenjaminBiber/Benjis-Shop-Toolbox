@@ -1,15 +1,27 @@
+@using Benjis_Shop_Toolbox.Components.Layout.TopBar
+@using Benjis_Shop_Toolbox.Components.Layout.SideBar
 @inherits LayoutComponentBase
-
-@* Required *@
-<MudThemeProvider />
 <MudPopoverProvider />
-
-@* Needed for dialogs *@
 <MudDialogProvider />
-
-@* Needed for snackbars *@
 <MudSnackbarProvider />
+<MudThemeProvider Theme="@ModernTheme.Morphtheme"/>
+    
+<MudLayout>
+    <SideBar @bind-Open="_drawerOpen" />
+    <TopBar OnMenuClick="ToggleDrawer"/>
+    
+    <MudMainContent>
+        <div class="content">
+            @Body
+        </div>
+    </MudMainContent>
+</MudLayout>
 
-<div class="content">
-    @Body
-</div>
+@code {
+    private bool _drawerOpen = true;
+
+    void ToggleDrawer()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+}
