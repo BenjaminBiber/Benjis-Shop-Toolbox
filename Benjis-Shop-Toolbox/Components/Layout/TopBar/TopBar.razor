@@ -1,0 +1,12 @@
+<MudAppBar Elevation="1" Color="Color.Primary">
+    <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                   Color="Color.Inherit"
+                   Edge="Edge.Start"
+                   OnClick="@OnMenuClick" />
+    <MudText Typo="Typo.h6" Class="ml-2">Benjis Shop Toolbox</MudText>
+</MudAppBar>
+
+@code {
+    [Parameter]
+    public EventCallback<MouseEventArgs> OnMenuClick { get; set; }
+}

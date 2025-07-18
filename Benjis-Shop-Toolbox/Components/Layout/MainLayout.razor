@@ -1,5 +1,24 @@
 @inherits LayoutComponentBase
 
-<div class="content">
-    @Body
-</div>
+<MudThemeProvider Theme="@ModernTheme.Theme">
+    <MudLayout>
+        <TopBar OnMenuClick="ToggleDrawer" />
+
+        <SideBar @bind-Open="_drawerOpen" />
+
+        <MudMainContent>
+            <div class="content">
+                @Body
+            </div>
+        </MudMainContent>
+    </MudLayout>
+</MudThemeProvider>
+
+@code {
+    private bool _drawerOpen = true;
+
+    void ToggleDrawer()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+}
