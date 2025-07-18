@@ -1,10 +1,6 @@
 @page "/"
 @inject ISnackbar Snackbar
 
-<h1>Hello, world!</h1>
-
-Welcome to your new app.
-
 <p>Aktuelle IIS Anwendung: @IisAppName</p>
 
 <MudStack Row="true" Spacing="2">
@@ -14,8 +10,8 @@ Welcome to your new app.
 </MudStack>
 
 @code {
-    private const string IisAppName = "Default Web Site/MyApp"; // Name der IIS Anwendung
-    private readonly TimeSpan RestartDelay = TimeSpan.FromSeconds(5);
+    private const string IisAppName = "Shop_TemplateV4"; // Name der IIS Anwendung
+    private readonly TimeSpan RestartDelay = TimeSpan.FromSeconds(3);
 
     private void StartIisApp()
     {
