@@ -1,8 +1,0 @@
-{
-  "IisAppName": "Shop_TemplateV4",
-  "LogName": "4SELLERS",
-  "AutoRefreshSeconds": 30,
-  "AutoRefreshEnabled": false,
-  "LoadOnStartup": true,
-  "OnlySinceRestart": false
-}

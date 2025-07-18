@@ -7,6 +7,7 @@ namespace Benjis_Shop_Toolbox.Services
     {
         private readonly string _filePath;
         public ToolboxSettings Settings { get; private set; }
+        public bool IsConfigured { get; private set; }
 
         public SettingsService()
         {
@@ -23,7 +24,11 @@ namespace Benjis_Shop_Toolbox.Services
                     var json = File.ReadAllText(_filePath);
                     var settings = JsonSerializer.Deserialize<ToolboxSettings>(json);
                     if (settings != null)
+                    {
+                        IsConfigured = !string.IsNullOrWhiteSpace(settings.IisAppName)
+                            && !string.IsNullOrWhiteSpace(settings.LogName);
                         return settings;
+                    }
                 }
             }
             catch
@@ -31,6 +36,7 @@ namespace Benjis_Shop_Toolbox.Services
                 // ignore errors and fall back to defaults
             }
 
+            IsConfigured = false;
             return new ToolboxSettings();
         }
 
@@ -38,6 +44,7 @@ namespace Benjis_Shop_Toolbox.Services
         {
             var json = JsonSerializer.Serialize(Settings, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(_filePath, json);
+            IsConfigured = !string.IsNullOrWhiteSpace(Settings.IisAppName) && !string.IsNullOrWhiteSpace(Settings.LogName);
         }
     }
 }
