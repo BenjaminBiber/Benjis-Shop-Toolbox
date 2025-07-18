@@ -1,9 +1,10 @@
 @page "/"
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject SettingsService SettingsService
 @implements IDisposable
 
-<p>Aktuelle IIS Anwendung: @IisAppName</p>
+<p>Aktuelle IIS Anwendung: @Settings.IisAppName</p>
 
 <MudStack Row="true" Spacing="2">
     <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="StartIisApp">Start</MudButton>
@@ -45,7 +46,6 @@
 </MudTable>
 
 @code {
-    private const string IisAppName = "Shop_TemplateV4"; // Name der IIS Anwendung
     private readonly TimeSpan RestartDelay = TimeSpan.FromSeconds(3);
 
     private void StartIisApp()
@@ -53,9 +53,9 @@
         try
         {
             using var manager = new Microsoft.Web.Administration.ServerManager();
-            var site = manager.Sites[IisAppName];
+            var site = manager.Sites[Settings.IisAppName];
             site?.Start();
-            Snackbar.Add($"Anwendung '{IisAppName}' gestartet.", Severity.Success);
+            Snackbar.Add($"Anwendung '{Settings.IisAppName}' gestartet.", Severity.Success);
         }
         catch (Exception ex)
         {
@@ -68,9 +68,9 @@
         try
         {
             using var manager = new Microsoft.Web.Administration.ServerManager();
-            var site = manager.Sites[IisAppName];
+            var site = manager.Sites[Settings.IisAppName];
             site?.Stop();
-            Snackbar.Add($"Anwendung '{IisAppName}' gestoppt.", Severity.Success);
+            Snackbar.Add($"Anwendung '{Settings.IisAppName}' gestoppt.", Severity.Success);
         }
         catch (Exception ex)
         {
@@ -88,18 +88,25 @@
     }
 
     // Log viewer fields
-    private readonly LogService _logService = new("4SELLERS");
+    private LogService _logService = default!;
     private IEnumerable<LogEntry> _logs = Enumerable.Empty<LogEntry>();
     private LogLevel _selectedLevel = LogLevel.All;
     private bool _autoRefresh;
-    private int _refreshSeconds = 30;
+    private int _refreshSeconds;
     private bool _onlySinceRestart;
     private DateTime _lastShopRestart = AppInfo.StartTime;
     private System.Timers.Timer? _timer;
 
     protected override void OnInitialized()
     {
-        LoadLogs();
+        _logService = new LogService(Settings.LogName);
+        _autoRefresh = Settings.AutoRefreshEnabled;
+        _refreshSeconds = Settings.AutoRefreshSeconds;
+        _onlySinceRestart = Settings.OnlySinceRestart;
+        if (Settings.LoadOnStartup)
+        {
+            LoadLogs();
+        }
         StartTimer();
     }
 
@@ -163,7 +170,9 @@
         LogLevel.Error => Icons.Material.Filled.Error,
         LogLevel.Critical => Icons.Material.Filled.PriorityHigh,
         _ => Icons.Material.Filled.Info
+
     };
+    private ToolboxSettings Settings => SettingsService.Settings;
 
     public void Dispose()
     {
