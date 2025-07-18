@@ -4,46 +4,59 @@
 @inject SettingsService SettingsService
 @implements IDisposable
 
-<p>Aktuelle IIS Anwendung: @Settings.IisAppName</p>
+<div class="row">
+    <div class="col-3">
+        <MudText Class="mb-3" Typo="Typo.h6">@Settings.IisAppName</MudText>
 
-<MudStack Row="true" Spacing="2">
-    <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="StartIisApp">Start</MudButton>
-    <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="StopIisApp">Stop</MudButton>
-    <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="RestartIisApp">Restart</MudButton>
-</MudStack>
+        <MudStack Row="false" Spacing="2">
+            <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="StartIisApp">Start</MudButton>
+            <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="StopIisApp">Stop</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="RestartIisApp">Restart</MudButton>
+        </MudStack>
 
-<MudDivider Class="my-4" />
-
-<MudStack Row="true" Spacing="2" Class="mb-4">
-    <MudSelect T="LogLevel" @bind-Value="_selectedLevel" Label="Ebene">
-        @foreach (var level in Enum.GetValues<LogLevel>())
+    </div>
+    <div class="col-9">
+        @if (_logs.Any())
         {
-            <MudSelectItem Value="@level">@level</MudSelectItem>
+            <MudStack Row="true" Spacing="2" Class="mb-4">
+                <MudSelect T="LogLevel" @bind-Value="_selectedLevel" Label="Ebene">
+                    @foreach (var level in Enum.GetValues<LogLevel>())
+                    {
+                        <MudSelectItem Value="@level">@level</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="LoadLogs">Laden</MudButton>
+            </MudStack>
+            
+            <MudTable Items="_logs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
+                <HeaderContent>
+                    <MudTh>Zeit</MudTh>
+                    <MudTh>Ebene</MudTh>
+                    <MudTh>Nachricht</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Zeit">@context.Time</MudTd>
+                    <MudTd DataLabel="Ebene">
+                        <MudChip T="string" Color="@GetColor(context.Level)" Icon="@GetIcon(context.Level)" Variant="Variant.Filled">@context.Level</MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Nachricht">@context.Message</MudTd>
+                </RowTemplate>
+            </MudTable>
+
+        }else
+        {
+            <div class="row">
+                <div class="col-11 d-flex align-items-center justify-content-center">
+                    <MudAlert Class="w-100">Keine Logs gefunden.</MudAlert>
+                </div>
+                <div class="col-1 d-flex align-items-center justify-content-center">
+                    <MudIconButton Icon="@Icons.Material.Filled.Autorenew" OnClick="LoadLogs"></MudIconButton>
+                </div>
+            </div>
         }
-    </MudSelect>
-    <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="LoadLogs">Laden</MudButton>
-</MudStack>
 
-<MudStack Row="true" Spacing="2" Class="mb-4">
-    <MudSwitch Value="_autoRefresh" T="bool" Color="Color.Primary" ValueChanged="ToggleAutoRefresh">Auto Update</MudSwitch>
-    <MudNumericField T="int" Value="_refreshSeconds" Label="Intervall (s)" Min="1" Immediate="true" ValueChanged="IntervalChanged" />
-    <MudSwitch @bind-Value="_onlySinceRestart" T="bool" Color="Color.Primary">Nur Logs seit letztem Neustart</MudSwitch>
-</MudStack>
-
-<MudTable Items="_logs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
-    <HeaderContent>
-        <MudTh>Zeit</MudTh>
-        <MudTh>Ebene</MudTh>
-        <MudTh>Nachricht</MudTh>
-    </HeaderContent>
-    <RowTemplate>
-        <MudTd DataLabel="Zeit">@context.Time</MudTd>
-        <MudTd DataLabel="Ebene">
-            <MudChip T="string" Color="@GetColor(context.Level)" Icon="@GetIcon(context.Level)" Variant="Variant.Filled">@context.Level</MudChip>
-        </MudTd>
-        <MudTd DataLabel="Nachricht">@context.Message</MudTd>
-    </RowTemplate>
-</MudTable>
+    </div>
+</div>
 
 @code {
     private readonly TimeSpan RestartDelay = TimeSpan.FromSeconds(3);
@@ -56,7 +69,7 @@
             if (string.IsNullOrWhiteSpace(Settings.IisAppName)) return;
             var site = manager.Sites[Settings.IisAppName];
             site?.Start();
-            Snackbar.Add($"Anwendung '{Settings.IisAppName}' gestartet.", Severity.Success);
+            Snackbar.Add($"Anwendung {Settings.IisAppName} gestartet.", Severity.Success);
         }
         catch (Exception ex)
         {
