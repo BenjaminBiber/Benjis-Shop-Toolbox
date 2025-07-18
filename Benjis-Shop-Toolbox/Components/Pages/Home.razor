@@ -14,16 +14,16 @@
 
 <MudStack Row="true" Spacing="2" Class="mb-4">
     <MudSelect T="string" @bind-Value="_selectedLevel" Label="Ebene">
-        <MudSelectItem Value="All">Alle</MudSelectItem>
-        <MudSelectItem Value="Information">Information</MudSelectItem>
-        <MudSelectItem Value="Warning">Warning</MudSelectItem>
-        <MudSelectItem Value="Error">Error</MudSelectItem>
-        <MudSelectItem Value="Critical">Critical</MudSelectItem>
+        <MudSelectItem Value="@("All")">Alle</MudSelectItem>
+        <MudSelectItem Value="@("Information")">Information</MudSelectItem>
+        <MudSelectItem Value="@("Warning")">Warning</MudSelectItem>
+        <MudSelectItem Value="@("Error")">Error</MudSelectItem>
+        <MudSelectItem Value="@("Critical")">Critical</MudSelectItem>
     </MudSelect>
     <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="LoadLogs">Laden</MudButton>
 </MudStack>
 
-<MudTable Items="_logs" Hover="true" OnRowClick="ShowLogDetails">
+<MudTable Items="_logs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
     <HeaderContent>
         <MudTh>Zeit</MudTh>
         <MudTh>Ebene</MudTh>
