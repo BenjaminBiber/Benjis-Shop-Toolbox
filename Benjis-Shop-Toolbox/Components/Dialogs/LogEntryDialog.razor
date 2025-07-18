@@ -1,0 +1,17 @@
+@using MudBlazor
+<MudDialog MaxWidth="MaxWidth.Small">
+    <DialogContent>
+        <MudText Typo="Typo.h6">@Entry.Level - @Entry.Time</MudText>
+        <MudText Class="mt-2" Style="white-space: pre-wrap;">@Entry.Message</MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="Close">Schließen</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public LogEntry Entry { get; set; } = default!;
+
+    void Close() => MudDialog.Close();
+}

@@ -1,5 +1,6 @@
 @page "/"
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <p>Aktuelle IIS Anwendung: @IisAppName</p>
 
@@ -8,6 +9,32 @@
     <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="StopIisApp">Stop</MudButton>
     <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="RestartIisApp">Restart</MudButton>
 </MudStack>
+
+<MudDivider Class="my-4" />
+
+<MudStack Row="true" Spacing="2" Class="mb-4">
+    <MudSelect T="string" @bind-Value="_selectedLevel" Label="Ebene">
+        <MudSelectItem Value="All">Alle</MudSelectItem>
+        <MudSelectItem Value="Information">Information</MudSelectItem>
+        <MudSelectItem Value="Warning">Warning</MudSelectItem>
+        <MudSelectItem Value="Error">Error</MudSelectItem>
+        <MudSelectItem Value="Critical">Critical</MudSelectItem>
+    </MudSelect>
+    <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="LoadLogs">Laden</MudButton>
+</MudStack>
+
+<MudTable Items="_logs" Hover="true" OnRowClick="ShowLogDetails">
+    <HeaderContent>
+        <MudTh>Zeit</MudTh>
+        <MudTh>Ebene</MudTh>
+        <MudTh>Nachricht</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Zeit">@context.Time</MudTd>
+        <MudTd DataLabel="Ebene">@context.Level</MudTd>
+        <MudTd DataLabel="Nachricht">@context.Message</MudTd>
+    </RowTemplate>
+</MudTable>
 
 @code {
     private const string IisAppName = "Shop_TemplateV4"; // Name der IIS Anwendung
@@ -48,5 +75,26 @@
         StopIisApp();
         await Task.Delay(RestartDelay);
         StartIisApp();
+    }
+
+    // Log viewer fields
+    private readonly LogService _logService = new("4SELLERS");
+    private IEnumerable<LogEntry> _logs = Enumerable.Empty<LogEntry>();
+    private string _selectedLevel = "All";
+
+    protected override void OnInitialized()
+    {
+        LoadLogs();
+    }
+
+    private void LoadLogs()
+    {
+        _logs = _logService.GetLogs(AppInfo.StartTime, _selectedLevel);
+    }
+
+    private void ShowLogDetails(TableRowClickEventArgs<LogEntry> args)
+    {
+        var parameters = new DialogParameters { [nameof(LogEntryDialog.Entry)] = args.Item };
+        DialogService.Show<LogEntryDialog>("Log Details", parameters);
     }
 }

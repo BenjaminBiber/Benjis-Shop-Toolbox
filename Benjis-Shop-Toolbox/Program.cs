@@ -2,8 +2,11 @@
 using BlazorDesktop.Hosting;
 using Benjis_Shop_Toolbox.Components;
 using MudBlazor.Services;
+using Benjis_Shop_Toolbox.Services;
 
 var builder = BlazorDesktopHostBuilder.CreateDefault(args);
+
+AppInfo.StartTime = DateTime.Now;
 
 builder.Services.AddMudServices();
 
