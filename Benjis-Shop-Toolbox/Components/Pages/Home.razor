@@ -1,6 +1,7 @@
 @page "/"
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@implements IDisposable
 
 <p>Aktuelle IIS Anwendung: @IisAppName</p>
 
@@ -13,14 +14,19 @@
 <MudDivider Class="my-4" />
 
 <MudStack Row="true" Spacing="2" Class="mb-4">
-    <MudSelect T="string" @bind-Value="_selectedLevel" Label="Ebene">
-        <MudSelectItem Value="@("All")">Alle</MudSelectItem>
-        <MudSelectItem Value="@("Information")">Information</MudSelectItem>
-        <MudSelectItem Value="@("Warning")">Warning</MudSelectItem>
-        <MudSelectItem Value="@("Error")">Error</MudSelectItem>
-        <MudSelectItem Value="@("Critical")">Critical</MudSelectItem>
+    <MudSelect T="LogLevel" @bind-Value="_selectedLevel" Label="Ebene">
+        @foreach (var level in Enum.GetValues<LogLevel>())
+        {
+            <MudSelectItem Value="@level">@level</MudSelectItem>
+        }
     </MudSelect>
     <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="LoadLogs">Laden</MudButton>
+</MudStack>
+
+<MudStack Row="true" Spacing="2" Class="mb-4">
+    <MudSwitch @bind-Checked="_autoRefresh" Color="Color.Primary" CheckedChanged="ToggleAutoRefresh">Auto Update</MudSwitch>
+    <MudNumericField T="int" @bind-Value="_refreshSeconds" Label="Intervall (s)" Min="1" Immediate="true" ValueChanged="IntervalChanged" />
+    <MudSwitch @bind-Checked="_onlySinceRestart" Color="Color.Primary">Nur Logs seit letztem Neustart</MudSwitch>
 </MudStack>
 
 <MudTable Items="_logs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
@@ -31,7 +37,9 @@
     </HeaderContent>
     <RowTemplate>
         <MudTd DataLabel="Zeit">@context.Time</MudTd>
-        <MudTd DataLabel="Ebene">@context.Level</MudTd>
+        <MudTd DataLabel="Ebene">
+            <MudChip Color="@GetColor(context.Level)" Icon="@GetIcon(context.Level)" Variant="Variant.Filled">@context.Level</MudChip>
+        </MudTd>
         <MudTd DataLabel="Nachricht">@context.Message</MudTd>
     </RowTemplate>
 </MudTable>
@@ -75,26 +83,90 @@
         StopIisApp();
         await Task.Delay(RestartDelay);
         StartIisApp();
+        _lastShopRestart = DateTime.Now;
+        LoadLogs();
     }
 
     // Log viewer fields
     private readonly LogService _logService = new("4SELLERS");
     private IEnumerable<LogEntry> _logs = Enumerable.Empty<LogEntry>();
-    private string _selectedLevel = "All";
+    private LogLevel _selectedLevel = LogLevel.All;
+    private bool _autoRefresh;
+    private int _refreshSeconds = 30;
+    private bool _onlySinceRestart;
+    private DateTime _lastShopRestart = AppInfo.StartTime;
+    private System.Timers.Timer? _timer;
 
     protected override void OnInitialized()
     {
         LoadLogs();
+        StartTimer();
     }
 
     private void LoadLogs()
     {
-        _logs = _logService.GetLogs(AppInfo.StartTime, _selectedLevel);
+        var since = _onlySinceRestart ? _lastShopRestart : AppInfo.StartTime;
+        _logs = _logService.GetLogs(since, _selectedLevel);
+    }
+
+    private void StartTimer()
+    {
+        _timer?.Dispose();
+        if (_autoRefresh)
+        {
+            _timer = new System.Timers.Timer(_refreshSeconds * 1000);
+            _timer.Elapsed += async (_, _) =>
+            {
+                await InvokeAsync(() =>
+                {
+                    LoadLogs();
+                    StateHasChanged();
+                });
+            };
+            _timer.AutoReset = true;
+            _timer.Start();
+        }
+    }
+
+    private void ToggleAutoRefresh(bool value)
+    {
+        _autoRefresh = value;
+        StartTimer();
+    }
+
+    private void IntervalChanged(int value)
+    {
+        if (value <= 0) return;
+        _refreshSeconds = value;
+        StartTimer();
     }
 
     private void ShowLogDetails(TableRowClickEventArgs<LogEntry> args)
     {
         var parameters = new DialogParameters { [nameof(LogEntryDialog.Entry)] = args.Item };
         DialogService.Show<LogEntryDialog>("Log Details", parameters);
+    }
+
+    private Color GetColor(LogLevel level) => level switch
+    {
+        LogLevel.Information => Color.Info,
+        LogLevel.Warning => Color.Warning,
+        LogLevel.Error => Color.Error,
+        LogLevel.Critical => Color.Error,
+        _ => Color.Default
+    };
+
+    private string GetIcon(LogLevel level) => level switch
+    {
+        LogLevel.Information => Icons.Material.Filled.Info,
+        LogLevel.Warning => Icons.Material.Filled.Warning,
+        LogLevel.Error => Icons.Material.Filled.Error,
+        LogLevel.Critical => Icons.Material.Filled.PriorityHigh,
+        _ => Icons.Material.Filled.Info
+    };
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
     }
 }
