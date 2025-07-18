@@ -24,9 +24,9 @@
 </MudStack>
 
 <MudStack Row="true" Spacing="2" Class="mb-4">
-    <MudSwitch @bind-Checked="_autoRefresh" Color="Color.Primary" CheckedChanged="ToggleAutoRefresh">Auto Update</MudSwitch>
-    <MudNumericField T="int" @bind-Value="_refreshSeconds" Label="Intervall (s)" Min="1" Immediate="true" ValueChanged="IntervalChanged" />
-    <MudSwitch @bind-Checked="_onlySinceRestart" Color="Color.Primary">Nur Logs seit letztem Neustart</MudSwitch>
+    <MudSwitch Value="_autoRefresh" T="bool" Color="Color.Primary" ValueChanged="ToggleAutoRefresh">Auto Update</MudSwitch>
+    <MudNumericField T="int" Value="_refreshSeconds" Label="Intervall (s)" Min="1" Immediate="true" ValueChanged="IntervalChanged" />
+    <MudSwitch @bind-Value="_onlySinceRestart" T="bool" Color="Color.Primary">Nur Logs seit letztem Neustart</MudSwitch>
 </MudStack>
 
 <MudTable Items="_logs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
@@ -38,7 +38,7 @@
     <RowTemplate>
         <MudTd DataLabel="Zeit">@context.Time</MudTd>
         <MudTd DataLabel="Ebene">
-            <MudChip Color="@GetColor(context.Level)" Icon="@GetIcon(context.Level)" Variant="Variant.Filled">@context.Level</MudChip>
+            <MudChip T="string" Color="@GetColor(context.Level)" Icon="@GetIcon(context.Level)" Variant="Variant.Filled">@context.Level</MudChip>
         </MudTd>
         <MudTd DataLabel="Nachricht">@context.Message</MudTd>
     </RowTemplate>
