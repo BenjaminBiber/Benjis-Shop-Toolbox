@@ -1,0 +1,26 @@
+@inject SettingsService SettingsService
+<MudDialog MaxWidth="MaxWidth.Small" FullWidth="true">
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-4">Einstellungen</MudText>
+        <MudTextField @bind-Value="Settings.IisAppName" Label="IIS App Name" Variant="Variant.Filled" Class="mb-2" />
+        <MudTextField @bind-Value="Settings.LogName" Label="Log Name" Variant="Variant.Filled" Class="mb-2" />
+        <MudNumericField T="int" @bind-Value="Settings.AutoRefreshSeconds" Label="Auto Refresh (Sekunden)" Class="mb-2" />
+        <MudSwitch @bind-Checked="Settings.AutoRefreshEnabled" T="bool" Color="Color.Primary">Automatisches Aktualisieren</MudSwitch>
+        <MudSwitch @bind-Checked="Settings.LoadOnStartup" T="bool" Color="Color.Primary">Automatisch laden</MudSwitch>
+        <MudSwitch @bind-Checked="Settings.OnlySinceRestart" T="bool" Color="Color.Primary">Nur Logs seit letztem Neustart</MudSwitch>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="Save">Speichern</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    private ToolboxSettings Settings => SettingsService.Settings;
+
+    private void Save()
+    {
+        SettingsService.Save();
+        MudDialog.Close();
+    }
+}

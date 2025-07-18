@@ -53,6 +53,7 @@
         try
         {
             using var manager = new Microsoft.Web.Administration.ServerManager();
+            if (string.IsNullOrWhiteSpace(Settings.IisAppName)) return;
             var site = manager.Sites[Settings.IisAppName];
             site?.Start();
             Snackbar.Add($"Anwendung '{Settings.IisAppName}' gestartet.", Severity.Success);
@@ -68,6 +69,7 @@
         try
         {
             using var manager = new Microsoft.Web.Administration.ServerManager();
+            if (string.IsNullOrWhiteSpace(Settings.IisAppName)) return;
             var site = manager.Sites[Settings.IisAppName];
             site?.Stop();
             Snackbar.Add($"Anwendung '{Settings.IisAppName}' gestoppt.", Severity.Success);
@@ -99,7 +101,19 @@
 
     protected override void OnInitialized()
     {
-        _logService = new LogService(Settings.LogName);
+        if (SettingsService.IsConfigured)
+        {
+            ApplySettings();
+        }
+        else
+        {
+            ShowSettingsDialog();
+        }
+    }
+
+    private void ApplySettings()
+    {
+        _logService = new LogService(Settings.LogName!);
         _autoRefresh = Settings.AutoRefreshEnabled;
         _refreshSeconds = Settings.AutoRefreshSeconds;
         _onlySinceRestart = Settings.OnlySinceRestart;
@@ -108,6 +122,12 @@
             LoadLogs();
         }
         StartTimer();
+    }
+
+    private void ShowSettingsDialog()
+    {
+        var dialog = DialogService.Show<SettingsDialog>("Einstellungen");
+        dialog.Result.ContinueWith(_ => InvokeAsync(() => ApplySettings()));
     }
 
     private void LoadLogs()
