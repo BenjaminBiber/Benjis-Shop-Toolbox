@@ -4,12 +4,14 @@
         <TargetFramework>net9.0-windows10.0.22000.0</TargetFramework>
         <OutputType>WinExe</OutputType>
         <UseWPF>true</UseWPF>
+        <EnableWindowsTargeting>true</EnableWindowsTargeting>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="BlazorDesktop" Version="9.0.1"/>
+        <PackageReference Include="BlazorDesktop" Version="9.0.1" />
+        <PackageReference Include="MudBlazor" Version="7.3.0" />
     </ItemGroup>
 
 </Project>
