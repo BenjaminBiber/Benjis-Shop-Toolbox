@@ -5,12 +5,52 @@
 
 Welcome to your new app.
 
-<MudButton Color="Color.Primary" OnClick="ShowMessage">Show Status</MudButton>
+<p>Aktuelle IIS Anwendung: @IisAppName</p>
+
+<MudStack Row="true" Spacing="2">
+    <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="StartIisApp">Start</MudButton>
+    <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="StopIisApp">Stop</MudButton>
+    <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="RestartIisApp">Restart</MudButton>
+</MudStack>
 
 @code {
+    private const string IisAppName = "Default Web Site/MyApp"; // Name der IIS Anwendung
+    private readonly TimeSpan RestartDelay = TimeSpan.FromSeconds(5);
 
-    private void ShowMessage()
+    private void StartIisApp()
     {
-        Snackbar.Add("Der Vorgang wurde erfolgreich ausgeführt.", Severity.Normal);
+        try
+        {
+            using var manager = new Microsoft.Web.Administration.ServerManager();
+            var site = manager.Sites[IisAppName];
+            site?.Start();
+            Snackbar.Add($"Anwendung '{IisAppName}' gestartet.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fehler beim Starten: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void StopIisApp()
+    {
+        try
+        {
+            using var manager = new Microsoft.Web.Administration.ServerManager();
+            var site = manager.Sites[IisAppName];
+            site?.Stop();
+            Snackbar.Add($"Anwendung '{IisAppName}' gestoppt.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fehler beim Stoppen: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task RestartIisApp()
+    {
+        StopIisApp();
+        await Task.Delay(RestartDelay);
+        StartIisApp();
     }
 }
