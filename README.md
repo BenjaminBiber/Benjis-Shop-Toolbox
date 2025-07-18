@@ -6,4 +6,5 @@
 - erstellen eines symlinks für das Theme
 - löschen von symlinks von Themes
 - Log filtering
+- Favicon ändern
 - Responsive
