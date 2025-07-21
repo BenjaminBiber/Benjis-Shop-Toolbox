@@ -2,9 +2,10 @@
 @inject ThemeLinkService ThemeService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject SettingsService SettingsService
 
 <MudPaper Class="pa-4" Elevation="4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-2">
         <MudText Typo="Typo.h5">Themes</MudText>
         <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="OpenCloneDialog" />
     </div>
@@ -12,13 +13,14 @@
     {
         foreach (var group in _groupedThemes)
         {
-            <MudText Typo="Typo.h6" Class="mt-4">@group.Key</MudText>
+            <MudText Typo="Typo.h6" Class="mt-2">@group.Key</MudText>
             <MudTable Items="group" Hover="true" Dense="true">
                 <HeaderContent>
                     <MudTh>Name</MudTh>
                     <MudTh>Pfad</MudTh>
                     <MudTh>Link</MudTh>
                     <MudTh></MudTh>
+                    <MudTh>Wird im Shop verwendet</MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="Name">@context.Name</MudTd>
@@ -27,12 +29,15 @@
                     <MudTd>
                         @if (context.LinkExists)
                         {
-                            <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => Remove(context)">Entfernen</MudButton>
+                            <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Error" OnClick="() => Remove(context)">Entfernen</MudButton>
                         }
                         else
                         {
-                            <MudButton Size="Size.Small" Color="Color.Primary" OnClick="() => Create(context)">Anlegen</MudButton>
+                            <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary" OnClick="() => Create(context)">Anlegen</MudButton>
                         }
+                    </MudTd>
+                    <MudTd>
+                        <MudCheckBox Disabled="context.IsThemeOverwrite || !context.LinkExists" Value="context.IsThemeOverwrite" ValueChanged="@((bool t) => ThemeOverwriteChanged(context))" Color="Color.Primary" />
                     </MudTd>
                 </RowTemplate>
             </MudTable>
@@ -42,7 +47,8 @@
 
 @code {
     private IEnumerable<IGrouping<string, ThemeInfo>>? _groupedThemes;
-
+    private ToolboxSettings Settings => SettingsService.Settings;
+    
     protected override void OnInitialized()
     {
         Load();
@@ -56,6 +62,87 @@
             .ToList();
     }
 
+    private void ThemeOverwriteChanged(ThemeInfo info)
+    {
+        ThemeService.SetThemeOverwrite(info);
+        Snackbar.Add($"Theme-Überschreibung für {info.Name} geändert.", Severity.Success);
+        Load();
+        Snackbar.Add($"Theme wurde auf {info.Name} gesetzt.", Severity.Success);
+        if (Settings.RestartShopOnThemeChange)
+        {
+            RestartIisApp().Wait();
+        }
+    }
+    
+    private readonly TimeSpan RestartDelay = TimeSpan.FromSeconds(3);
+    
+    private void StartIisApp()
+    {
+        try
+        {
+            using var manager = new Microsoft.Web.Administration.ServerManager();
+            if (string.IsNullOrWhiteSpace(Settings.IisAppName)) return;
+            var site = manager.Sites[Settings.IisAppName];
+            site?.Start();
+            Snackbar.Add($"Anwendung {Settings.IisAppName} gestartet.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fehler beim Starten: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void StopIisApp()
+    {
+        try
+        {
+            var manager = new Microsoft.Web.Administration.ServerManager();
+            if (string.IsNullOrWhiteSpace(Settings.IisAppName)) return;
+            var site = manager.Sites[Settings.IisAppName];
+            site?.Stop();
+            Snackbar.Add($"Anwendung '{Settings.IisAppName}' gestoppt.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fehler beim Stoppen: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task RestartIisApp()
+    {
+        StopIisApp();
+
+        RecycleAppPool(Settings.IisAppName);
+
+        await Task.Delay(RestartDelay);
+        StartIisApp();
+    }
+    
+    private void RecycleAppPool(string appPoolName)
+    {
+        try
+        {
+            using var manager = new ServerManager();
+            var pool = manager.ApplicationPools.FirstOrDefault(p => p.Name == appPoolName);
+            if (pool == null)
+            {
+                Snackbar.Add($"AppPool '{appPoolName}' nicht gefunden.", Severity.Warning);
+                return;
+            }
+
+            if (pool.State == ObjectState.Stopped)
+                pool.Start();
+            else
+                pool.Recycle();
+
+            Snackbar.Add($"AppPool '{appPoolName}' recycelt.", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fehler beim AppPool-Recycling: {ex.Message}", Severity.Error);
+        }
+    }
+    
     private void Create(ThemeInfo info)
     {
         ThemeService.CreateLink(info);
@@ -74,7 +161,7 @@
     {
         var dlg = DialogService.Show<CloneThemeDialog>("Repo klonen");
         var result = await dlg.Result;
-        if (!result.Cancelled)
+        if (!result.Canceled)
         {
             Snackbar.Add("Repository geklont.", Severity.Success);
             Load();

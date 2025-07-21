@@ -14,6 +14,11 @@ namespace Benjis_Shop_Toolbox.Services
 
         public IEnumerable<ThemeInfo> GetThemes()
         {
+            if (string.IsNullOrEmpty(_settings.Settings.ShopYamlPath))
+            {
+                return new List<ThemeInfo>();
+            }
+            var config = ShopYamlLoader.LoadConfiguration(_settings.Settings.ShopYamlPath);
             var repo = _settings.Settings.RepoPath;
             var shop = _settings.Settings.ShopThemesPath;
             var themes = new List<ThemeInfo>();
@@ -28,13 +33,24 @@ namespace Benjis_Shop_Toolbox.Services
                         var repoName = relative.Split(Path.DirectorySeparatorChar)[0];
                         var linkPath = Path.Combine(shop, name);
                         bool exists = File.Exists(linkPath) || Directory.Exists(linkPath);
-                        themes.Add(new ThemeInfo(name, themeDir, exists, repoName));
+                        themes.Add(new ThemeInfo(name, themeDir, exists, repoName, ShopYamlLoader.IsThemeOverride(config, name)));
                     }
                 }
             }
             return themes;
         }
 
+        public void SetThemeOverwrite(ThemeInfo theme)
+        {
+            if (string.IsNullOrEmpty(_settings.Settings.ShopYamlPath))
+            {
+                return;
+            }
+            var config = ShopYamlLoader.LoadConfiguration(_settings.Settings.ShopYamlPath);
+            config.ThemeOverwrite = theme.Name;
+            ShopYamlLoader.UpdateConfig(_settings.Settings.ShopYamlPath, theme.Name);
+        }
+        
         public void CreateLink(ThemeInfo theme)
         {
             var linkPath = Path.Combine(_settings.Settings.ShopThemesPath, theme.Name);
@@ -47,9 +63,13 @@ namespace Benjis_Shop_Toolbox.Services
         public void RemoveLink(ThemeInfo theme)
         {
             var linkPath = Path.Combine(_settings.Settings.ShopThemesPath, theme.Name);
-            if (File.Exists(linkPath) || Directory.Exists(linkPath))
+            if (File.Exists(linkPath))
             {
                 File.Delete(linkPath);
+            }
+            else if (Directory.Exists(linkPath))
+            {
+                Directory.Delete(linkPath, true); 
             }
         }
 
