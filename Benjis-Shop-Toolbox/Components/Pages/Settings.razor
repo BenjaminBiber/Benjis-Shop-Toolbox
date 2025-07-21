@@ -1,7 +1,9 @@
 @page "/settings"
 @using Benjis_Shop_Toolbox.Models
+@using System.IO
 @inject SettingsService SettingsService
 @inject ISnackbar Snackbar
+@inject FileDialogService FileDialog
 
 <MudPaper Class="pa-4" Elevation="4">
     <MudText Typo="Typo.h5" Class="mb-4">Einstellungen</MudText>
@@ -15,7 +17,8 @@
         }
     </MudSelect>
     <MudTextField @bind-Value="Setting.LogName" Label="Log Name" Variant="Variant.Filled" Class="mb-2" />
-    <MudTextField @bind-Value="Setting.ShopYamlPath" Label="Pfad zur shop.yaml" Variant="Variant.Filled" Class="mb-2" />
+    <MudTextField @bind-Value="Setting.ShopYamlPath" Label="Pfad zur shop.yaml" Variant="Variant.Filled" Class="mb-2"
+                  Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseYaml" />
     <MudSelect T="int" @bind-Value="Setting.AutoRefreshSeconds" Label="Auto Refresh (Sekunden)" Class="mb-2">
         @foreach (var reloadTime in ReloadTime.ReloadTimes)
         {
@@ -25,8 +28,10 @@
     <MudSwitch @bind-Value="Setting.LoadOnStartup" T="bool" Color="Color.Primary">Beim Starten der App die Logs laden</MudSwitch>
     <MudSwitch @bind-Value="Setting.OnlySinceRestart" T="bool" Color="Color.Primary">Nur Logs seit letztem Neustart</MudSwitch>
     <MudSwitch @bind-Value="Setting.RestartShopOnThemeChange" T="bool" Color="Color.Primary">Bei Theme wechsel Shop neustarten</MudSwitch>
-    <MudTextField @bind-Value="Setting.RepoPath" Label="Repo Pfad" Variant="Variant.Filled" Class="mb-2" />
-    <MudTextField @bind-Value="Setting.ShopThemesPath" Label="Shop Themes Pfad" Variant="Variant.Filled" Class="mb-2" />
+    <MudTextField @bind-Value="Setting.RepoPath" Label="Repo Pfad" Variant="Variant.Filled" Class="mb-2"
+                  Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseRepo" />
+    <MudTextField @bind-Value="Setting.ShopThemesPath" Label="Shop Themes Pfad" Variant="Variant.Filled" Class="mb-2"
+                  Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseShop" />
     <MudButton OnClick="Save" Color="Color.Primary" Variant="Variant.Filled" Class="mt-4">Speichern</MudButton>
 </MudPaper>
 
@@ -54,6 +59,33 @@
         else
         {
             Snackbar.Add("Fehler beim Speichern der Einstellungen", Severity.Error);
+        }
+    }
+
+    private void ChooseYaml()
+    {
+        var path = FileDialog.OpenFile("shop.yaml auswählen", "YAML Dateien (*.yaml;*.yml)|*.yaml;*.yml|Alle Dateien (*.*)|*.*", Path.GetDirectoryName(Setting.ShopYamlPath) ?? string.Empty);
+        if (!string.IsNullOrEmpty(path))
+        {
+            Setting.ShopYamlPath = path;
+        }
+    }
+
+    private void ChooseRepo()
+    {
+        var path = FileDialog.OpenFolder("Repo Ordner auswählen", Setting.RepoPath);
+        if (!string.IsNullOrEmpty(path))
+        {
+            Setting.RepoPath = path;
+        }
+    }
+
+    private void ChooseShop()
+    {
+        var path = FileDialog.OpenFolder("Shop Themes Ordner auswählen", Setting.ShopThemesPath);
+        if (!string.IsNullOrEmpty(path))
+        {
+            Setting.ShopThemesPath = path;
         }
     }
 }
