@@ -6,28 +6,56 @@
 
 <div class="row">
     <div class="col-3">
-        <MudText Class="mb-3" Typo="Typo.h6">@Settings.IisAppName</MudText>
+        <MudSelect Value="Settings.IisAppName" ValueChanged="@((string? s) => SettingsService.Save(s))" Label="IIS App" Variant="Variant.Filled" Class="mb-2">
+            @foreach (var site in manager.Sites)
+            {
+                if (site != null)
+                {
+                    <MudSelectItem Value="@site.Name">@site.Name</MudSelectItem>
+                }
+            }
+        </MudSelect>
 
         <MudStack Row="false" Spacing="2">
             <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="StartIisApp">Start</MudButton>
             <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="StopIisApp">Stop</MudButton>
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="RestartIisApp">Restart</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="RestartIisApp">Neustart</MudButton>
         </MudStack>
 
     </div>
     <div class="col-9">
-        @if (_logs.Any())
-        {
-            <MudStack Row="true" Spacing="2" Class="mb-4">
-                <MudSelect T="LogLevel" @bind-Value="_selectedLevel" Label="Ebene">
+        <div class="row mb-3">
+            <div class="col-5"></div>
+            <div class="col-2">
+                <MudSelect T="LogLevel" Value="_selectedLevel" ValueChanged="@((LogLevel l) => LoadLogs(l))" Label="Ebene">
                     @foreach (var level in Enum.GetValues<LogLevel>())
                     {
-                        <MudSelectItem Value="@level">@level</MudSelectItem>
+                        <MudSelectItem Value="@level">@level.GetDescription()</MudSelectItem>
                     }
                 </MudSelect>
-                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="LoadLogs">Laden</MudButton>
-            </MudStack>
-            
+            </div>
+            <div class="col-2">
+                <MudSelect T="ReloadOption" Value="_logOptions" ValueChanged="@((ReloadOption l) => LoadLogs(l))" Label="Zeitpunkt">
+                    @foreach (var level in Enum.GetValues<ReloadOption>())
+                    {
+                        <MudSelectItem Value="@level">@level.GetDescription()</MudSelectItem>
+                    }
+                </MudSelect>
+            </div>
+            <div class="col-2">
+                <MudSelect T="double" Value="_refreshSeconds" ValueChanged="@((double l) => HandleTimer(l))" Label="Logs neu laden">
+                    @foreach (var reloadTime in ReloadTime.ReloadTimes)
+                    {
+                        <MudSelectItem Value="@reloadTime.Value.TotalSeconds">@reloadTime.Key</MudSelectItem>
+                    }
+                </MudSelect>
+            </div>
+            <div class="col-1">
+                <MudIconButton Icon="@Icons.Material.Filled.Autorenew" OnClick="LoadLogs"></MudIconButton>
+            </div>
+        </div>
+        @if (_logs.Any())
+        {
             <MudTable Items="_logs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
                 <HeaderContent>
                     <MudTh>Zeit</MudTh>
@@ -43,14 +71,12 @@
                 </RowTemplate>
             </MudTable>
 
-        }else
+        }
+        else
         {
             <div class="row">
-                <div class="col-11 d-flex align-items-center justify-content-center">
+                <div class="col d-flex align-items-center justify-content-center">
                     <MudAlert Class="w-100">Keine Logs gefunden.</MudAlert>
-                </div>
-                <div class="col-1 d-flex align-items-center justify-content-center">
-                    <MudIconButton Icon="@Icons.Material.Filled.Autorenew" OnClick="LoadLogs"></MudIconButton>
                 </div>
             </div>
         }
@@ -81,7 +107,7 @@
     {
         try
         {
-            using var manager = new Microsoft.Web.Administration.ServerManager();
+            manager = new Microsoft.Web.Administration.ServerManager();
             if (string.IsNullOrWhiteSpace(Settings.IisAppName)) return;
             var site = manager.Sites[Settings.IisAppName];
             site?.Stop();
@@ -111,6 +137,8 @@
     private bool _onlySinceRestart;
     private DateTime _lastShopRestart = AppInfo.StartTime;
     private System.Timers.Timer? _timer;
+    private ReloadOption _logOptions = ReloadOption.SeitStartDerAnwendung;
+    private ServerManager manager = new ServerManager();
 
     protected override void OnInitialized()
     {
@@ -130,6 +158,7 @@
         _autoRefresh = Settings.AutoRefreshEnabled;
         _refreshSeconds = Settings.AutoRefreshSeconds;
         _onlySinceRestart = Settings.OnlySinceRestart;
+        _logOptions = _onlySinceRestart ? ReloadOption.SeitLetztemNeuladen : ReloadOption.SeitStartDerAnwendung;
         if (Settings.LoadOnStartup)
         {
             LoadLogs();
@@ -137,6 +166,20 @@
         StartTimer();
     }
 
+    private void HandleTimer(double seconds)
+    {
+        _refreshSeconds = (int)seconds;
+        if(_refreshSeconds <= 0)
+        {
+            _autoRefresh = false;
+        }
+        else
+        {
+            _autoRefresh = true;
+        }
+        StartTimer();
+    }
+    
     private void ShowSettingsDialog()
     {
         var dialog = DialogService.Show<SettingsDialog>("Einstellungen");
@@ -146,6 +189,28 @@
     private void LoadLogs()
     {
         var since = _onlySinceRestart ? _lastShopRestart : AppInfo.StartTime;
+        _logs = _logService.GetLogs(since, _selectedLevel);
+    }
+    
+    private void LoadLogs(LogLevel logLevel)
+    {
+        var since = _onlySinceRestart ? _lastShopRestart : AppInfo.StartTime;
+        _selectedLevel = logLevel;
+        _logs = _logService.GetLogs(since, logLevel);
+    }
+    
+    private void LoadLogs(ReloadOption logLevel)
+    {
+        _logOptions = logLevel;
+        if (logLevel == ReloadOption.SeitStartDerAnwendung)
+        {
+            _onlySinceRestart = false;
+        }
+        else if (logLevel == ReloadOption.SeitLetztemNeuladen)
+        {
+            _onlySinceRestart = true;
+        }
+        var since = logLevel == ReloadOption.AlleLogs ? DateTime.MinValue  : _onlySinceRestart ? _lastShopRestart : AppInfo.StartTime;
         _logs = _logService.GetLogs(since, _selectedLevel);
     }
 

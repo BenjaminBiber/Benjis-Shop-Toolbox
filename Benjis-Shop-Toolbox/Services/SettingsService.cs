@@ -41,8 +41,13 @@ namespace Benjis_Shop_Toolbox.Services
             return new ToolboxSettings();
         }
 
-        public void Save()
+        public void Save(string? iis = null)
         {
+            if (!string.IsNullOrEmpty(iis))
+            {
+                Settings.IisAppName = iis;
+            }
+            
             var json = JsonSerializer.Serialize(Settings, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(_filePath, json);
             IsConfigured = !string.IsNullOrWhiteSpace(Settings.IisAppName) && !string.IsNullOrWhiteSpace(Settings.LogName);

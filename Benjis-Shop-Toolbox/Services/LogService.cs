@@ -12,7 +12,7 @@ namespace Benjis_Shop_Toolbox.Services
     public class LogService
     {
         private readonly string _logName;
-
+        
         public LogService(string logName)
         {
             _logName = logName;
