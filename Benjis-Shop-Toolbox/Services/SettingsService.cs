@@ -41,16 +41,25 @@ namespace Benjis_Shop_Toolbox.Services
             return new ToolboxSettings();
         }
 
-        public void Save(string? iis = null)
+        public void Save(string? iis = null, string? repoPath = null, string? shopPath = null)
         {
             if (!string.IsNullOrEmpty(iis))
             {
                 Settings.IisAppName = iis;
             }
+            if (!string.IsNullOrEmpty(repoPath))
+            {
+                Settings.RepoPath = repoPath;
+            }
+            if (!string.IsNullOrEmpty(shopPath))
+            {
+                Settings.ShopThemesPath = shopPath;
+            }
             
             var json = JsonSerializer.Serialize(Settings, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(_filePath, json);
-            IsConfigured = !string.IsNullOrWhiteSpace(Settings.IisAppName) && !string.IsNullOrWhiteSpace(Settings.LogName);
+            IsConfigured = !string.IsNullOrWhiteSpace(Settings.IisAppName) &&
+                !string.IsNullOrWhiteSpace(Settings.LogName);
         }
     }
 }

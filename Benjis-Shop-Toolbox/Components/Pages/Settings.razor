@@ -23,6 +23,8 @@
     <MudSwitch @bind-Value="Setting.AutoRefreshEnabled" T="bool" Color="Color.Primary">Automatisches Aktualisieren</MudSwitch>
     <MudSwitch @bind-Value="Setting.LoadOnStartup" T="bool" Color="Color.Primary">Automatisch laden</MudSwitch>
     <MudSwitch @bind-Value="Setting.OnlySinceRestart" T="bool" Color="Color.Primary">Nur Logs seit letztem Neustart</MudSwitch>
+    <MudTextField @bind-Value="Setting.RepoPath" Label="Repo Pfad" Variant="Variant.Filled" Class="mb-2" />
+    <MudTextField @bind-Value="Setting.ShopThemesPath" Label="Shop Themes Pfad" Variant="Variant.Filled" Class="mb-2" />
     <MudButton OnClick="Save" Color="Color.Primary" Variant="Variant.Filled" Class="mt-4">Speichern</MudButton>
 </MudPaper>
 

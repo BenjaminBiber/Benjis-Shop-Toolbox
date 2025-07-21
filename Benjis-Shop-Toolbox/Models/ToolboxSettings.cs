@@ -8,5 +8,7 @@ namespace Benjis_Shop_Toolbox.Models
         public bool AutoRefreshEnabled { get; set; }
         public bool LoadOnStartup { get; set; }
         public bool OnlySinceRestart { get; set; }
+        public string RepoPath { get; set; } = "/Pfad/zum/repo-ordner";
+        public string ShopThemesPath { get; set; } = "/Pfad/zum/shop-themes-ordner";
     }
 }
