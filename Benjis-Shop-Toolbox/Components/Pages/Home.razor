@@ -27,7 +27,7 @@
         <div class="row mb-3">
             <div class="col-5"></div>
             <div class="col-2">
-                <MudSelect T="LogLevel" Value="_selectedLevel" ValueChanged="@((LogLevel l) => LoadLogs(l))" Label="Ebene">
+                <MudSelect T="LogLevel" Value="_selectedLevel" ValueChanged="@(async (LogLevel l) => await LoadLogs(l))" Label="Ebene">
                     @foreach (var level in Enum.GetValues<LogLevel>())
                     {
                         <MudSelectItem Value="@level">@level.GetDescription()</MudSelectItem>
@@ -35,7 +35,7 @@
                 </MudSelect>
             </div>
             <div class="col-2">
-                <MudSelect T="ReloadOption" Value="_logOptions" ValueChanged="@((ReloadOption l) => LoadLogs(l))" Label="Zeitpunkt">
+                <MudSelect T="ReloadOption" Value="_logOptions" ValueChanged="@(async (ReloadOption l) => await LoadLogs(l))" Label="Zeitpunkt">
                     @foreach (var level in Enum.GetValues<ReloadOption>())
                     {
                         <MudSelectItem Value="@level">@level.GetDescription()</MudSelectItem>
@@ -51,12 +51,23 @@
                 </MudSelect>
             </div>
             <div class="col-1">
-                <MudIconButton Icon="@Icons.Material.Filled.Autorenew" OnClick="LoadLogs"></MudIconButton>
+                <MudIconButton Icon="@Icons.Material.Filled.Autorenew" OnClick="@(async () => await LoadLogs())"></MudIconButton>
             </div>
         </div>
-        @if (_logs.Any())
+        <div class="row mb-2">
+            <div class="col-12">
+                <MudTextField @bind-Value="_searchText" Immediate="true" Variant="Variant.Filled" Label="Suche" Class="w-100" />
+            </div>
+        </div>
+        @if (_isLoading)
         {
-            <MudTable Style="height: 85dvh" Height="95%" FixedFooter="true" FixedHeader="true" Items="_logs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
+            <div class="d-flex justify-content-center my-3">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        @if (FilteredLogs.Any())
+        {
+            <MudTable Style="height: 85dvh" Height="95%" FixedFooter="true" FixedHeader="true" Items="FilteredLogs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
                 <HeaderContent>
                     <MudTh>Zeit</MudTh>
                     <MudTh>Ebene</MudTh>
@@ -136,7 +147,7 @@
         StartIisApp();
 
         _lastShopRestart = DateTime.Now;
-        LoadLogs();
+        await LoadLogs();
     }
 
     
@@ -176,12 +187,18 @@
     private System.Timers.Timer? _timer;
     private ReloadOption _logOptions = ReloadOption.SeitStartDerAnwendung;
     private ServerManager manager = new ServerManager();
+    private string _searchText = string.Empty;
+    private bool _isLoading;
 
-    protected override void OnInitialized()
+    private IEnumerable<LogEntry> FilteredLogs => string.IsNullOrWhiteSpace(_searchText)
+        ? _logs
+        : _logs.Where(l => l.Message.Contains(_searchText, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
     {
         if (SettingsService.IsConfigured)
         {
-            ApplySettings();
+            await ApplySettings();
         }
         else
         {
@@ -189,7 +206,7 @@
         }
     }
 
-    private void ApplySettings()
+    private async Task ApplySettings()
     {
         _logService = new LogService(Settings.LogName!);
         _autoRefresh = Settings.AutoRefreshEnabled;
@@ -198,7 +215,7 @@
         _logOptions = _onlySinceRestart ? ReloadOption.SeitLetztemNeuladen : ReloadOption.SeitStartDerAnwendung;
         if (Settings.LoadOnStartup)
         {
-            LoadLogs();
+            await LoadLogs();
         }
         StartTimer();
     }
@@ -220,24 +237,34 @@
     private void ShowSettingsDialog()
     {
         var dialog = DialogService.Show<SettingsDialog>("Einstellungen");
-        dialog.Result.ContinueWith(_ => InvokeAsync(() => ApplySettings()));
+        dialog.Result.ContinueWith(_ => InvokeAsync(async () => await ApplySettings()));
     }
 
-    private void LoadLogs()
+    private async Task LoadLogs()
     {
+        _isLoading = true;
+        StateHasChanged();
         var since = _onlySinceRestart ? _lastShopRestart : AppInfo.StartTime;
-        _logs = _logService.GetLogs(since, _selectedLevel);
+        _logs = await Task.Run(() => _logService.GetLogs(since, _selectedLevel));
+        _isLoading = false;
+        StateHasChanged();
     }
-    
-    private void LoadLogs(LogLevel logLevel)
+
+    private async Task LoadLogs(LogLevel logLevel)
     {
+        _isLoading = true;
+        StateHasChanged();
         var since = _onlySinceRestart ? _lastShopRestart : AppInfo.StartTime;
         _selectedLevel = logLevel;
-        _logs = _logService.GetLogs(since, logLevel);
+        _logs = await Task.Run(() => _logService.GetLogs(since, logLevel));
+        _isLoading = false;
+        StateHasChanged();
     }
-    
-    private void LoadLogs(ReloadOption logLevel)
+
+    private async Task LoadLogs(ReloadOption logLevel)
     {
+        _isLoading = true;
+        StateHasChanged();
         _logOptions = logLevel;
         if (logLevel == ReloadOption.SeitStartDerAnwendung)
         {
@@ -248,7 +275,9 @@
             _onlySinceRestart = true;
         }
         var since = logLevel == ReloadOption.AlleLogs ? DateTime.MinValue  : _onlySinceRestart ? _lastShopRestart : AppInfo.StartTime;
-        _logs = _logService.GetLogs(since, _selectedLevel);
+        _logs = await Task.Run(() => _logService.GetLogs(since, _selectedLevel));
+        _isLoading = false;
+        StateHasChanged();
     }
 
     private void StartTimer()
@@ -259,9 +288,9 @@
             _timer = new System.Timers.Timer(_refreshSeconds * 1000);
             _timer.Elapsed += async (_, _) =>
             {
-                await InvokeAsync(() =>
+                await InvokeAsync(async () =>
                 {
-                    LoadLogs();
+                    await LoadLogs();
                     StateHasChanged();
                 });
             };

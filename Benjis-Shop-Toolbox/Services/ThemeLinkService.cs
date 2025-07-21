@@ -1,6 +1,7 @@
 using System.IO;
 using System.Diagnostics;
 using Benjis_Shop_Toolbox.Models;
+using System.Linq;
 
 namespace Benjis_Shop_Toolbox.Services
 {
@@ -69,7 +70,23 @@ namespace Benjis_Shop_Toolbox.Services
             }
             else if (Directory.Exists(linkPath))
             {
-                Directory.Delete(linkPath, true); 
+                Directory.Delete(linkPath, true);
+            }
+        }
+
+        public void LinkAndOverwrite(string repoName)
+        {
+            var themes = GetThemes().Where(t => t.Repo == repoName).ToList();
+            foreach (var theme in themes)
+            {
+                if (!theme.LinkExists)
+                {
+                    CreateLink(theme);
+                }
+            }
+            if (themes.Count > 0)
+            {
+                SetThemeOverwrite(themes[0]);
             }
         }
 
