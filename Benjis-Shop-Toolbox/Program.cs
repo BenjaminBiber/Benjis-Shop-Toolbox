@@ -11,6 +11,7 @@ AppInfo.StartTime = DateTime.Now;
 builder.Services.AddMudServices();
 builder.Services.AddSingleton<SettingsService>();
 builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<FileDialogService>();
 builder.Services.AddScoped<ThemeLinkService>();
 
 builder.RootComponents.Add<Routes>("#app");
