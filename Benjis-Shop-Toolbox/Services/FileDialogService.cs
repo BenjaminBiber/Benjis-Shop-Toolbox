@@ -1,6 +1,7 @@
 using System;
 using System.Windows.Forms;
 using Microsoft.Win32;
+using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 
 namespace Benjis_Shop_Toolbox.Services
 {
