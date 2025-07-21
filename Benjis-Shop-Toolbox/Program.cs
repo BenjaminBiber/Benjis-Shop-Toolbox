@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Components.Web;
+using Microsoft.AspNetCore.Components.Web;
 using BlazorDesktop.Hosting;
 using Benjis_Shop_Toolbox.Components;
 using MudBlazor.Services;
@@ -21,3 +21,4 @@ if (builder.HostEnvironment.IsDevelopment())
 }
 
 await builder.Build().RunAsync();
+

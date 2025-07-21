@@ -1,9 +1,13 @@
 @page "/themes"
 @inject ThemeLinkService ThemeService
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <MudPaper Class="pa-4" Elevation="4">
-    <MudText Typo="Typo.h5" Class="mb-4">Themes</MudText>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <MudText Typo="Typo.h5">Themes</MudText>
+        <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="OpenCloneDialog" />
+    </div>
     <MudTable Items="_themes" Hover="true">
         <HeaderContent>
             <MudTh>Name</MudTh>
@@ -54,5 +58,16 @@
         ThemeService.RemoveLink(info);
         Snackbar.Add($"Link für {info.Name} entfernt.", Severity.Success);
         Load();
+    }
+
+    private async Task OpenCloneDialog()
+    {
+        var dlg = DialogService.Show<CloneThemeDialog>("Repo klonen");
+        var result = await dlg.Result;
+        if (!result.Cancelled)
+        {
+            Snackbar.Add("Repository geklont.", Severity.Success);
+            Load();
+        }
     }
 }

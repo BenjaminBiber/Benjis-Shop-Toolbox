@@ -1,0 +1,27 @@
+@inject ThemeLinkService ThemeService
+<MudDialog MaxWidth="MaxWidth.Small" FullWidth="true">
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-4">Repository klonen</MudText>
+        <MudTextField @bind-Value="_gitUrl" Label="Git URL" Variant="Variant.Filled" Class="mb-2" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="Clone">Klonen</MudButton>
+        <MudButton Color="Color.Default" OnClick="Cancel">Abbrechen</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    private string _gitUrl = string.Empty;
+
+    private async Task Clone()
+    {
+        if (!string.IsNullOrWhiteSpace(_gitUrl))
+        {
+            await ThemeService.CloneRepositoryAsync(_gitUrl);
+        }
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    void Cancel() => MudDialog.Cancel();
+}
