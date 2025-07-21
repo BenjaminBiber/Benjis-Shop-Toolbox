@@ -6,7 +6,7 @@
 
 <div class="row h-100">
     <div class="col-3 h-100">
-        <MudSelect Value="Settings.IisAppName" ValueChanged="@((string? s) => SettingsService.Save(s))" Label="IIS App" Variant="Variant.Filled" Class="mb-2">
+        <MudSelect Value="Settings.IisAppName" ValueChanged="@((string? s) => SettingsService.Save(s))" Label="IIS App" Variant="Variant.Text" Class="mb-2">
             @foreach (var site in manager.Sites)
             {
                 if (site != null)
@@ -25,7 +25,9 @@
     </div>
     <div class="col-9 h-100">
         <div class="row mb-3">
-            <div class="col-5"></div>
+            <div class="col-5">
+                <MudTextField Variant="Variant.Text" @bind-Value="_searchText" Immediate="true" Label="Suche" Class="w-100"/>
+            </div>
             <div class="col-2">
                 <MudSelect T="LogLevel" Value="_selectedLevel" ValueChanged="@(async (LogLevel l) => await LoadLogs(l))" Label="Ebene">
                     @foreach (var level in Enum.GetValues<LogLevel>())
@@ -52,11 +54,6 @@
             </div>
             <div class="col-1">
                 <MudIconButton Icon="@Icons.Material.Filled.Autorenew" OnClick="@(async () => await LoadLogs())"></MudIconButton>
-            </div>
-        </div>
-        <div class="row mb-2">
-            <div class="col-12">
-                <MudTextField @bind-Value="_searchText" Immediate="true" Variant="Variant.Filled" Label="Suche" Class="w-100" />
             </div>
         </div>
         @if (_isLoading)
