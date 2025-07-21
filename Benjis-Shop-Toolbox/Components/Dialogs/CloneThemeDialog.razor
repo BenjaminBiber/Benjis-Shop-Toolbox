@@ -1,8 +1,10 @@
+@using System.IO
 @inject ThemeLinkService ThemeService
 <MudDialog MaxWidth="MaxWidth.Small" FullWidth="true">
     <DialogContent>
         <MudText Typo="Typo.h6" Class="mb-4">Repository klonen</MudText>
         <MudTextField @bind-Value="_gitUrl" Label="Git URL" Variant="Variant.Filled" Class="mb-2" />
+        <MudCheckBox @bind-Checked="_linkAfterClone" Color="Color.Primary" Label="Als Symlink hinzufügen und in shop.yaml eintragen" />
     </DialogContent>
     <DialogActions>
         <MudButton Color="Color.Primary" OnClick="Clone">Klonen</MudButton>
@@ -13,12 +15,19 @@
 @code {
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
     private string _gitUrl = string.Empty;
+    private bool _linkAfterClone;
 
     private async Task Clone()
     {
         if (!string.IsNullOrWhiteSpace(_gitUrl))
         {
-            await ThemeService.CloneRepositoryAsync(_gitUrl);
+            var success = await ThemeService.CloneRepositoryAsync(_gitUrl);
+            if (success && _linkAfterClone)
+            {
+                var repoName = Path.GetFileNameWithoutExtension(_gitUrl.TrimEnd('/')
+                    .Split('/').Last());
+                ThemeService.LinkAndOverwrite(repoName);
+            }
         }
         MudDialog.Close(DialogResult.Ok(true));
     }
