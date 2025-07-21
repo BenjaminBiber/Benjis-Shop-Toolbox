@@ -1,4 +1,5 @@
 using System.IO;
+using System.Diagnostics;
 using Benjis_Shop_Toolbox.Models;
 
 namespace Benjis_Shop_Toolbox.Services
@@ -48,6 +49,33 @@ namespace Benjis_Shop_Toolbox.Services
             {
                 File.Delete(linkPath);
             }
+        }
+
+        public async Task<bool> CloneRepositoryAsync(string gitUrl)
+        {
+            if (string.IsNullOrWhiteSpace(gitUrl))
+                return false;
+
+            var repoFolder = _settings.Settings.RepoPath;
+            Directory.CreateDirectory(repoFolder);
+
+            var namePart = Path.GetFileNameWithoutExtension(gitUrl.TrimEnd('/')
+                .Split('/').Last());
+            var targetDir = Path.Combine(repoFolder, namePart);
+            if (Directory.Exists(targetDir))
+                return false;
+
+            var psi = new ProcessStartInfo("git", $"clone {gitUrl} \"{targetDir}\"")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false
+            };
+            using var proc = Process.Start(psi);
+            if (proc == null)
+                return false;
+            await proc.WaitForExitAsync();
+            return proc.ExitCode == 0;
         }
     }
 }
