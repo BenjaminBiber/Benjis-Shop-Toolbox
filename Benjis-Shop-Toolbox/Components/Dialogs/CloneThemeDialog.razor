@@ -1,5 +1,6 @@
 @using System.IO
 @inject ThemeLinkService ThemeService
+@inject ISnackbar Snackbar
 <MudDialog MaxWidth="MaxWidth.Small" FullWidth="true">
     <DialogContent>
         <MudText Typo="Typo.h6" Class="mb-4">Repository klonen</MudText>
@@ -27,6 +28,13 @@
                 var repoName = Path.GetFileNameWithoutExtension(_gitUrl.TrimEnd('/')
                     .Split('/').Last());
                 ThemeService.LinkAndOverwrite(repoName);
+            }
+
+            if (!success)
+            {
+                Snackbar.Add("Klonen fehlgeschlagen", Severity.Error);
+                MudDialog.Close(DialogResult.Ok(false));
+                return;
             }
         }
         MudDialog.Close(DialogResult.Ok(true));

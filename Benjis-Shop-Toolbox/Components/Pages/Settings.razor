@@ -46,7 +46,14 @@
         {
             Setting.AutoRefreshEnabled = false;
         }
-        SettingsService.Save();
-        Snackbar.Add("Einstellungen gespeichert", Severity.Success);
+        var success = SettingsService.Save();
+        if (success)
+        {
+            Snackbar.Add("Einstellungen gespeichert", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add("Fehler beim Speichern der Einstellungen", Severity.Error);
+        }
     }
 }
