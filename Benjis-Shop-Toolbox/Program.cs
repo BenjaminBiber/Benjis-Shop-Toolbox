@@ -10,6 +10,7 @@ AppInfo.StartTime = DateTime.Now;
 
 builder.Services.AddMudServices();
 builder.Services.AddSingleton<SettingsService>();
+builder.Services.AddSingleton<ThemeLinkService>();
 
 builder.RootComponents.Add<Routes>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");

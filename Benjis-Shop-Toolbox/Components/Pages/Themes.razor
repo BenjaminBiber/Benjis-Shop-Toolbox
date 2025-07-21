@@ -1,0 +1,58 @@
+@page "/themes"
+@inject ThemeLinkService ThemeService
+@inject ISnackbar Snackbar
+
+<MudPaper Class="pa-4" Elevation="4">
+    <MudText Typo="Typo.h5" Class="mb-4">Themes</MudText>
+    <MudTable Items="_themes" Hover="true">
+        <HeaderContent>
+            <MudTh>Name</MudTh>
+            <MudTh>Pfad</MudTh>
+            <MudTh>Link</MudTh>
+            <MudTh></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Name">@context.Name</MudTd>
+            <MudTd DataLabel="Pfad">@context.Path</MudTd>
+            <MudTd DataLabel="Link">@(context.LinkExists ? "Ja" : "Nein")</MudTd>
+            <MudTd>
+                @if (context.LinkExists)
+                {
+                    <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => Remove(context)">Entfernen</MudButton>
+                }
+                else
+                {
+                    <MudButton Size="Size.Small" Color="Color.Primary" OnClick="() => Create(context)">Anlegen</MudButton>
+                }
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+</MudPaper>
+
+@code {
+    private IEnumerable<ThemeInfo> _themes = Array.Empty<ThemeInfo>();
+
+    protected override void OnInitialized()
+    {
+        Load();
+    }
+
+    private void Load()
+    {
+        _themes = ThemeService.GetThemes();
+    }
+
+    private void Create(ThemeInfo info)
+    {
+        ThemeService.CreateLink(info);
+        Snackbar.Add($"Link für {info.Name} erstellt.", Severity.Success);
+        Load();
+    }
+
+    private void Remove(ThemeInfo info)
+    {
+        ThemeService.RemoveLink(info);
+        Snackbar.Add($"Link für {info.Name} entfernt.", Severity.Success);
+        Load();
+    }
+}
