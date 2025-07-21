@@ -1,6 +1,7 @@
 @page "/settings"
 @using Benjis_Shop_Toolbox.Models
 @inject SettingsService SettingsService
+@inject ISnackbar Snackbar
 
 <MudPaper Class="pa-4" Elevation="4">
     <MudText Typo="Typo.h5" Class="mb-4">Einstellungen</MudText>
@@ -14,15 +15,16 @@
         }
     </MudSelect>
     <MudTextField @bind-Value="Setting.LogName" Label="Log Name" Variant="Variant.Filled" Class="mb-2" />
+    <MudTextField @bind-Value="Setting.ShopYamlPath" Label="Pfad zur shop.yaml" Variant="Variant.Filled" Class="mb-2" />
     <MudSelect T="int" @bind-Value="Setting.AutoRefreshSeconds" Label="Auto Refresh (Sekunden)" Class="mb-2">
         @foreach (var reloadTime in ReloadTime.ReloadTimes)
         {
             <MudSelectItem Value="@(Int32.Parse(reloadTime.Value.TotalSeconds.ToString()))">@reloadTime.Key</MudSelectItem>
         }
     </MudSelect>
-    <MudSwitch @bind-Value="Setting.AutoRefreshEnabled" T="bool" Color="Color.Primary">Automatisches Aktualisieren</MudSwitch>
-    <MudSwitch @bind-Value="Setting.LoadOnStartup" T="bool" Color="Color.Primary">Automatisch laden</MudSwitch>
+    <MudSwitch @bind-Value="Setting.LoadOnStartup" T="bool" Color="Color.Primary">Beim Starten der App die Logs laden</MudSwitch>
     <MudSwitch @bind-Value="Setting.OnlySinceRestart" T="bool" Color="Color.Primary">Nur Logs seit letztem Neustart</MudSwitch>
+    <MudSwitch @bind-Value="Setting.RestartShopOnThemeChange" T="bool" Color="Color.Primary">Bei Theme wechsel Shop neustarten</MudSwitch>
     <MudTextField @bind-Value="Setting.RepoPath" Label="Repo Pfad" Variant="Variant.Filled" Class="mb-2" />
     <MudTextField @bind-Value="Setting.ShopThemesPath" Label="Shop Themes Pfad" Variant="Variant.Filled" Class="mb-2" />
     <MudButton OnClick="Save" Color="Color.Primary" Variant="Variant.Filled" Class="mt-4">Speichern</MudButton>
@@ -39,6 +41,12 @@
     
     private void Save()
     {
+        Setting.AutoRefreshEnabled = true;
+        if (Setting.AutoRefreshSeconds <= 0)
+        {
+            Setting.AutoRefreshEnabled = false;
+        }
         SettingsService.Save();
+        Snackbar.Add("Einstellungen gespeichert", Severity.Success);
     }
 }

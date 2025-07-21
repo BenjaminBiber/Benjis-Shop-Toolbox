@@ -4,8 +4,8 @@
 @inject SettingsService SettingsService
 @implements IDisposable
 
-<div class="row">
-    <div class="col-3">
+<div class="row h-100">
+    <div class="col-3 h-100">
         <MudSelect Value="Settings.IisAppName" ValueChanged="@((string? s) => SettingsService.Save(s))" Label="IIS App" Variant="Variant.Filled" Class="mb-2">
             @foreach (var site in manager.Sites)
             {
@@ -23,7 +23,7 @@
         </MudStack>
 
     </div>
-    <div class="col-9">
+    <div class="col-9 h-100">
         <div class="row mb-3">
             <div class="col-5"></div>
             <div class="col-2">
@@ -56,7 +56,7 @@
         </div>
         @if (_logs.Any())
         {
-            <MudTable Items="_logs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
+            <MudTable Style="height: 85dvh" Height="95%" FixedFooter="true" FixedHeader="true" Items="_logs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
                 <HeaderContent>
                     <MudTh>Zeit</MudTh>
                     <MudTh>Ebene</MudTh>
@@ -69,6 +69,13 @@
                     </MudTd>
                     <MudTd DataLabel="Nachricht">@context.Message</MudTd>
                 </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100, int.MaxValue }"
+                                   RowsPerPageString="Logs pro Seite"
+                                   InfoFormat="{first_item}-{last_item} von {all_items}"
+                                   AllItemsText="Alle"
+                                   HorizontalAlignment="HorizontalAlignment.Right"/>
+                </PagerContent>
             </MudTable>
 
         }
@@ -119,15 +126,45 @@
         }
     }
 
-    private async Task RestartIisApp()
+    public async Task RestartIisApp()
     {
         StopIisApp();
+
+        RecycleAppPool(Settings.IisAppName);
+
         await Task.Delay(RestartDelay);
         StartIisApp();
+
         _lastShopRestart = DateTime.Now;
         LoadLogs();
     }
 
+    
+    private void RecycleAppPool(string appPoolName)
+    {
+        try
+        {
+            using var manager = new ServerManager();
+            var pool = manager.ApplicationPools.FirstOrDefault(p => p.Name == appPoolName);
+            if (pool == null)
+            {
+                Snackbar.Add($"AppPool '{appPoolName}' nicht gefunden.", Severity.Warning);
+                return;
+            }
+
+            if (pool.State == ObjectState.Stopped)
+                pool.Start();
+            else
+                pool.Recycle();
+
+            Snackbar.Add($"AppPool '{appPoolName}' recycelt.", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fehler beim AppPool-Recycling: {ex.Message}", Severity.Error);
+        }
+    }
+    
     // Log viewer fields
     private LogService _logService = default!;
     private IEnumerable<LogEntry> _logs = Enumerable.Empty<LogEntry>();
