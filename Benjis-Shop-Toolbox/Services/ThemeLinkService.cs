@@ -24,9 +24,11 @@ namespace Benjis_Shop_Toolbox.Services
                     foreach (var themeDir in Directory.EnumerateDirectories(dir))
                     {
                         var name = Path.GetFileName(themeDir);
+                        var relative = Path.GetRelativePath(repo, themeDir);
+                        var repoName = relative.Split(Path.DirectorySeparatorChar)[0];
                         var linkPath = Path.Combine(shop, name);
                         bool exists = File.Exists(linkPath) || Directory.Exists(linkPath);
-                        themes.Add(new ThemeInfo(name, themeDir, exists));
+                        themes.Add(new ThemeInfo(name, themeDir, exists, repoName));
                     }
                 }
             }
