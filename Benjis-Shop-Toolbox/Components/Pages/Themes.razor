@@ -67,7 +67,6 @@
         ThemeService.SetThemeOverwrite(info);
         Snackbar.Add($"Theme-Überschreibung für {info.Name} geändert.", Severity.Success);
         Load();
-        Snackbar.Add($"Theme wurde auf {info.Name} gesetzt.", Severity.Success);
         if (Settings.RestartShopOnThemeChange)
         {
             RestartIisApp().Wait();
@@ -146,14 +145,12 @@
     private void Create(ThemeInfo info)
     {
         ThemeService.CreateLink(info);
-        Snackbar.Add($"Link für {info.Name} erstellt.", Severity.Success);
         Load();
     }
 
     private void Remove(ThemeInfo info)
     {
         ThemeService.RemoveLink(info);
-        Snackbar.Add($"Link für {info.Name} entfernt.", Severity.Success);
         Load();
     }
 
@@ -163,7 +160,6 @@
         var result = await dlg.Result;
         if (!result.Canceled)
         {
-            Snackbar.Add("Repository geklont.", Severity.Success);
             Load();
         }
     }
