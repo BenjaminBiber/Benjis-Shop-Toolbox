@@ -4,9 +4,22 @@
 
 <MudPaper Class="pa-4" Elevation="4">
     <MudText Typo="Typo.h5" Class="mb-4">Einstellungen</MudText>
-    <MudTextField @bind-Value="Setting.IisAppName" Label="IIS App Name" Variant="Variant.Filled" Class="mb-2" />
+    <MudSelect @bind-Value="Setting.IisAppName" Label="IIS App Name" Variant="Variant.Filled" Class="mb-2">
+        @foreach (var site in _manager.Sites)
+        {
+            if (site != null)
+            {
+                <MudSelectItem Value="@site.Name">@site.Name</MudSelectItem>
+            }
+        }
+    </MudSelect>
     <MudTextField @bind-Value="Setting.LogName" Label="Log Name" Variant="Variant.Filled" Class="mb-2" />
-    <MudNumericField T="int" @bind-Value="Setting.AutoRefreshSeconds" Label="Auto Refresh (Sekunden)" Class="mb-2" />
+    <MudSelect T="int" @bind-Value="Setting.AutoRefreshSeconds" Label="Auto Refresh (Sekunden)" Class="mb-2">
+        @foreach (var reloadTime in ReloadTime.ReloadTimes)
+        {
+            <MudSelectItem Value="@(Int32.Parse(reloadTime.Value.TotalSeconds.ToString()))">@reloadTime.Key</MudSelectItem>
+        }
+    </MudSelect>
     <MudSwitch @bind-Value="Setting.AutoRefreshEnabled" T="bool" Color="Color.Primary">Automatisches Aktualisieren</MudSwitch>
     <MudSwitch @bind-Value="Setting.LoadOnStartup" T="bool" Color="Color.Primary">Automatisch laden</MudSwitch>
     <MudSwitch @bind-Value="Setting.OnlySinceRestart" T="bool" Color="Color.Primary">Nur Logs seit letztem Neustart</MudSwitch>
@@ -15,7 +28,13 @@
 
 @code {
     private ToolboxSettings Setting => SettingsService.Settings;
-
+    private ServerManager _manager = new ServerManager();
+    
+    protected override void OnInitialized()
+    {
+        _manager = new Microsoft.Web.Administration.ServerManager();
+    }
+    
     private void Save()
     {
         SettingsService.Save();
