@@ -8,21 +8,17 @@ public class ReloadTime
     public static readonly Dictionary<string, TimeSpan> ReloadTimes = new Dictionary<string, TimeSpan>()
     {
         { "Nicht Neuladen", TimeSpan.Zero },
+        { "3 sek", TimeSpan.FromSeconds(3) },
+        { "5 sek", TimeSpan.FromSeconds(5) },
+        { "10 sek", TimeSpan.FromSeconds(10) },
+        { "15 sek", TimeSpan.FromSeconds(15) },
         { "30 sek", TimeSpan.FromSeconds(30) },
         { "1 min", TimeSpan.FromMinutes(1) },
         { "2 min", TimeSpan.FromMinutes(2) },
         { "5 min", TimeSpan.FromMinutes(5) },
         { "10 min", TimeSpan.FromMinutes(10) },
         { "15 min", TimeSpan.FromMinutes(15) },
-        { "30 min", TimeSpan.FromMinutes(30) },
-        { "1 h", TimeSpan.FromHours(1) },
-        { "2 h", TimeSpan.FromHours(2) },
-        { "3 h", TimeSpan.FromHours(3) },
-        { "4 h", TimeSpan.FromHours(4) },
-        { "6 h", TimeSpan.FromHours(6) },
-        { "8 h", TimeSpan.FromHours(8) },
-        { "12 h", TimeSpan.FromHours(12) },
-        { "24 h", TimeSpan.FromHours(24) }
+        { "30 min", TimeSpan.FromMinutes(30) }
     };
 }
 
