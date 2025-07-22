@@ -23,7 +23,7 @@ jobs:
           release-type: simple
           skip-github-pull-request: true
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
 
   build:
     needs: release
