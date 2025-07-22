@@ -75,7 +75,7 @@
                     <MudTd DataLabel="Ebene">
                         <MudChip T="string" Color="@GetColor(context.Level)" Icon="@GetIcon(context.Level)" Variant="Variant.Filled">@context.Level</MudChip>
                     </MudTd>
-                    <MudTd DataLabel="Nachricht">@context.Message</MudTd>
+                    <MudTd DataLabel="Nachricht">@Highlight(context.Message)</MudTd>
                 </RowTemplate>
                 <PagerContent>
                     <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100, int.MaxValue }"
@@ -187,9 +187,28 @@
     private string _searchText = string.Empty;
     private bool _isLoading;
 
-    private IEnumerable<LogEntry> FilteredLogs => string.IsNullOrWhiteSpace(_searchText)
-        ? _logs
-        : _logs.Where(l => l.Message.Contains(_searchText, StringComparison.OrdinalIgnoreCase));
+    private DateTime SelectedSince => _logOptions == ReloadOption.AlleLogs
+        ? DateTime.MinValue
+        : _onlySinceRestart ? _lastShopRestart : AppInfo.StartTime;
+
+    private IEnumerable<LogEntry> FilteredLogs => _logs
+        .Where(l => l.Time >= SelectedSince)
+        .Where(l => string.IsNullOrWhiteSpace(_searchText)
+            || l.Message.Contains(_searchText, StringComparison.OrdinalIgnoreCase));
+
+    private MarkupString Highlight(string message)
+    {
+        if (string.IsNullOrWhiteSpace(_searchText))
+        {
+            return (MarkupString)System.Net.WebUtility.HtmlEncode(message);
+        }
+
+        var encoded = System.Net.WebUtility.HtmlEncode(message);
+        var pattern = System.Text.RegularExpressions.Regex.Escape(_searchText);
+        var highlighted = System.Text.RegularExpressions.Regex.Replace(encoded, pattern,
+            m => $"<mark>{m.Value}</mark>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return (MarkupString)highlighted;
+    }
 
     protected override async Task OnInitializedAsync()
     {
