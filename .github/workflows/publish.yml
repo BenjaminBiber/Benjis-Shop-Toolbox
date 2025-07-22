@@ -18,7 +18,7 @@ jobs:
       changelog: ${{ steps.release.outputs.changelog }}
     steps:
       - id: release
-        uses: google-github-actions/release-please-action@v4
+        uses: googleapis/release-please-action@v4
         with:
           release-type: simple
           skip-github-pull-request: true
