@@ -1,15 +1,30 @@
-name: Build and Attach Release
+name: Release Build
 
 on:
-  release:
-    types: [created]
-  workflow_dispatch:
+  push:
+    branches:
+      - main
 
 permissions:
   contents: write
 
 jobs:
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      changelog: ${{ steps.release.outputs.changelog }}
+    steps:
+      - id: release
+        uses: google-github-actions/release-please-action@v4
+        with:
+          release-type: simple
+          skip-github-pull-request: true
+
   build:
+    needs: release
+    if: ${{ needs.release.outputs.release_created == 'true' }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,8 +37,9 @@ jobs:
       - name: Publish self-contained EXE
         run: dotnet publish Benjis-Shop-Toolbox/Benjis-Shop-Toolbox.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish
 
-
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.release.outputs.tag_name }}
+          body: ${{ needs.release.outputs.changelog }}
           files: publish/Benjis-Shop-Toolbox.exe
