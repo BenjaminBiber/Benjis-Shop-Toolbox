@@ -24,6 +24,12 @@ jobs:
           skip-github-pull-request: true
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
+      - name: Debug Release Output
+        run: |
+          echo "Release created: ${{ steps.release.outputs.release_created }}"
+          echo "Tag: ${{ steps.release.outputs.tag_name }}"
+          echo "Changelog: ${{ steps.release.outputs.changelog }}"
+
 
   build:
     needs: release
