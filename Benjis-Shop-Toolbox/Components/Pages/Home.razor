@@ -62,9 +62,9 @@
                 <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
             </div>
         }
-        @if (FilteredLogs.Any())
+        @if (DisplayLogs.Any())
         {
-            <MudTable Style="height: 85dvh" Height="95%" FixedFooter="true" FixedHeader="true" Items="FilteredLogs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
+            <MudTable Style="height: 85dvh" Height="95%" FixedFooter="true" FixedHeader="true" Items="DisplayLogs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
                 <HeaderContent>
                     <MudTh>Zeit</MudTh>
                     <MudTh>Ebene</MudTh>
@@ -75,7 +75,13 @@
                     <MudTd DataLabel="Ebene">
                         <MudChip T="string" Color="@GetColor(context.Level)" Icon="@GetIcon(context.Level)" Variant="Variant.Filled">@context.Level</MudChip>
                     </MudTd>
-                    <MudTd DataLabel="Nachricht">@Highlight(context.Message)</MudTd>
+                    <MudTd DataLabel="Nachricht">
+                        @Highlight(context.Message)
+                        @if (context.Count > 1)
+                        {
+                            <span class="ms-1">(x@context.Count)</span>
+                        }
+                    </MudTd>
                 </RowTemplate>
                 <PagerContent>
                     <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100, int.MaxValue }"
@@ -195,6 +201,40 @@
         .Where(l => l.Time >= SelectedSince)
         .Where(l => string.IsNullOrWhiteSpace(_searchText)
             || l.Message.Contains(_searchText, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<LogEntry> DisplayLogs => Settings.BundleLogs
+        ? BundleLogs(FilteredLogs)
+        : FilteredLogs;
+
+    private static IEnumerable<LogEntry> BundleLogs(IEnumerable<LogEntry> logs)
+    {
+        LogEntry? current = null;
+        foreach (var log in logs)
+        {
+            if (current != null && log.Message == current.Message && log.Level == current.Level)
+            {
+                current.Count += log.Count;
+            }
+            else
+            {
+                if (current != null)
+                {
+                    yield return current;
+                }
+                current = new LogEntry
+                {
+                    Time = log.Time,
+                    Level = log.Level,
+                    Message = log.Message,
+                    Count = log.Count
+                };
+            }
+        }
+        if (current != null)
+        {
+            yield return current;
+        }
+    }
 
     private MarkupString Highlight(string message)
     {

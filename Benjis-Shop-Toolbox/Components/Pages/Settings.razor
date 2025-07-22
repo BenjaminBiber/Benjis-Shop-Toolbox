@@ -27,6 +27,7 @@
     </MudSelect>
     <MudSwitch @bind-Value="Setting.LoadOnStartup" T="bool" Color="Color.Primary">Beim Starten der App die Logs laden</MudSwitch>
     <MudSwitch @bind-Value="Setting.OnlySinceRestart" T="bool" Color="Color.Primary">Nur Logs seit letztem Neustart</MudSwitch>
+    <MudSwitch @bind-Value="Setting.BundleLogs" T="bool" Color="Color.Primary">Gleiche Logs bündeln</MudSwitch>
     <MudSwitch @bind-Value="Setting.RestartShopOnThemeChange" T="bool" Color="Color.Primary">Bei Theme wechsel Shop neustarten</MudSwitch>
     <MudTextField @bind-Value="Setting.RepoPath" Label="Repo Pfad" Variant="Variant.Filled" Class="mb-2"
                   Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseRepo" />

@@ -13,5 +13,10 @@ namespace Benjis_Shop_Toolbox.Models
         
         public string? ShopYamlPath { get; set; }
         public bool RestartShopOnThemeChange { get; set; }
+
+        /// <summary>
+        /// Gibt an, ob aufeinanderfolgende identische Logeinträge gebündelt angezeigt werden sollen.
+        /// </summary>
+        public bool BundleLogs { get; set; }
     }
 }
