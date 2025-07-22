@@ -6,17 +6,41 @@
 
 <div class="row h-100">
     <div class="col-3 h-100">
-        <MudSelect Value="Settings.IisAppName" ValueChanged="@((string? s) => SettingsService.Save(s))" Label="IIS App" Variant="Variant.Text" Class="mb-2">
-            @foreach (var site in manager.Sites)
-            {
-                if (site != null)
-                {
-                    <MudSelectItem Value="@site.Name">@site.Name</MudSelectItem>
+        <div class="row">
+            <div class="col-10">
+                @{
+                    var color = String.IsNullOrEmpty(Settings.IisAppName) ? Color.Default : GetColor();
                 }
-            }
-        </MudSelect>
-
-        <MudStack Row="false" Spacing="2" Class="mx-4">
+                <MudBadge Overlap="true" Dot="true" Class="w-100" Origin="Origin.TopRight" Color="color">
+                    <MudSelect Value="Settings.IisAppName" ValueChanged="@((string? s) => SettingsService.Save(s))" Label="IIS App" Variant="Variant.Outlined" Class="mb-2 mt-2">
+                        @foreach (var site in manager.Sites)
+                        {
+                            if (site != null)
+                            {
+                                <MudSelectItem Value="@site.Name">@site.Name</MudSelectItem>
+                            }
+                        }
+                    </MudSelect>
+                </MudBadge>
+            </div>
+            <div class="col-1 d-flex align-items-center justify-content-center">
+                <MudMenu Icon="@Icons.Material.Filled.OpenInNew" Class="mx-0 my-0" AriaLabel="Öffne IIS App im Browser">
+                    @if(!String.IsNullOrEmpty(Settings.IisAppName))
+                    {
+                        @foreach (var binding in manager.Sites[Settings.IisAppName]?.Bindings ?? Enumerable.Empty<Binding>())
+                        {
+                            var url = GetSiteUrl(binding);
+                            if (url != null)
+                            {
+                                <MudMenuItem Href="@url" Target="_blank" Label="@url"/>
+                            }
+                        }
+                    }
+                </MudMenu>
+            </div>
+        </div>
+        
+        <MudStack Row="false" Spacing="2" Class="mr-17">
             <MudButton Color="Color.Success" StartIcon="@Icons.Material.Filled.Start" Variant="Variant.Filled" OnClick="StartIisApp">Start</MudButton>
             <MudButton Color="Color.Warning" StartIcon="@Icons.Material.Filled.RestartAlt" Variant="Variant.Filled" OnClick="RestartIisApp">Neustart</MudButton>
             <MudButton Color="Color.Error" StartIcon="@Icons.Material.Filled.Stop" Variant="Variant.Filled" OnClick="StopIisApp">Stop</MudButton>
@@ -262,6 +286,35 @@
         }
     }
 
+    public string GetSiteUrl(Binding binding)
+    {
+        var protocol = binding.Protocol;
+
+        var parts = binding.BindingInformation.Split(':');
+
+        if (parts.Length != 3)
+        {
+            return null;
+        }
+
+        string ip = parts[0];
+        string port = parts[1];
+        string host = binding.Host;
+
+        string domain = !string.IsNullOrEmpty(host)
+            ? host
+            : (ip == "*" || ip == "0.0.0.0" ? "localhost" : ip);
+
+        bool isDefaultPort = (protocol == "http" && port == "80") || (protocol == "https" && port == "443");
+
+        string url = $"{protocol}://{domain}";
+
+        if (!isDefaultPort)
+            url += $":{port}";
+
+        return url;
+    }
+    
     private async Task ApplySettings()
     {
         _logService = new LogService(Settings.LogName!);
@@ -387,6 +440,15 @@
         LogLevel.Warning => Color.Warning,
         LogLevel.Error => Color.Error,
         LogLevel.Critical => Color.Error,
+        _ => Color.Default
+    };
+
+    private Color GetColor() => manager.Sites[Settings.IisAppName].State switch
+    {
+        ObjectState.Started => Color.Success,
+        ObjectState.Starting => Color.Warning,
+        ObjectState.Stopped => Color.Error,
+        ObjectState.Stopping => Color.Warning,
         _ => Color.Default
     };
 
