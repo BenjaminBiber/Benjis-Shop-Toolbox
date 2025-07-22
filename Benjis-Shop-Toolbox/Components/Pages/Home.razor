@@ -330,8 +330,15 @@
 
     private void ShowLogDetails(TableRowClickEventArgs<LogEntry> args)
     {
-        var parameters = new DialogParameters { [nameof(LogEntryDialog.Entry)] = args.Item };
-        DialogService.Show<LogEntryDialog>("Log Details", parameters);
+        var parameters = new DialogParameters<LogEntryDialog> { {x => x.Entry, args.Item} };
+        var options = new DialogOptions
+        {
+            CloseButton = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            BackdropClick = false
+        };
+        DialogService.Show<LogEntryDialog>("Log Details", parameters, options);
     }
 
     private Color GetColor(LogLevel level) => level switch
