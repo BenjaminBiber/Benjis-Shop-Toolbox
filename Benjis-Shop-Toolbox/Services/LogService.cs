@@ -7,6 +7,10 @@ namespace Benjis_Shop_Toolbox.Services
         public DateTime Time { get; set; }
         public LogLevel Level { get; set; }
         public string Message { get; set; } = string.Empty;
+        /// <summary>
+        /// Anzahl gebündelter Logeinträge.
+        /// </summary>
+        public int Count { get; set; } = 1;
     }
 
     public class LogService
