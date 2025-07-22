@@ -9,7 +9,13 @@
         <MudText Typo="Typo.h5">Themes</MudText>
         <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="OpenCloneDialog" />
     </div>
-    @if (_groupedThemes != null)
+    @if (_isLoading)
+    {
+        <div class="d-flex justify-content-center my-3">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
+    else if (_groupedThemes != null)
     {
         foreach (var group in _groupedThemes)
         {
@@ -29,15 +35,15 @@
                     <MudTd>
                         @if (context.LinkExists)
                         {
-                            <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Error" OnClick="() => Remove(context)">Entfernen</MudButton>
+                            <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Error" OnClick="@(async () => await Remove(context))">Entfernen</MudButton>
                         }
                         else
                         {
-                            <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary" OnClick="() => Create(context)">Anlegen</MudButton>
+                            <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary" OnClick="@(async () => await Create(context))">Anlegen</MudButton>
                         }
                     </MudTd>
                     <MudTd>
-                        <MudCheckBox Disabled="context.IsThemeOverwrite || !context.LinkExists" Value="context.IsThemeOverwrite" ValueChanged="@((bool t) => ThemeOverwriteChanged(context))" Color="Color.Primary" />
+                        <MudCheckBox Disabled="context.IsThemeOverwrite || !context.LinkExists" Value="context.IsThemeOverwrite" ValueChanged="@(async (bool t) => await ThemeOverwriteChanged(context))" Color="Color.Primary" />
                     </MudTd>
                 </RowTemplate>
             </MudTable>
@@ -47,11 +53,24 @@
 
 @code {
     private IEnumerable<IGrouping<string, ThemeInfo>>? _groupedThemes;
+    private bool _isLoading;
     private ToolboxSettings Settings => SettingsService.Settings;
-    
-    protected override void OnInitialized()
+
+    protected override async Task OnInitializedAsync()
     {
-        Load();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        StateHasChanged();
+        _groupedThemes = await Task.Run(() => ThemeService.GetThemes()
+            .GroupBy(t => t.Repo)
+            .OrderBy(g => g.Key)
+            .ToList());
+        _isLoading = false;
+        StateHasChanged();
     }
 
     private void Load()
@@ -62,14 +81,35 @@
             .ToList();
     }
 
-    private void ThemeOverwriteChanged(ThemeInfo info)
+    private async Task ThemeOverwriteChanged(ThemeInfo info)
     {
-        ThemeService.SetThemeOverwrite(info);
-        Snackbar.Add($"Theme-Überschreibung für {info.Name} geändert.", Severity.Success);
-        Load();
-        if (Settings.RestartShopOnThemeChange)
+        _isLoading = true;
+        StateHasChanged();
+        try
         {
-            RestartIisApp().Wait();
+            var result = ThemeService.SetThemeOverwrite(info);
+            if (result)
+            {
+                Snackbar.Add($"Theme-Überschreibung für {info.Name} geändert.", Severity.Success);
+                await LoadAsync();
+                if (Settings.RestartShopOnThemeChange)
+                {
+                    await RestartIisApp();
+                }
+            }
+            else
+            {
+                Snackbar.Add($"Theme-Überschreibung für {info.Name} konnte nicht geändert werden.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fehler beim Ändern der Theme-Überschreibung: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
         }
     }
     
@@ -142,16 +182,16 @@
         }
     }
     
-    private void Create(ThemeInfo info)
+    private async Task Create(ThemeInfo info)
     {
         ThemeService.CreateLink(info);
-        Load();
+        await LoadAsync();
     }
 
-    private void Remove(ThemeInfo info)
+    private async Task Remove(ThemeInfo info)
     {
         ThemeService.RemoveLink(info);
-        Load();
+        await LoadAsync();
     }
 
     private async Task OpenCloneDialog()
@@ -160,7 +200,7 @@
         var result = await dlg.Result;
         if (!result.Canceled)
         {
-            Load();
+            await LoadAsync();
         }
     }
 }
