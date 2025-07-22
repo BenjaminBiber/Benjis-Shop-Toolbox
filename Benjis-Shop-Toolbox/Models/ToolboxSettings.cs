@@ -3,7 +3,7 @@ namespace Benjis_Shop_Toolbox.Models
     public class ToolboxSettings
     {
         public string? IisAppName { get; set; }
-        public string? LogName { get; set; }
+        public string? LogName { get; set; } = "4SELLERS";
         public int AutoRefreshSeconds { get; set; }
         public bool AutoRefreshEnabled { get; set; }
         public bool LoadOnStartup { get; set; }
