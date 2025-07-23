@@ -1,7 +1,7 @@
 using System;
-// using System.Windows.Forms;
-// using Microsoft.Win32;
-// using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
+using System.Linq;
+using ElectronNET.API;
+using ElectronNET.API.Entities;
 
 namespace Benjis_Shop_Toolbox.Services
 {
@@ -22,23 +22,37 @@ namespace Benjis_Shop_Toolbox.Services
         /// </summary>
         public string? OpenFile(string title, string filter, string initialDir = "")
         {
-            // try
-            // {
-            //     var dialog = new OpenFileDialog
-            //     {
-            //         Title = title,
-            //         Filter = filter,
-            //         InitialDirectory = string.IsNullOrWhiteSpace(initialDir) ? Environment.CurrentDirectory : initialDir
-            //     };
-            //
-            //     return dialog.ShowDialog() == true ? dialog.FileName : null;
-            // }
-            // catch (Exception ex)
-            // {
-            //     _notifications.Error($"Fehler beim Öffnen des Dateidialogs: {ex.Message}");
-            //     return null;
-            // }
-            return null;
+            if (!HybridSupport.IsElectronActive)
+            {
+                return null;
+            }
+
+            try
+            {
+                var options = new OpenDialogOptions
+                {
+                    Title = title,
+                    Properties = new[] { OpenDialogProperty.openFile },
+                    Filters = ParseFilters(filter)
+                };
+
+                if (!string.IsNullOrWhiteSpace(initialDir))
+                {
+                    options.DefaultPath = initialDir;
+                }
+
+                var result = Electron.Dialog
+                    .ShowOpenDialogAsync(options)
+                    .GetAwaiter()
+                    .GetResult();
+
+                return result?.FirstOrDefault();
+            }
+            catch (Exception ex)
+            {
+                _notifications.Error($"Fehler beim Öffnen des Dateidialogs: {ex.Message}");
+                return null;
+            }
         }
 
         /// <summary>
@@ -46,22 +60,59 @@ namespace Benjis_Shop_Toolbox.Services
         /// </summary>
         public string? OpenFolder(string description, string initialDir = "")
         {
-            // try
-            // {
-            //     using var dialog = new FolderBrowserDialog
-            //     {
-            //         Description = description,
-            //         SelectedPath = string.IsNullOrWhiteSpace(initialDir) ? Environment.CurrentDirectory : initialDir
-            //     };
-            //
-            //     return dialog.ShowDialog() == DialogResult.OK ? dialog.SelectedPath : null;
-            // }
-            // catch (Exception ex)
-            // {
-            //     _notifications.Error($"Fehler beim Öffnen des Ordnerdialogs: {ex.Message}");
-            //     return null;
-            // }
-            return null;
+            if (!HybridSupport.IsElectronActive)
+            {
+                return null;
+            }
+
+            try
+            {
+                var options = new OpenDialogOptions
+                {
+                    Title = description,
+                    Properties = new[] { OpenDialogProperty.openDirectory }
+                };
+
+                if (!string.IsNullOrWhiteSpace(initialDir))
+                {
+                    options.DefaultPath = initialDir;
+                }
+
+                var result = Electron.Dialog
+                    .ShowOpenDialogAsync(options)
+                    .GetAwaiter()
+                    .GetResult();
+
+                return result?.FirstOrDefault();
+            }
+            catch (Exception ex)
+            {
+                _notifications.Error($"Fehler beim Öffnen des Ordnerdialogs: {ex.Message}");
+                return null;
+            }
+        }
+
+        private static FileFilter[]? ParseFilters(string filter)
+        {
+            if (string.IsNullOrWhiteSpace(filter))
+            {
+                return null;
+            }
+
+            var parts = filter.Split('|');
+            var list = new System.Collections.Generic.List<FileFilter>();
+            for (int i = 0; i + 1 < parts.Length; i += 2)
+            {
+                var name = parts[i];
+                var extensions = parts[i + 1]
+                    .Split(';', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(e => e.Trim().TrimStart('*', '.'))
+                    .ToArray();
+
+                list.Add(new FileFilter { Name = name, Extensions = extensions });
+            }
+
+            return list.ToArray();
         }
     }
 }
