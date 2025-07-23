@@ -1,10 +1,10 @@
 {
-  "executable": "Benjis-Shop-Toolbox",
+  "executable": "ElectronApp",
   "splashscreen": {
     "imageFile": ""
   },
   "name": "Benjis-Shop-Toolbox",
-  "author": "",
+  "author": "Benjamin Biber",
   "singleInstance": false,
   "environment": "Production",
   "build": {

@@ -3,17 +3,10 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <RootNamespace>Benjis-Shop-Toolbox</RootNamespace>
-    <AssemblyName>$(AssemblyName.Replace(' ', '_'))</AssemblyName>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <WarningsNotAsErrors>NU1605</WarningsNotAsErrors>
     <NoWarn>NU1605</NoWarn>
   </PropertyGroup>
-  <ItemGroup>
-    <Content Update="electron.manifest.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Colorful.Console" Version="1.2.6">
       <NoWarn>NU1605</NoWarn>
@@ -27,5 +20,18 @@
   </ItemGroup>
   <ItemGroup>
     <_ContentIncludedByDefault Remove="Components\Layout\MainLayout.razor" />
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="Components\Dialogs\CloneThemeDialog.razor" />
+    <AdditionalFiles Include="Components\Dialogs\LogEntryDialog.razor" />
+    <AdditionalFiles Include="Components\Dialogs\SettingsDialog.razor" />
+    <AdditionalFiles Include="Components\Layout\MainLayout.razor" />
+    <AdditionalFiles Include="Components\Layout\SideBar\SideBar.razor" />
+    <AdditionalFiles Include="Components\Layout\TopBar\TopBar.razor" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Update="electron.manifest.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 </Project>

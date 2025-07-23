@@ -4,18 +4,19 @@
 <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;">
     <base href="/"/>
-    <link rel="stylesheet" href="app.css"/>
-    <link rel="stylesheet" href="Benjis-Shop-Toolbox.styles.css"/>
     <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
     <link href="_content/MudBlazor/MudBlazor.min.css?v=@(MudBlazor.Metadata.Version)" rel="stylesheet" />
+    <link rel="stylesheet" href="app.css"/>
+    <link rel="stylesheet" href="ElectronApp.styles.css"/>
     <link rel="stylesheet" href="css/bootstrap.css" />
     <link rel="icon" type="image/x-icon" href="favicon.png" />
-    <HeadOutlet/>
+    <HeadOutlet @rendermode="InteractiveServer"/>
 </head>
 
 <body>
-<Routes/>
+<Routes @rendermode="InteractiveServer"/>
 <script src="_framework/blazor.web.js"></script>
 <script src="_content/MudBlazor/MudBlazor.min.js?v=@(MudBlazor.Metadata.Version)"></script>
 </body>
