@@ -1,7 +1,7 @@
 using System;
-using System.Windows.Forms;
-using Microsoft.Win32;
-using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
+// using System.Windows.Forms;
+// using Microsoft.Win32;
+// using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 
 namespace Benjis_Shop_Toolbox.Services
 {
@@ -22,22 +22,23 @@ namespace Benjis_Shop_Toolbox.Services
         /// </summary>
         public string? OpenFile(string title, string filter, string initialDir = "")
         {
-            try
-            {
-                var dialog = new OpenFileDialog
-                {
-                    Title = title,
-                    Filter = filter,
-                    InitialDirectory = string.IsNullOrWhiteSpace(initialDir) ? Environment.CurrentDirectory : initialDir
-                };
-
-                return dialog.ShowDialog() == true ? dialog.FileName : null;
-            }
-            catch (Exception ex)
-            {
-                _notifications.Error($"Fehler beim Öffnen des Dateidialogs: {ex.Message}");
-                return null;
-            }
+            // try
+            // {
+            //     var dialog = new OpenFileDialog
+            //     {
+            //         Title = title,
+            //         Filter = filter,
+            //         InitialDirectory = string.IsNullOrWhiteSpace(initialDir) ? Environment.CurrentDirectory : initialDir
+            //     };
+            //
+            //     return dialog.ShowDialog() == true ? dialog.FileName : null;
+            // }
+            // catch (Exception ex)
+            // {
+            //     _notifications.Error($"Fehler beim Öffnen des Dateidialogs: {ex.Message}");
+            //     return null;
+            // }
+            return null;
         }
 
         /// <summary>
@@ -45,21 +46,22 @@ namespace Benjis_Shop_Toolbox.Services
         /// </summary>
         public string? OpenFolder(string description, string initialDir = "")
         {
-            try
-            {
-                using var dialog = new FolderBrowserDialog
-                {
-                    Description = description,
-                    SelectedPath = string.IsNullOrWhiteSpace(initialDir) ? Environment.CurrentDirectory : initialDir
-                };
-
-                return dialog.ShowDialog() == DialogResult.OK ? dialog.SelectedPath : null;
-            }
-            catch (Exception ex)
-            {
-                _notifications.Error($"Fehler beim Öffnen des Ordnerdialogs: {ex.Message}");
-                return null;
-            }
+            // try
+            // {
+            //     using var dialog = new FolderBrowserDialog
+            //     {
+            //         Description = description,
+            //         SelectedPath = string.IsNullOrWhiteSpace(initialDir) ? Environment.CurrentDirectory : initialDir
+            //     };
+            //
+            //     return dialog.ShowDialog() == DialogResult.OK ? dialog.SelectedPath : null;
+            // }
+            // catch (Exception ex)
+            // {
+            //     _notifications.Error($"Fehler beim Öffnen des Ordnerdialogs: {ex.Message}");
+            //     return null;
+            // }
+            return null;
         }
     }
 }
