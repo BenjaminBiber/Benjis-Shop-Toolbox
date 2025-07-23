@@ -1,23 +1,25 @@
-using Benjis_Shop_Toolbox.Components;
 using Benjis_Shop_Toolbox.Services;
-using ElectronNET.API;
+using ElectronApp.Components;
 using MudBlazor.Services;
-using App = Benjis_Shop_Toolbox.Components.App;
+using ElectronNET.API;
+using ElectronNET.API.Entities;
+using App = ElectronApp.Components.App;
+using WebHostBuilderExtensions = ElectronNET.API.WebHostBuilderExtensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
-builder.WebHost.UseElectron(args);
-
-AppInfo.StartTime = DateTime.Now;
 
 builder.Services.AddMudServices();
 builder.Services.AddSingleton<SettingsService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<FileDialogService>();
 builder.Services.AddScoped<ThemeLinkService>();
+builder.WebHost.UseElectron(args);
+
+AppInfo.StartTime = DateTime.Now;
 
 var app = builder.Build();
 
@@ -37,17 +39,25 @@ app.UseAntiforgery();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
+
 if (HybridSupport.IsElectronActive)
 {
     Task.Run(async () =>
     {
-        var window = await Electron.WindowManager.CreateWindowAsync(new ElectronNET.API.Entities.BrowserWindowOptions
+        AppInfo.Window = await Electron.WindowManager.CreateWindowAsync(new ElectronNET.API.Entities.BrowserWindowOptions
         {
-            Show = true
+            Show = true,
+            WebPreferences = new WebPreferences
+            {
+                NodeIntegration = false,
+            },
+            Icon = "wwwroot/favicon.ico"
         });
+        AppInfo.Window.LoadURL("http://localhost:8005"); // <- Explizit HTTP, nicht file://
 
-        window.OnClosed += () => Electron.App.Quit();
+        AppInfo.Window.OnClosed += () => Electron.App.Quit();
     });
 }
+
 
 app.Run();

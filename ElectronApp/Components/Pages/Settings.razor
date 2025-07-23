@@ -1,4 +1,8 @@
 @page "/settings"
+@using Benjis_Shop_Toolbox.Models
+@using Benjis_Shop_Toolbox.Services
+@using ElectronNET.API.Entities
+@using Microsoft.Web.Administration
 @inject SettingsService SettingsService
 @inject ISnackbar Snackbar
 @inject FileDialogService FileDialog
@@ -63,7 +67,15 @@
 
     private void ChooseYaml()
     {
-        var path = FileDialog.OpenFile("shop.yaml auswählen", "YAML Dateien (*.yaml;*.yml)|*.yaml;*.yml|Alle Dateien (*.*)|*.*", Path.GetDirectoryName(Setting.ShopYamlPath) ?? string.Empty);
+        var filters = new FileFilter[]
+        {
+            new FileFilter
+            {
+                Name = "YAML Dateien",
+                Extensions = new [] { "yaml", "yml" }
+            }
+        };
+        var path = FileDialog.OpenFile("shop.yaml auswählen", filters, Path.GetDirectoryName(Setting.ShopYamlPath) ?? string.Empty);
         if (!string.IsNullOrEmpty(path))
         {
             Setting.ShopYamlPath = path;

@@ -1,11 +1,16 @@
-@using Benjis_Shop_Toolbox.Components.Layout.TopBar
-@using Benjis_Shop_Toolbox.Components.Layout.SideBar
+@using Benjis_Shop_Toolbox.Themes
+@using ElectronApp.Components.Layout.SideBar
+@using ElectronApp.Components.Layout.TopBar
 @inherits LayoutComponentBase
-<MudPopoverProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
+
 <MudThemeProvider Theme="@ModernTheme.Morphtheme"/>
-    
+<MudPopoverProvider />
+
+@* Needed for dialogs *@
+<MudDialogProvider />
+
+@* Needed for snackbars *@
+<MudSnackbarProvider />
 <MudLayout>
     <SideBar @bind-Open="_drawerOpen" />
     <TopBar OnMenuClick="ToggleDrawer"/>
