@@ -57,8 +57,8 @@
                 <MudTextField Variant="Variant.Text" @bind-Value="_searchText" Immediate="true" Label="Suche" Class="w-100"/>
             </div>
             <div class="col-2">
-                <MudSelect T="LogLevel" Value="_selectedLevel" ValueChanged="@(async (LogLevel l) => await LoadLogs(l))" Label="Ebene">
-                    @foreach (var level in Enum.GetValues<LogLevel>())
+                <MudSelect T="LogLevel" MultiSelection="true" SelectedValues="_selectedLevels" SelectedValuesChanged="@(async levels => await SelectedLevelsChanged(levels))" Label="Ebene">
+                    @foreach (var level in Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All))
                     {
                         <MudSelectItem Value="@level">@level.GetDescription()</MudSelectItem>
                     }
@@ -210,7 +210,9 @@
     // Log viewer fields
     private LogService _logService = default!;
     private IEnumerable<LogEntry> _logs = Enumerable.Empty<LogEntry>();
-    private LogLevel _selectedLevel = LogLevel.All;
+    private HashSet<LogLevel> _selectedLevels = Enum.GetValues<LogLevel>()
+        .Where(l => l != LogLevel.All)
+        .ToHashSet();
     private bool _autoRefresh;
     private int _refreshSeconds;
     private bool _onlySinceRestart;
@@ -227,6 +229,7 @@
 
     private IEnumerable<LogEntry> FilteredLogs => _logs
         .Where(l => l.Time >= SelectedSince)
+        .Where(l => _selectedLevels.Count == 0 || _selectedLevels.Contains(l.Level))
         .Where(l => string.IsNullOrWhiteSpace(_searchText)
             || l.Message.Contains(_searchText, StringComparison.OrdinalIgnoreCase));
 
@@ -358,20 +361,15 @@
         _isLoading = true;
         StateHasChanged();
         var since = _onlySinceRestart ? _lastShopRestart : AppInfo.StartTime;
-        _logs = await Task.Run(() => _logService.GetLogs(since, _selectedLevel));
+        _logs = await Task.Run(() => _logService.GetLogs(since, LogLevel.All));
         _isLoading = false;
         StateHasChanged();
     }
 
-    private async Task LoadLogs(LogLevel logLevel)
+    private async Task SelectedLevelsChanged(IEnumerable<LogLevel> levels)
     {
-        _isLoading = true;
-        StateHasChanged();
-        var since = _onlySinceRestart ? _lastShopRestart : AppInfo.StartTime;
-        _selectedLevel = logLevel;
-        _logs = await Task.Run(() => _logService.GetLogs(since, logLevel));
-        _isLoading = false;
-        StateHasChanged();
+        _selectedLevels = levels.ToHashSet();
+        await LoadLogs();
     }
 
     private async Task LoadLogs(ReloadOption logLevel)
@@ -388,7 +386,7 @@
             _onlySinceRestart = true;
         }
         var since = logLevel == ReloadOption.AlleLogs ? DateTime.MinValue  : _onlySinceRestart ? _lastShopRestart : AppInfo.StartTime;
-        _logs = await Task.Run(() => _logService.GetLogs(since, _selectedLevel));
+        _logs = await Task.Run(() => _logService.GetLogs(since, LogLevel.All));
         _isLoading = false;
         StateHasChanged();
     }
