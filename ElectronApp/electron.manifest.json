@@ -1,20 +1,24 @@
 {
   "executable": "ElectronApp",
+  "aspCoreBackendPort": 8005,
   "splashscreen": {
     "imageFile": ""
   },
-  "name": "Benjis-Shop-Toolbox",
-  "author": "Benjamin Biber",
+  "name": "Benjis-Toolbox-Shop",
+  "author": "",
   "singleInstance": false,
-  "environment": "Production",
+  "environment": "Benjis-Toolbox-Shop",
   "build": {
-    "appId": "com.Benjis-Shop-Toolbox.app",
-    "productName": "Benjis-Shop-Toolbox",
+    "appId": "com.ElectronApp.app",
+    "productName": "Benjis-Toolbox-Shop",
     "copyright": "Copyright © 2020",
     "buildVersion": "1.0.0",
+    "win": {
+      "icon": "../../../bin/Release/net8.0/win-x64/wwwroot/favicon.ico"
+    },
     "compression": "maximum",
     "directories": {
-      "output": ".../.././bin/Desktop"
+      "output": "../../../bin/Desktop"
     },
     "extraResources": [
       {
