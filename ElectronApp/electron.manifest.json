@@ -14,7 +14,7 @@
     "buildVersion": "1.0.0",
     "compression": "maximum",
     "directories": {
-      "output": "../../../bin/Desktop"
+      "output": ".../.././bin/Desktop"
     },
     "extraResources": [
       {

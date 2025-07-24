@@ -51,7 +51,7 @@ if (HybridSupport.IsElectronActive)
             {
                 NodeIntegration = false,
             },
-            Icon = "wwwroot/favicon.ico"
+            Icon = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "favicon.ico")
         });
         AppInfo.Window.LoadURL("http://localhost:8005"); // <- Explizit HTTP, nicht file://
 
