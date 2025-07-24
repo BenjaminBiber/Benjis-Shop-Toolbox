@@ -222,7 +222,8 @@
     private ServerManager manager = new ServerManager();
     private string _searchText = string.Empty;
     private bool _isLoading;
-
+    private ReloadOption reload;
+    
     private DateTime SelectedSince => _logOptions == ReloadOption.AlleLogs
         ? DateTime.MinValue
         : _onlySinceRestart ? _lastShopRestart : AppInfo.StartTime;
@@ -360,7 +361,7 @@
     {
         _isLoading = true;
         StateHasChanged();
-        var since = _onlySinceRestart ? _lastShopRestart : AppInfo.StartTime;
+        var since = reload == ReloadOption.AlleLogs ? DateTime.MinValue  : _onlySinceRestart ? _lastShopRestart : AppInfo.StartTime;
         _logs = await Task.Run(() => _logService.GetLogs(since, LogLevel.All));
         _isLoading = false;
         StateHasChanged();
@@ -374,6 +375,7 @@
 
     private async Task LoadLogs(ReloadOption logLevel)
     {
+        reload = logLevel;
         _isLoading = true;
         StateHasChanged();
         _logOptions = logLevel;
