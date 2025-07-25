@@ -19,7 +19,13 @@
     {
         @foreach (var group in GroupedSites)
         {
-            <MudText Typo="Typo.h6" Class="mb-2">@group.Key</MudText>
+            <div class="d-flex align-items-center mb-2">
+                <MudText Typo="Typo.h6" Class="me-2">@group.Key</MudText>
+                <MudSpacer />
+                <MudIconButton Icon="@Icons.Material.Filled.Start" Color="Color.Success" OnClick="@(() => StartGroup(group.Value))" />
+                <MudIconButton Icon="@Icons.Material.Filled.RestartAlt" Color="Color.Warning" OnClick="@(() => RestartGroup(group.Value))" />
+                <MudIconButton Icon="@Icons.Material.Filled.Stop" Color="Color.Error" OnClick="@(() => StopGroup(group.Value))" />
+            </div>
             <MudTable Items="group.Value" Hover="true" Dense="true">
                 <HeaderContent>
                     <MudTh>Name</MudTh>
@@ -100,7 +106,7 @@
         _ => Color.Default
     };
 
-    private void StartSite(string name)
+    private void StartSite(string name, bool reloadGroups = true)
     {
         try
         {
@@ -112,11 +118,14 @@
         {
             Snackbar.Add($"Fehler beim Starten: {ex.Message}", Severity.Error);
         }
-        LoadGroups();
-        StateHasChanged();
+        if (reloadGroups)
+        {
+            LoadGroups();
+            StateHasChanged();
+        }
     }
 
-    private void StopSite(string name)
+    private void StopSite(string name, bool reloadGroups = true)
     {
         try
         {
@@ -128,16 +137,24 @@
         {
             Snackbar.Add($"Fehler beim Stoppen: {ex.Message}", Severity.Error);
         }
-        LoadGroups();
-        StateHasChanged();
+        if (reloadGroups)
+        {
+            LoadGroups();
+            StateHasChanged();
+        }
     }
 
-    private async Task RestartSite(string name)
+    private async Task RestartSite(string name, bool reloadGroups = true)
     {
-        StopSite(name);
+        StopSite(name, false);
         RecycleAppPool(name);
         await Task.Delay(RestartDelay);
-        StartSite(name);
+        StartSite(name, false);
+        if (reloadGroups)
+        {
+            LoadGroups();
+            StateHasChanged();
+        }
     }
 
     private void RecycleAppPool(string appPoolName)
@@ -163,6 +180,36 @@
         {
             Snackbar.Add($"Fehler beim AppPool-Recycling: {ex.Message}", Severity.Error);
         }
+    }
+
+    private void StartGroup(IEnumerable<string> sites)
+    {
+        foreach (var site in sites)
+        {
+            StartSite(site, false);
+        }
+        LoadGroups();
+        StateHasChanged();
+    }
+
+    private void StopGroup(IEnumerable<string> sites)
+    {
+        foreach (var site in sites)
+        {
+            StopSite(site, false);
+        }
+        LoadGroups();
+        StateHasChanged();
+    }
+
+    private async Task RestartGroup(IEnumerable<string> sites)
+    {
+        foreach (var site in sites)
+        {
+            await RestartSite(site, false);
+        }
+        LoadGroups();
+        StateHasChanged();
     }
 
     private ToolboxSettings Settings => SettingsService.Settings;
