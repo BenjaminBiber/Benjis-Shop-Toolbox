@@ -69,5 +69,48 @@ namespace Benjis_Shop_Toolbox.Services
                 return false;
             }
         }
+
+        public bool Import(string path)
+        {
+            try
+            {
+                if (!File.Exists(path))
+                {
+                    return false;
+                }
+
+                var json = File.ReadAllText(path);
+                var settings = JsonSerializer.Deserialize<ToolboxSettings>(json);
+                if (settings == null)
+                {
+                    return false;
+                }
+
+                Settings = settings;
+                return Save();
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public bool Export()
+        {
+            try
+            {
+                var downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+                Directory.CreateDirectory(downloads);
+                var fileName = $"settings-{DateTime.Now:yyyy-MM-dd}.json";
+                var destPath = Path.Combine(downloads, fileName);
+                var json = JsonSerializer.Serialize(Settings, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(destPath, json);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
     }
 }

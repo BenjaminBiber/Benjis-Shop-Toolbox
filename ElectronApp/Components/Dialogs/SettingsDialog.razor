@@ -37,6 +37,7 @@
     </DialogContent>
     <DialogActions>
         <MudButton Color="Color.Primary" OnClick="Save">Speichern</MudButton>
+        <MudButton Color="Color.Secondary" OnClick="ImportSettings">Importieren</MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -101,6 +102,26 @@
         if (!string.IsNullOrEmpty(path))
         {
             Setting.ShopThemesPath = path;
+        }
+    }
+
+    private void ImportSettings()
+    {
+        var filters = new FileFilter[]
+        {
+            new FileFilter { Name = "JSON", Extensions = new [] { "json" } }
+        };
+        var path = FileDialog.OpenFile("Einstellungen importieren", filters);
+        if (!string.IsNullOrEmpty(path))
+        {
+            if (SettingsService.Import(path))
+            {
+                Snackbar.Add("Einstellungen importiert", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Fehler beim Import", Severity.Error);
+            }
         }
     }
 }
