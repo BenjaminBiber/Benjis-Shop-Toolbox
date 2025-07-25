@@ -26,7 +26,7 @@
                 <MudIconButton Icon="@Icons.Material.Filled.RestartAlt" Color="Color.Warning" OnClick="@(() => RestartGroup(group.Value))" />
                 <MudIconButton Icon="@Icons.Material.Filled.Stop" Color="Color.Error" OnClick="@(() => StopGroup(group.Value))" />
             </div>
-            <MudTable Items="group.Value" Hover="true" Dense="true">
+            <MudTable Items="group.Value" Hover="true" Class="mb-6" Dense="true">
                 <HeaderContent>
                     <MudTh>Name</MudTh>
                     <MudTh>Status</MudTh>
