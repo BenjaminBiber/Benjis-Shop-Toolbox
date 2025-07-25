@@ -57,7 +57,7 @@
                 <MudTextField Variant="Variant.Text" @bind-Value="_searchText" Immediate="true" Label="Suche" Class="w-100"/>
             </div>
             <div class="col-2">
-                <MudSelect T="LogLevel" MultiSelection="true" SelectedValues="_selectedLevels" SelectedValuesChanged="@(async levels => await SelectedLevelsChanged(levels))" Label="Ebene">
+                <MudSelect T="LogLevel" MultiSelection="true" MultiSelectionTextFunc="@(new Func<List<string>, string>(GetMultiSelectionText))" SelectedValues="_selectedLevels" SelectedValuesChanged="@(async levels => await SelectedLevelsChanged(levels))" Label="Ebene">
                     @foreach (var level in Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All))
                     {
                         <MudSelectItem Value="@level">@level.GetDescription()</MudSelectItem>
@@ -433,9 +433,9 @@
             CloseButton = true,
             MaxWidth = MaxWidth.Medium,
             FullWidth = true,
-            BackdropClick = false
+            BackdropClick = true,
         };
-        DialogService.Show<LogEntryDialog>("Log Details", parameters, options);
+        DialogService.Show<LogEntryDialog>("", parameters, options);
     }
 
     private Color GetColor(LogLevel level) => level switch
@@ -470,5 +470,21 @@
     public void Dispose()
     {
         _timer?.Dispose();
+    }
+    
+    private string GetMultiSelectionText(List<string> selectedValues)
+    {
+        if (Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All).Count() == selectedValues.Count)
+        {
+            return LogLevel.All.GetDescription();
+        }
+        else if (selectedValues.Count == 0)
+        {
+            return "Keine Ebene ausgewählt";
+        }
+        else
+        {
+            return string.Join(", ", selectedValues.Select(v => Enum.Parse<LogLevel>(v).GetDescription()));
+        }
     }
 }

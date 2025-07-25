@@ -1,12 +1,20 @@
+<MudDrawer @bind-Open="IsOpen" Variant="DrawerVariant.Responsive" ClipMode="DrawerClipMode.Docked" Anchor="Anchor.Start" Elevation="3">
+    <MudNavMenu>
+        <MudNavLink IconColor="Color.Primary" Href="" Icon="@Icons.Material.Filled.Home" Match="NavLinkMatch.All">Home</MudNavLink>
+        <MudNavLink IconColor="Color.Primary" Href="themes" Icon="@Icons.Material.Filled.Link">Themes</MudNavLink>
+        <MudNavLink IconColor="Color.Primary" Href="settings" Icon="@Icons.Material.Filled.Settings">Settings</MudNavLink>
+    </MudNavMenu>
+</MudDrawer>
+
+
 <MudAppBar Fixed="true" Elevation="3" Color="Color.Secondary">
     <MudIconButton Icon="@Icons.Material.Filled.Menu"
                    Color="Color.Inherit"
                    Edge="Edge.Start"
-                   OnClick="@OnMenuClick" />
+                   OnClick="@(() => IsOpen = !IsOpen)" />
     <MudText Typo="Typo.h6" Class="ml-2">Benjis Shop Toolbox</MudText>
 </MudAppBar>
 
 @code {
-    [Parameter]
-    public EventCallback<MouseEventArgs> OnMenuClick { get; set; }
+    public bool IsOpen { get; set; }
 }
