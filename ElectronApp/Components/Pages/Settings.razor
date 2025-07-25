@@ -35,7 +35,8 @@
                   Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseRepo" />
     <MudTextField @bind-Value="Setting.ShopThemesPath" Label="Shop Themes Pfad" Variant="Variant.Filled" Class="mb-2"
                   Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseShop" />
-    <MudButton OnClick="Save" Color="Color.Primary" Variant="Variant.Filled" Class="mt-4">Speichern</MudButton>
+    <MudButton OnClick="Save" Color="Color.Primary" Variant="Variant.Filled" Class="mt-4 mr-2">Speichern</MudButton>
+    <MudButton OnClick="ExportSettings" Color="Color.Secondary" Variant="Variant.Filled" Class="mt-4">Exportieren</MudButton>
 </MudPaper>
 
 @code {
@@ -97,6 +98,18 @@
         if (!string.IsNullOrEmpty(path))
         {
             Setting.ShopThemesPath = path;
+        }
+    }
+
+    private void ExportSettings()
+    {
+        if (SettingsService.Export())
+        {
+            Snackbar.Add("Einstellungen exportiert", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add("Fehler beim Export", Severity.Error);
         }
     }
 }
