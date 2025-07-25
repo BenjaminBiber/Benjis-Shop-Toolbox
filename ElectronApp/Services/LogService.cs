@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 
 namespace Benjis_Shop_Toolbox.Services
 {
@@ -6,13 +7,21 @@ namespace Benjis_Shop_Toolbox.Services
     {
         public DateTime Time { get; set; }
         public LogLevel Level { get; set; }
-        public string Message { get; set; } = string.Empty;
+        public string Message { get; set; }
+        public LogMessage ParsedMessage { get; set; } = new LogMessage();
         /// <summary>
         /// Anzahl gebündelter Logeinträge.
         /// </summary>
         public int Count { get; set; } = 1;
     }
 
+    public class LogMessage
+    {
+        public string Origin { get; set; } = string.Empty;
+        public string Metadata { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+    }
+    
     public class LogService
     {
         private readonly string _logName;
@@ -32,14 +41,15 @@ namespace Benjis_Shop_Toolbox.Services
             {
                 entries = entries.Where(e => MapEntryType(e.EntryType) == level);
             }
-
+            ParseLog(entries.First().Message);
             return entries
                 .OrderByDescending(e => e.TimeGenerated)
                 .Select(e => new LogEntry
                 {
                     Time = e.TimeGenerated,
                     Level = MapEntryType(e.EntryType),
-                    Message = e.Message
+                    ParsedMessage = ParseLog(e.Message),
+                    Message = e.Message,
                 })
                 .ToList();
         }
@@ -53,5 +63,23 @@ namespace Benjis_Shop_Toolbox.Services
             EventLogEntryType.SuccessAudit => LogLevel.Information,
             _ => LogLevel.Information
         };
+        
+        public LogMessage ParseLog(string logText)
+        {
+            var pattern = @"^(?:(?<Origin>(ServiceId|ShopId):\s+.+?)\r?\n)?\s*Metadata:\s*(?<Metadata>.+?)\r?\n\s*Message:\s*(?<Message>.+)$";
+
+            var regex = new Regex(pattern, RegexOptions.Singleline);
+            var match = regex.Match(logText);
+
+            if (!match.Success)
+                throw new ArgumentException("Log format not recognized");
+
+            return new LogMessage()
+            {
+                Origin = match.Groups["Origin"].Success ? match.Groups["Origin"].Value : string.Empty,
+                Metadata = match.Groups["Metadata"].Success ? match.Groups["Metadata"].Value.Replace("\t", "") : string.Empty,
+                Message = match.Groups["Message"].Value
+            };
+        }
     }
 }
