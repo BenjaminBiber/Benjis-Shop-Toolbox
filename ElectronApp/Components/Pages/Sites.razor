@@ -1,0 +1,169 @@
+@page "/sites"
+@using Benjis_Shop_Toolbox.Models
+@using Benjis_Shop_Toolbox.Services
+@using Microsoft.Web.Administration
+@inject SettingsService SettingsService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@using ElectronApp.Components.Dialogs
+
+<MudPaper Class="pa-4" Elevation="4">
+    <div class="d-flex justify-content-end mb-2">
+        <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="OpenAddDialog" />
+    </div>
+    @if (GroupedSites.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">Keine IIS Sites vorhanden.</MudAlert>
+    }
+    else
+    {
+        @foreach (var group in GroupedSites)
+        {
+            <MudText Typo="Typo.h6" Class="mb-2">@group.Key</MudText>
+            <MudTable Items="group.Value" Hover="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Name">@context</MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string" Color="@GetStateColor(GetSiteState(context))" Variant="Variant.Filled">@GetSiteState(context)</MudChip>
+                    </MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Start" Color="Color.Success" OnClick="@(() => StartSite(context))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.RestartAlt" Color="Color.Warning" OnClick="@(() => RestartSite(context))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Stop" Color="Color.Error" OnClick="@(() => StopSite(context))" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    }
+</MudPaper>
+
+@code {
+    private readonly TimeSpan RestartDelay = TimeSpan.FromSeconds(3);
+    private ServerManager _manager = new();
+
+    private Dictionary<string, List<string>> GroupedSites { get; set; } = new();
+
+    private async Task OpenAddDialog()
+    {
+        var dlg = DialogService.Show<AddSiteGroupDialog>("Gruppe hinzufügen");
+        var result = await dlg.Result;
+        if (!result.Canceled)
+        {
+            LoadGroups();
+            StateHasChanged();
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        LoadGroups();
+    }
+
+    private void LoadGroups()
+    {
+        _manager = new ServerManager();
+        var allSites = _manager.Sites.Select(s => s.Name).ToList();
+        GroupedSites = new();
+
+        foreach (var group in Settings.SiteGroups)
+        {
+            var existing = group.Sites.Where(allSites.Contains).ToList();
+            if (existing.Count > 0)
+            {
+                GroupedSites[group.Name] = existing;
+            }
+            allSites.RemoveAll(s => existing.Contains(s));
+        }
+
+        if (allSites.Count > 0)
+        {
+            GroupedSites["Ungruppiert"] = allSites;
+        }
+    }
+
+    private ObjectState GetSiteState(string name)
+    {
+        return _manager.Sites[name]?.State ?? ObjectState.Stopped;
+    }
+
+    private Color GetStateColor(ObjectState state) => state switch
+    {
+        ObjectState.Started => Color.Success,
+        ObjectState.Starting => Color.Warning,
+        ObjectState.Stopped => Color.Error,
+        ObjectState.Stopping => Color.Warning,
+        _ => Color.Default
+    };
+
+    private void StartSite(string name)
+    {
+        try
+        {
+            using var manager = new ServerManager();
+            manager.Sites[name]?.Start();
+            Snackbar.Add($"Anwendung {name} gestartet.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fehler beim Starten: {ex.Message}", Severity.Error);
+        }
+        LoadGroups();
+        StateHasChanged();
+    }
+
+    private void StopSite(string name)
+    {
+        try
+        {
+            using var manager = new ServerManager();
+            manager.Sites[name]?.Stop();
+            Snackbar.Add($"Anwendung '{name}' gestoppt.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fehler beim Stoppen: {ex.Message}", Severity.Error);
+        }
+        LoadGroups();
+        StateHasChanged();
+    }
+
+    private async Task RestartSite(string name)
+    {
+        StopSite(name);
+        RecycleAppPool(name);
+        await Task.Delay(RestartDelay);
+        StartSite(name);
+    }
+
+    private void RecycleAppPool(string appPoolName)
+    {
+        try
+        {
+            using var manager = new ServerManager();
+            var pool = manager.ApplicationPools.FirstOrDefault(p => p.Name == appPoolName);
+            if (pool == null)
+            {
+                Snackbar.Add($"AppPool '{appPoolName}' nicht gefunden.", Severity.Warning);
+                return;
+            }
+
+            if (pool.State == ObjectState.Stopped)
+                pool.Start();
+            else
+                pool.Recycle();
+
+            Snackbar.Add($"AppPool '{appPoolName}' recycelt.", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fehler beim AppPool-Recycling: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private ToolboxSettings Settings => SettingsService.Settings;
+}
