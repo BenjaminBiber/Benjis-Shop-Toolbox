@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Benjis_Shop_Toolbox.Models
 {
     public class ToolboxSettings
@@ -9,8 +11,8 @@ namespace Benjis_Shop_Toolbox.Models
         public bool LoadOnStartup { get; set; }
         public bool OnlySinceRestart { get; set; }
         public string RepoPath { get; set; }
-        public string ShopThemesPath { get; set; } 
-        
+        public string ShopThemesPath { get; set; }
+
         public string? ShopYamlPath { get; set; }
         public bool RestartShopOnThemeChange { get; set; }
 
@@ -18,5 +20,10 @@ namespace Benjis_Shop_Toolbox.Models
         /// Gibt an, ob aufeinanderfolgende identische Logeinträge gebündelt angezeigt werden sollen.
         /// </summary>
         public bool BundleLogs { get; set; }
+
+        /// <summary>
+        /// Optional grouping for IIS sites displayed on the Sites page.
+        /// </summary>
+        public List<SiteGroup> SiteGroups { get; set; } = new();
     }
 }

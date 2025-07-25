@@ -1,0 +1,59 @@
+@using Benjis_Shop_Toolbox.Models
+@using Benjis_Shop_Toolbox.Services
+@using Microsoft.Web.Administration
+@inject SettingsService SettingsService
+@inject ISnackbar Snackbar
+<MudDialog MaxWidth="MaxWidth.Small" FullWidth="true">
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-4">Sitegruppe hinzufügen</MudText>
+        <MudTextField @bind-Value="_name" Label="Name" Variant="Variant.Filled" Class="mb-2" />
+        <MudSelect T="string" MultiSelection="true" SelectedValues="_selected" SelectedValuesChanged="@OnSitesChanged" Label="Sites" Variant="Variant.Filled">
+            @foreach (var site in _availableSites)
+            {
+                <MudSelectItem Value="@site">@site</MudSelectItem>
+            }
+        </MudSelect>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="Save">Speichern</MudButton>
+        <MudButton Color="Color.Default" OnClick="Cancel">Abbrechen</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    private List<string> _availableSites = new();
+    private HashSet<string> _selected = new();
+    private string _name = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        using var manager = new ServerManager();
+        _availableSites = manager.Sites.Select(s => s.Name).ToList();
+    }
+
+    private void Save()
+    {
+        if (string.IsNullOrWhiteSpace(_name) || _selected.Count == 0)
+        {
+            Snackbar.Add("Name und Sites angeben", Severity.Warning);
+            return;
+        }
+        var settings = SettingsService.Settings;
+        if (settings.SiteGroups.Any(g => g.Name == _name))
+        {
+            Snackbar.Add("Gruppe mit diesem Namen existiert bereits", Severity.Error);
+            return;
+        }
+        settings.SiteGroups.Add(new SiteGroup { Name = _name, Sites = _selected.ToList() });
+        SettingsService.Save();
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void OnSitesChanged(IEnumerable<string> sites)
+    {
+        _selected = sites.ToHashSet();
+    }
+
+    void Cancel() => MudDialog.Cancel();
+}
