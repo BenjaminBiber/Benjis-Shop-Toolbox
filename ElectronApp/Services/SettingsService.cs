@@ -101,7 +101,7 @@ namespace Benjis_Shop_Toolbox.Services
             {
                 var downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
                 Directory.CreateDirectory(downloads);
-                var fileName = $"settings-{DateTime.Now:yyyy-MM-dd}.json";
+                var fileName = $"Toolbox-Settings-{DateTime.Now:yyyy-MM-dd}.json";
                 var destPath = Path.Combine(downloads, fileName);
                 var json = JsonSerializer.Serialize(Settings, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(destPath, json);
