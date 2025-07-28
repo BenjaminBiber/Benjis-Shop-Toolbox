@@ -25,6 +25,7 @@
                 <MudIconButton Icon="@Icons.Material.Filled.Start" Color="Color.Success" OnClick="@(() => StartGroup(group.Value))" />
                 <MudIconButton Icon="@Icons.Material.Filled.RestartAlt" Color="Color.Warning" OnClick="@(() => RestartGroup(group.Value))" />
                 <MudIconButton Icon="@Icons.Material.Filled.Stop" Color="Color.Error" OnClick="@(() => StopGroup(group.Value))" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Class="ml-4" Color="Color.Info" OnClick="@(() => DeleteGroup(group.Key))" />
             </div>
             <MudTable Items="group.Value" Hover="true" Class="mb-6" Dense="true">
                 <HeaderContent>
@@ -83,12 +84,11 @@
             {
                 GroupedSites[group.Name] = existing;
             }
-            allSites.RemoveAll(s => existing.Contains(s));
         }
 
-        if (allSites.Count > 0)
+        if (allSites.Any(x => !GroupedSites.Values.Any(c => c.Contains(x))))
         {
-            GroupedSites["Ungruppiert"] = allSites;
+            GroupedSites["Ungruppiert"] = allSites.Where(x => !GroupedSites.Values.Any(c => c.Contains(x))).ToList();
         }
     }
 
@@ -212,5 +212,19 @@
         StateHasChanged();
     }
 
+    private void DeleteGroup(string groupName)
+    {
+        if (Settings.SiteGroups.RemoveAll(g => g.Name == groupName) > 0)
+        {
+            SettingsService.Save();
+            LoadGroups();
+            Snackbar.Add($"Gruppe '{groupName}' gelöscht.", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add($"Gruppe '{groupName}' nicht gefunden.", Severity.Warning);
+        }
+    }
+    
     private ToolboxSettings Settings => SettingsService.Settings;
 }

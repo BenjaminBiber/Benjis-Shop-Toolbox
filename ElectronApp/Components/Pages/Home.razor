@@ -5,14 +5,15 @@
 @using Benjis_Shop_Toolbox.Models
 @using Benjis_Shop_Toolbox.Services
 @using ElectronApp.Components.Dialogs
+@using ElectronApp.Models
 @using Microsoft.Web.Administration
 @using MudBlazor
 @implements IDisposable
 
 <div class="row h-100">
-    <div class="col-3 h-100">
-        <div class="row">
-            <div class="col-10">
+    <div class="col-12 col-lg-3">
+        <div class="row mb-3 mb-lg-0">
+            <div class="col-4 col-lg-10">
                 @{
                     var color = String.IsNullOrEmpty(Settings.IisAppName) ? Color.Default : GetColor();
                 }
@@ -28,7 +29,7 @@
                     </MudSelect>
                 </MudBadge>
             </div>
-            <div class="col-1 d-flex align-items-center justify-content-center">
+            <div class="col-4 col-lg-1 d-flex align-items-center justify-content-start justify-content-lg-center">
                 <MudMenu Icon="@Icons.Material.Filled.OpenInNew" Class="mx-0 my-0" AriaLabel="Öffne IIS App im Browser">
                     @if(!String.IsNullOrEmpty(Settings.IisAppName))
                     {
@@ -37,24 +38,37 @@
                             var url = GetSiteUrl(binding);
                             if (url != null)
                             {
-                                <MudMenuItem Href="@url" Target="_blank" Label="@url"/>
+                                <MudMenuItem OnClick="@(() => OpenInBrowser(url))" Label="@url" />
                             }
                         }
                     }
                 </MudMenu>
             </div>
+            <div class="col-4 d-flex justify-content-evenly align-items-center d-lg-none">
+                <MudIconButton Color="Color.Success" Icon="@Icons.Material.Filled.Start" Variant="Variant.Filled" OnClick="StartIisApp">Start</MudIconButton>
+                <MudIconButton Color="Color.Warning" Icon="@Icons.Material.Filled.RestartAlt" Variant="Variant.Filled" OnClick="RestartIisApp">Neustart</MudIconButton>
+                <MudIconButton Color="Color.Error" Icon="@Icons.Material.Filled.Stop" Variant="Variant.Filled" OnClick="StopIisApp">Stop</MudIconButton>
+            </div>
         </div>
         
-        <MudStack Row="false" Spacing="2" Class="mr-17">
+        <MudStack Row="false" Class="d-none d-lg-flex mr-17" Spacing="2">
             <MudButton Color="Color.Success" StartIcon="@Icons.Material.Filled.Start" Variant="Variant.Filled" OnClick="StartIisApp">Start</MudButton>
             <MudButton Color="Color.Warning" StartIcon="@Icons.Material.Filled.RestartAlt" Variant="Variant.Filled" OnClick="RestartIisApp">Neustart</MudButton>
             <MudButton Color="Color.Error" StartIcon="@Icons.Material.Filled.Stop" Variant="Variant.Filled" OnClick="StopIisApp">Stop</MudButton>
         </MudStack>
     </div>
-    <div class="col-9 h-100">
+    <div class="col-12 col-lg-9 h-100">
         <div class="row mb-3">
-            <div class="col-5">
+            <div class="col-3">
                 <MudTextField Variant="Variant.Text" @bind-Value="_searchText" Immediate="true" Label="Suche" Class="w-100"/>
+            </div>
+            <div class="col-2">
+                <MudSelect T="MessageType" MultiSelection="true" MultiSelectionTextFunc="@(new Func<List<string>, string>(GetMultiSelectionTextMessage))" SelectedValues="_selectedMessageTypes" SelectedValuesChanged="@(async levels => await SelectedLevelsChanged(levels))" Label="LogMeldung">
+                    @foreach (var level in Enum.GetValues<MessageType>())
+                    {
+                        <MudSelectItem Value="@level">@level.GetDescription()</MudSelectItem>
+                    }
+                </MudSelect>
             </div>
             <div class="col-2">
                 <MudSelect T="LogLevel" MultiSelection="true" MultiSelectionTextFunc="@(new Func<List<string>, string>(GetMultiSelectionText))" SelectedValues="_selectedLevels" SelectedValuesChanged="@(async levels => await SelectedLevelsChanged(levels))" Label="Ebene">
@@ -86,7 +100,7 @@
         </div>
         @if (_isLoading)
         {
-            <div class="d-flex justify-content-center my-3">
+            <div class="position-absolute d-flex justify-content-center my-3">
                 <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
             </div>
         }
@@ -104,7 +118,7 @@
                         <MudChip T="string" Color="@GetColor(context.Level)" Icon="@GetIcon(context.Level)" Variant="Variant.Filled">@context.Level</MudChip>
                     </MudTd>
                     <MudTd DataLabel="Nachricht">
-                        @Highlight(context.Message)
+                        @Highlight(context.ParsedMessage.GetFormattedMessage(_selectedMessageTypes))
                         @if (context.Count > 1)
                         {
                             <span class="ms-1">(x@context.Count)</span>
@@ -213,6 +227,7 @@
     private HashSet<LogLevel> _selectedLevels = Enum.GetValues<LogLevel>()
         .Where(l => l != LogLevel.All)
         .ToHashSet();
+    private HashSet<MessageType> _selectedMessageTypes = Enum.GetValues<MessageType>().ToHashSet();
     private bool _autoRefresh;
     private int _refreshSeconds;
     private bool _onlySinceRestart;
@@ -258,7 +273,8 @@
                     Time = log.Time,
                     Level = log.Level,
                     Message = log.Message,
-                    Count = log.Count
+                    Count = log.Count,
+                    ParsedMessage = log.ParsedMessage
                 };
             }
         }
@@ -372,6 +388,12 @@
         _selectedLevels = levels.ToHashSet();
         await LoadLogs();
     }
+    
+    private async Task SelectedLevelsChanged(IEnumerable<MessageType> levels)
+    {
+        _selectedMessageTypes = levels.ToHashSet();
+        StateHasChanged();
+    }
 
     private async Task LoadLogs(ReloadOption logLevel)
     {
@@ -431,7 +453,7 @@
         var options = new DialogOptions
         {
             CloseButton = true,
-            MaxWidth = MaxWidth.Medium,
+            MaxWidth = MaxWidth.Large,
             FullWidth = true,
             BackdropClick = true,
         };
@@ -472,6 +494,22 @@
         _timer?.Dispose();
     }
     
+    private string GetMultiSelectionTextMessage(List<string> selectedValues)
+    {
+        if (Enum.GetValues<MessageType>().Count() == selectedValues.Count)
+        {
+            return "Ganze LogMeldungen";
+        }
+        else if (selectedValues.Count == 0)
+        {
+            return "Keine LogMeldung ausgewählt";
+        }
+        else
+        {
+            return string.Join(", ", selectedValues.Select(v => Enum.Parse<MessageType>(v).GetDescription()));
+        }
+    }
+    
     private string GetMultiSelectionText(List<string> selectedValues)
     {
         if (Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All).Count() == selectedValues.Count)
@@ -487,4 +525,23 @@
             return string.Join(", ", selectedValues.Select(v => Enum.Parse<LogLevel>(v).GetDescription()));
         }
     }
+
+    void OpenInBrowser(string url)
+    {
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true // Wichtig: öffnet im Standard-Browser
+            };
+            System.Diagnostics.Process.Start(psi);
+        }
+        catch (Exception ex)
+        {
+            // Optional: Fehlerbehandlung
+            Console.WriteLine($"Fehler beim Öffnen: {ex.Message}");
+        }
+    }
+
 }

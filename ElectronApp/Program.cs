@@ -12,6 +12,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+
 builder.Services.AddMudServices();
 builder.Services.AddSingleton<SettingsService>();
 builder.Services.AddScoped<NotificationService>();
@@ -53,7 +56,7 @@ if (HybridSupport.IsElectronActive)
             },
             Icon = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "favicon.ico")
         });
-        AppInfo.Window.LoadURL("http://localhost:8005"); // <- Explizit HTTP, nicht file://
+        AppInfo.Window.LoadURL("http://localhost:8005");
 
         AppInfo.Window.OnClosed += () => Electron.App.Quit();
     });

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using ElectronApp.Models;
 
 namespace Benjis_Shop_Toolbox.Services
 {
@@ -20,6 +21,30 @@ namespace Benjis_Shop_Toolbox.Services
         public string Origin { get; set; } = string.Empty;
         public string Metadata { get; set; } = string.Empty;
         public string Message { get; set; } = string.Empty;
+        
+        public bool IsValid => !string.IsNullOrEmpty(Message) && !string.IsNullOrEmpty(Metadata);
+        
+        public string GetFormattedMessage(HashSet<MessageType> messageTypes)
+        {
+            var formattedMessage = string.Empty;
+
+            if (messageTypes.Contains(MessageType.Origin) && !string.IsNullOrEmpty(Origin))
+            {
+                formattedMessage += $"Origin: {Origin}\n";
+            }
+
+            if (messageTypes.Contains(MessageType.Metadata) && !string.IsNullOrEmpty(Metadata))
+            {
+                formattedMessage += $"Metadata: {Metadata}\n";
+            }
+
+            if (messageTypes.Contains(MessageType.Message) && !string.IsNullOrEmpty(Message))
+            {
+                formattedMessage += $"Message: {Message}";
+            }
+
+            return formattedMessage.Trim();
+        }
     }
     
     public class LogService
@@ -67,7 +92,6 @@ namespace Benjis_Shop_Toolbox.Services
         public LogMessage ParseLog(string logText)
         {
             var pattern = @"^(?:(?<Origin>(ServiceId|ShopId):\s+.+?)\r?\n)?\s*Metadata:\s*(?<Metadata>.+?)\r?\n\s*Message:\s*(?<Message>.+)$";
-
             var regex = new Regex(pattern, RegexOptions.Singleline);
             var match = regex.Match(logText);
 
