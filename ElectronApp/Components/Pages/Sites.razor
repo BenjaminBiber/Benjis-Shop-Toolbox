@@ -5,7 +5,9 @@
 @inject SettingsService SettingsService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject FileDialogService FileDialog
 @using ElectronApp.Components.Dialogs
+@using ElectronNET.API.Entities
 
 <MudPaper Class="pa-4" Elevation="4">
     <div class="d-flex justify-content-end mb-2">
@@ -31,12 +33,22 @@
                 <HeaderContent>
                     <MudTh>Name</MudTh>
                     <MudTh>Status</MudTh>
+                    <MudTh>Shop</MudTh>
+                    <MudTh>shop.yaml</MudTh>
                     <MudTh></MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="Name">@context</MudTd>
                     <MudTd DataLabel="Status">
                         <MudChip T="string" Color="@GetStateColor(GetSiteState(context))" Variant="Variant.Filled">@GetSiteState(context)</MudChip>
+                    </MudTd>
+                    <MudTd>
+                        <MudCheckBox Value="GetSiteSetting(context).IsShop" ValueChanged="@((bool v) => ToggleShop(context, v))" />
+                    </MudTd>
+                    <MudTd>
+                        <MudTextField Value="GetSiteSetting(context).ShopYamlPath" ValueChanged="@((string v) => UpdateYamlPath(context, v))" Disabled="!GetSiteSetting(context).IsShop" Variant="Variant.Outlined"
+                                      Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen"
+                                      OnAdornmentClick="@(() => ChooseYaml(context))" />
                     </MudTd>
                     <MudTd>
                         <MudIconButton Icon="@Icons.Material.Filled.Start" Color="Color.Success" OnClick="@(() => StartSite(context))" />
@@ -225,6 +237,46 @@
             Snackbar.Add($"Gruppe '{groupName}' nicht gefunden.", Severity.Warning);
         }
     }
-    
+
+    private SiteSetting GetSiteSetting(string name)
+    {
+        var setting = Settings.SiteSettings.FirstOrDefault(s => s.Name == name);
+        if (setting == null)
+        {
+            setting = new SiteSetting { Name = name };
+            Settings.SiteSettings.Add(setting);
+        }
+        return setting;
+    }
+
+    private void ToggleShop(string name, bool value)
+    {
+        var setting = GetSiteSetting(name);
+        setting.IsShop = value;
+        SettingsService.Save();
+    }
+
+    private void UpdateYamlPath(string name, string path)
+    {
+        var setting = GetSiteSetting(name);
+        setting.ShopYamlPath = path;
+        SettingsService.Save();
+    }
+
+    private void ChooseYaml(string name)
+    {
+        var filters = new FileFilter[]
+        {
+            new FileFilter { Name = "YAML", Extensions = new[] { "yaml", "yml" } }
+        };
+        var initialDir = Path.GetDirectoryName(GetSiteSetting(name).ShopYamlPath) ?? string.Empty;
+        var path = FileDialog.OpenFile("shop.yaml auswählen", filters, initialDir);
+        if (!string.IsNullOrEmpty(path))
+        {
+            UpdateYamlPath(name, path);
+            StateHasChanged();
+        }
+    }
+
     private ToolboxSettings Settings => SettingsService.Settings;
 }
