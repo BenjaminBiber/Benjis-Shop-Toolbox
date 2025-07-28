@@ -130,12 +130,7 @@
         }
         try
         {
-            var serializer = new YamlDotNet.Serialization.SerializerBuilder()
-                .WithNamingConvention(YamlDotNet.Serialization.NamingConventions.CamelCaseNamingConvention.Instance)
-                .Build();
-            var root = new ZionRoot { ZionConfiguration = _config };
-            var yaml = serializer.Serialize(root);
-            File.WriteAllText(info.ShopYamlPath, yaml);
+            ShopYamlLoader.SaveConfiguration(info.ShopYamlPath, _config);
             Snackbar.Add("shop.yaml gespeichert", Severity.Success);
         }
         catch (Exception ex)
