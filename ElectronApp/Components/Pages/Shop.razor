@@ -1,0 +1,89 @@
+@page "/shop"
+@using Benjis_Shop_Toolbox.Models
+@using Benjis_Shop_Toolbox.Services
+@using ElectronNET.API.Entities
+@inject SettingsService SettingsService
+@inject ISnackbar Snackbar
+
+<MudPaper Class="pa-4" Elevation="4">
+    <MudText Typo="Typo.h5" Class="mb-4">Shop Einstellungen</MudText>
+    <MudSelect T="string" Value="_selectedSite" ValueChanged="OnSiteChanged" Label="Shop" Variant="Variant.Filled" Class="mb-4">
+        @foreach (var site in Settings.SiteSettings.Where(s => s.IsShop))
+        {
+            <MudSelectItem Value="@site.Name">@site.Name</MudSelectItem>
+        }
+    </MudSelect>
+
+    @if (_config != null)
+    {
+        <MudTextField @bind-Value="_config.ShopId" Label="ShopId" Variant="Variant.Filled" Class="mb-2" />
+        <MudTextField @bind-Value="_config.UserId" Label="UserId" Variant="Variant.Filled" Class="mb-2" />
+        <MudTextField @bind-Value="_config.BaseTheme" Label="BaseTheme" Variant="Variant.Filled" Class="mb-2" />
+        <MudTextField @bind-Value="_config.ThemeOverwrite" Label="ThemeOverwrite" Variant="Variant.Filled" Class="mb-2" />
+        <MudButton OnClick="Save" Color="Color.Primary" Variant="Variant.Filled" Class="mt-2">Speichern</MudButton>
+    }
+    else if (!string.IsNullOrEmpty(_selectedSite))
+    {
+        <MudAlert Severity="Severity.Info" Class="mt-2">shop.yaml nicht gefunden.</MudAlert>
+    }
+</MudPaper>
+
+@code {
+    private string? _selectedSite;
+    private ZionConfiguration? _config;
+    private ToolboxSettings Settings => SettingsService.Settings;
+
+    protected override void OnInitialized()
+    {
+        var firstShop = Settings.SiteSettings.FirstOrDefault(s => s.IsShop);
+        if (firstShop != null)
+        {
+            _selectedSite = firstShop.Name;
+            LoadConfig();
+        }
+    }
+
+    private void OnSiteChanged(string? name)
+    {
+        _selectedSite = name;
+        LoadConfig();
+    }
+
+    private void LoadConfig()
+    {
+        _config = null;
+        if (string.IsNullOrEmpty(_selectedSite))
+            return;
+        var info = Settings.SiteSettings.FirstOrDefault(s => s.Name == _selectedSite);
+        if (info != null && !string.IsNullOrEmpty(info.ShopYamlPath) && File.Exists(info.ShopYamlPath))
+        {
+            _config = ShopYamlLoader.LoadConfiguration(info.ShopYamlPath);
+        }
+    }
+
+    private void Save()
+    {
+        if (_config == null || string.IsNullOrEmpty(_selectedSite))
+            return;
+        var info = Settings.SiteSettings.FirstOrDefault(s => s.Name == _selectedSite);
+        if (info == null || string.IsNullOrEmpty(info.ShopYamlPath))
+        {
+            Snackbar.Add("Kein Pfad zur shop.yaml konfiguriert", Severity.Error);
+            return;
+        }
+        try
+        {
+            var serializer = new YamlDotNet.Serialization.SerializerBuilder()
+                .WithNamingConvention(YamlDotNet.Serialization.NamingConventions.CamelCaseNamingConvention.Instance)
+                .Build();
+            var root = new ZionRoot { ZionConfiguration = _config };
+            var yaml = serializer.Serialize(root);
+            File.WriteAllText(info.ShopYamlPath, yaml);
+            Snackbar.Add("shop.yaml gespeichert", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fehler beim Speichern: {ex.Message}", Severity.Error);
+        }
+    }
+}

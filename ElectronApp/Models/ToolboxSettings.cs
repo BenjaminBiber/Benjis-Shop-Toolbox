@@ -25,5 +25,10 @@ namespace Benjis_Shop_Toolbox.Models
         /// Optional grouping for IIS sites displayed on the Sites page.
         /// </summary>
         public List<SiteGroup> SiteGroups { get; set; } = new();
+
+        /// <summary>
+        /// Additional configuration per IIS site.
+        /// </summary>
+        public List<SiteSetting> SiteSettings { get; set; } = new();
     }
 }
