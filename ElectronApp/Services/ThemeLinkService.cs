@@ -40,7 +40,7 @@ namespace Benjis_Shop_Toolbox.Services
                             var repoName = relative.Split(Path.DirectorySeparatorChar)[0];
                             var linkPath = Path.Combine(shop, name);
                             bool exists = File.Exists(linkPath) || Directory.Exists(linkPath);
-                            themes.Add(new ThemeInfo(name, themeDir, exists, repoName, ShopYamlLoader.IsThemeOverride(config, name)));
+                            themes.Add(new ThemeInfo(name, themeDir, exists, repoName,Path.Combine(repo, repoName), ShopYamlLoader.IsThemeOverride(config, name)));
                         }
                     }
                 }
@@ -53,6 +53,12 @@ namespace Benjis_Shop_Toolbox.Services
             }
         }
 
+        public ThemeInfo GetThemeByName(string repoName)
+        {
+            var themes = GetThemes();
+            return themes.FirstOrDefault(x => x.Name.ToLower() == repoName.ToLower()) ?? new ThemeInfo();
+        }
+        
         public bool SetThemeOverwrite(ThemeInfo theme)
         {
             if (string.IsNullOrEmpty(_settings.Settings.ShopYamlPath))

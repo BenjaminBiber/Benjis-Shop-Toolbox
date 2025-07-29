@@ -6,60 +6,74 @@
 @inject ISnackbar Snackbar
 
 <MudPaper Class="pa-4" Elevation="4">
-    <MudText Typo="Typo.h5" Class="mb-4">Shop Einstellungen</MudText>
     <MudSelect T="string" Value="_selectedSite" ValueChanged="OnSiteChanged" Label="Shop" Variant="Variant.Filled" Class="mb-4">
         @foreach (var site in Settings.SiteSettings.Where(s => s.IsShop))
         {
             <MudSelectItem Value="@site.Name">@site.Name</MudSelectItem>
         }
     </MudSelect>
-
+    
     @if (_config != null)
     {
-        <MudTextField @bind-Value="_config.ShopId" Label="ShopId" Variant="Variant.Filled" Class="mb-2" />
-        <MudTextField @bind-Value="_config.UserId" Label="UserId" Variant="Variant.Filled" Class="mb-2" />
-        <MudTextField @bind-Value="_config.BaseTheme" Label="BaseTheme" Variant="Variant.Filled" Class="mb-2" />
-        <MudTextField @bind-Value="_config.ThemeOverwrite" Label="ThemeOverwrite" Variant="Variant.Filled" Class="mb-2" />
+        <div class="row">
+            <div class="col-4">
+                <MudText Typo="Typo.h6" Class="mb-2">Shop Einstellungen</MudText>
+                <MudTextField @bind-Value="_config.ShopId" Label="ShopId" Variant="Variant.Filled" Class="mb-2"/>
+                <MudTextField @bind-Value="_config.UserId" Label="UserId" Variant="Variant.Filled" Class="mb-2"/>
+                <MudTextField @bind-Value="_config.BaseTheme" Label="BaseTheme" Variant="Variant.Filled" Class="mb-2"/>
+                <MudTextField @bind-Value="_config.ThemeOverwrite" Label="ThemeOverwrite" Variant="Variant.Filled"/>
+            </div>
+            <div class="col-4">
+                <MudText Typo="Typo.h6" Class="mb-2">Application Einstellungen</MudText>
+                <MudTextField @bind-Value="_config.ApplicationConfiguration.CacheMode" Label="CacheMode" Variant="Variant.Filled" Class="mb-2" />
+                <MudTextField @bind-Value="_config.ApplicationConfiguration.ApplicationType" Label="ApplicationType" Variant="Variant.Filled" Class="mb-2" />
+                <MudTextField @bind-Value="_config.ApplicationConfiguration.DatabaseTpe" Label="DatabaseType" Variant="Variant.Filled" Class="mb-2" />
+                <MudTextField @bind-Value="_config.ApplicationConfiguration.DatabaseVersion" Label="DatabaseVersion" Variant="Variant.Filled" />
+            </div>
+            <div class="col-4">
+                <MudText Typo="Typo.h6" Class="mb-2">Weitere Einstellungen</MudText>
+                <MudTextField @bind-Value="_config.Extensions.Directory" Label="Extensions Directory" Variant="Variant.Filled" Class="mb-2" />
+                <MudTextField @bind-Value="_config.MainAssembly.AssemblyName" Label="AssemblyName" Variant="Variant.Filled" Class="mb-2" />
+                <MudTextField @bind-Value="_config.LicenseService.Address" Label="LicenseService Address" Variant="Variant.Filled" Class="mb-2" />
+                <MudTextField @bind-Value="_config.ApiConnection.Url" Label="Api Url" Variant="Variant.Filled" Class="mb-2" />
+                <MudTextField @bind-Value="_config.ApiConnection.Token" Label="Api Token" Variant="Variant.Filled" />
+            </div>
+        </div>
 
-        <MudDivider Class="my-4" />
-        <MudText Typo="Typo.h6" Class="mb-2">Application Configuration</MudText>
-        <MudTextField @bind-Value="_config.ApplicationConfiguration.CacheMode" Label="CacheMode" Variant="Variant.Filled" Class="mb-2" />
-        <MudTextField @bind-Value="_config.ApplicationConfiguration.ApplicationType" Label="ApplicationType" Variant="Variant.Filled" Class="mb-2" />
-        <MudTextField @bind-Value="_config.ApplicationConfiguration.DatabaseTpe" Label="DatabaseType" Variant="Variant.Filled" Class="mb-2" />
-        <MudTextField @bind-Value="_config.ApplicationConfiguration.DatabaseVersion" Label="DatabaseVersion" Variant="Variant.Filled" Class="mb-2" />
-
-        <MudDivider Class="my-4" />
         <MudText Typo="Typo.h6" Class="mb-2">Database Connections</MudText>
-        @if (_config.DatabaseConnections != null)
+        @if (_config.DatabaseConnections.Any())
         {
             @for (int i = 0; i < _config.DatabaseConnections.Count; i++)
             {
                 var conn = _config.DatabaseConnections[i];
                 <MudPaper Class="pa-2 mb-2" Elevation="2">
                     <div class="d-flex justify-content-between align-items-start">
-                        <MudText Typo="Typo.subtitle2">Verbindung @(i + 1)</MudText>
+                        <MudText Typo="Typo.subtitle2">Verbindung @(i - 1)</MudText>
                         <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => RemoveConnection(i))" />
                     </div>
-                    <MudTextField @bind-Value="conn.Server" Label="Server" Variant="Variant.Outlined" Class="mb-2" />
-                    <MudTextField @bind-Value="conn.Database" Label="Database" Variant="Variant.Outlined" Class="mb-2" />
-                    <MudTextField @bind-Value="conn.User" Label="User" Variant="Variant.Outlined" Class="mb-2" />
-                    <MudTextField @bind-Value="conn.Password" Label="Password" Variant="Variant.Outlined" Class="mb-2" />
-                    <MudNumericField T="int" @bind-Value="conn.MaxPoolSize" Label="MaxPoolSize" Variant="Variant.Outlined" Class="mb-2" />
-                    <MudSwitch @bind-Value="conn.Encrypt" Color="Color.Primary" Class="mb-2">Encrypt</MudSwitch>
-                    <MudSwitch @bind-Value="conn.TrustServerCertificate" Color="Color.Primary" Class="mb-2">TrustServerCertificate</MudSwitch>
+                    <div class="row">
+                        <div class="col">
+                            <MudTextField @bind-Value="conn.Server" Label="Server" Variant="Variant.Outlined" Class="mb-2" />
+                            <MudTextField @bind-Value="conn.Database" Label="Database" Variant="Variant.Outlined" Class="mb-2" />
+                            <MudTextField @bind-Value="conn.User" Label="User" Variant="Variant.Outlined" Class="mb-2" />
+                        </div>
+                        <div class="col">
+                            <MudTextField @bind-Value="conn.Password" Label="Password" Variant="Variant.Outlined" Class="mb-2" />
+                            <MudNumericField T="int" @bind-Value="conn.MaxPoolSize" Label="MaxPoolSize" Variant="Variant.Outlined" Class="mb-2" />
+                            <div class="row">
+                                <div class="col">
+                                    <MudSwitch @bind-Value="conn.Encrypt" Color="Color.Primary" Class="mb-2">Encrypt</MudSwitch>
+                                </div>
+                                <div class="col">
+                                    <MudSwitch @bind-Value="conn.TrustServerCertificate" Color="Color.Primary" Class="mb-2">TrustServerCertificate</MudSwitch>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </MudPaper>
             }
         }
-        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddConnection" Class="mb-4">Verbindung hinzufügen</MudButton>
-
-        <MudDivider Class="my-4" />
-        <MudText Typo="Typo.h6" Class="mb-2">Weitere Einstellungen</MudText>
-        <MudTextField @bind-Value="_config.Extensions.Directory" Label="Extensions Directory" Variant="Variant.Filled" Class="mb-2" />
-        <MudTextField @bind-Value="_config.MainAssembly.AssemblyName" Label="AssemblyName" Variant="Variant.Filled" Class="mb-2" />
-        <MudTextField @bind-Value="_config.LicenseService.Address" Label="LicenseService Address" Variant="Variant.Filled" Class="mb-2" />
-        <MudTextField @bind-Value="_config.ApiConnection.Url" Label="Api Url" Variant="Variant.Filled" Class="mb-2" />
-        <MudTextField @bind-Value="_config.ApiConnection.Token" Label="Api Token" Variant="Variant.Filled" Class="mb-2" />
-
+        
         <MudButton OnClick="Save" Color="Color.Primary" Variant="Variant.Filled" Class="mt-4">Speichern</MudButton>
     }
     else if (!string.IsNullOrEmpty(_selectedSite))
@@ -99,6 +113,11 @@
         {
             _config = ShopYamlLoader.LoadConfiguration(info.ShopYamlPath);
             _config.DatabaseConnections ??= new List<DatabaseConnection>();
+            _config.ApplicationConfiguration ??= new ApplicationConfiguration();
+            _config.Extensions ??= new Extensions();
+            _config.MainAssembly ??= new MainAssembly();
+            _config.LicenseService ??= new LicenseService();
+            _config.ApiConnection ??= new ApiConnection();
         }
     }
 

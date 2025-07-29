@@ -18,6 +18,7 @@ builder.Logging.AddConsole();
 builder.Services.AddMudServices();
 builder.Services.AddSingleton<SettingsService>();
 builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<SolutionOpener>();
 builder.Services.AddScoped<FileDialogService>();
 builder.Services.AddScoped<ThemeLinkService>();
 builder.WebHost.UseElectron(args);
