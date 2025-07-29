@@ -1,4 +1,5 @@
 @page "/themes"
+@using System.Diagnostics
 @using Benjis_Shop_Toolbox.Models
 @using Benjis_Shop_Toolbox.Services
 @using ElectronApp.Components.Dialogs
@@ -8,6 +9,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject SettingsService SettingsService
+@inject SolutionOpener SolutionOpener
 
 <MudPaper Class="pa-4" Elevation="4">
     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -50,6 +52,12 @@
                     <MudTd>
                         <MudCheckBox Disabled="context.IsThemeOverwrite || !context.LinkExists" Value="context.IsThemeOverwrite" ValueChanged="@(async (bool t) => await ThemeOverwriteChanged(context))" Color="Color.Primary" />
                     </MudTd>
+                    <MudTd>
+                        <MudMenu Icon="@Icons.Material.Filled.OpenInNew">
+                            <MudMenuItem OnClick="@(() => OpenDirectoryInExplorer(context.Path))" Label="Explorer" />
+                            <MudMenuItem OnClick="@(() => OpenSolution(context))" Label="Rider" />
+                        </MudMenu>
+                    </MudTd>
                 </RowTemplate>
             </MudTable>
         }
@@ -66,6 +74,24 @@
         await LoadAsync();
     }
 
+    public static void OpenDirectoryInExplorer(string path)
+    {
+        if (Directory.Exists(path))
+        {
+            Process.Start("explorer.exe", path);
+        }
+        else
+        {
+            Console.WriteLine("Ordner existiert nicht: " + path);
+        }
+    }
+    
+    private void OpenSolution(ThemeInfo info)
+    {
+        Snackbar.Add($"{info.Name} wird in Rider geöffnet...", Severity.Info);
+        SolutionOpener.OpenSolutionInRider(info.ThemeFolder);
+    }
+    
     private async Task LoadAsync()
     {
         _isLoading = true;
@@ -95,16 +121,11 @@
             var result = ThemeService.SetThemeOverwrite(info);
             if (result)
             {
-                Snackbar.Add($"Theme-Überschreibung für {info.Name} geändert.", Severity.Success);
                 await LoadAsync();
                 if (Settings.RestartShopOnThemeChange)
                 {
                     await RestartIisApp();
                 }
-            }
-            else
-            {
-                Snackbar.Add($"Theme-Überschreibung für {info.Name} konnte nicht geändert werden.", Severity.Error);
             }
         }
         catch (Exception ex)

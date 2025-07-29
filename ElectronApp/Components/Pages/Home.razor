@@ -126,14 +126,13 @@
                     </MudTd>
                 </RowTemplate>
                 <PagerContent>
-                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100, int.MaxValue }"
+                    <MudTablePager PageSizeOptions="new int[] { 50, 100, int.MaxValue }"
                                    RowsPerPageString="Logs pro Seite"
                                    InfoFormat="{first_item}-{last_item} von {all_items}"
                                    AllItemsText="Alle"
                                    HorizontalAlignment="HorizontalAlignment.Right"/>
                 </PagerContent>
             </MudTable>
-
         }
         else
         {

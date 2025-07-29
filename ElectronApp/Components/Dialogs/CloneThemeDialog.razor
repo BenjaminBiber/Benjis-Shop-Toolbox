@@ -2,11 +2,20 @@
 @using Benjis_Shop_Toolbox.Services
 @inject ThemeLinkService ThemeService
 @inject ISnackbar Snackbar
+@inject SolutionOpener SolutionOpener
+
 <MudDialog MaxWidth="MaxWidth.Small" FullWidth="true">
     <DialogContent>
         <MudText Typo="Typo.h6" Class="mb-4">Repository klonen</MudText>
         <MudTextField @bind-Value="_gitUrl" Label="Git URL" Variant="Variant.Filled" Class="mb-2" />
-        <MudCheckBox @bind-Value="_linkAfterClone" Color="Color.Primary" Label="Als Symlink hinzufügen und in shop.yaml eintragen" />
+        <div class="row">
+            <div class="col">
+                <MudCheckBox @bind-Value="_linkAfterClone" Color="Color.Primary" Label="Als Symlink hinzufügen und in shop.yaml eintragen" />
+            </div>
+            <div class="col">
+                <MudCheckBox @bind-Value="_linkAfterClone" Color="Color.Primary" Label="Nach dem Klonen in Rider öffnen" />
+            </div>
+        </div>
     </DialogContent>
     <DialogActions>
         <MudButton Color="Color.Primary" OnClick="Clone">Klonen</MudButton>
@@ -18,7 +27,8 @@
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
     private string _gitUrl = string.Empty;
     private bool _linkAfterClone;
-
+    private bool _openInRider;
+    
     private async Task Clone()
     {
         if (!string.IsNullOrWhiteSpace(_gitUrl))
@@ -29,6 +39,14 @@
                 var repoName = Path.GetFileNameWithoutExtension(_gitUrl.TrimEnd('/')
                     .Split('/').Last());
                 ThemeService.LinkAndOverwrite(repoName);
+            }
+
+            if (success && _openInRider)
+            {
+                var repoName = Path.GetFileNameWithoutExtension(_gitUrl.TrimEnd('/')
+                    .Split('/').Last());
+                var theme = ThemeService.GetThemeByName(repoName);
+                SolutionOpener.OpenSolutionInRider(theme.ThemeFolder);
             }
 
             if (!success)
