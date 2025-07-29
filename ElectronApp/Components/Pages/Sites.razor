@@ -281,7 +281,12 @@
     private async Task OpenPathsDialog(string name)
     {
         var parameters = new DialogParameters { ["SiteName"] = name };
-        var dlg = DialogService.Show<SitePathsDialog>("Shop Pfade", parameters);
+        var options = new DialogOptions()
+        {
+            FullScreen = true,
+            MaxWidth = MaxWidth.Medium
+        };
+        var dlg = DialogService.Show<SitePathsDialog>("Shop Pfade", parameters,options);
         var result = await dlg.Result;
         if (!result.Canceled)
         {
