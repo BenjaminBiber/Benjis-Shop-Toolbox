@@ -100,11 +100,11 @@
         </div>
         @if (_isLoading)
         {
-            <div class="position-absolute d-flex justify-content-center my-3">
+            <div class="position-absolute mr-auto ml-auto d-flex justify-content-center my-3">
                 <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
             </div>
         }
-        @if (DisplayLogs.Any())
+        else if (DisplayLogs.Any())
         {
             <MudTable Style="height: 85dvh" Height="95%" FixedFooter="true" FixedHeader="true" Items="DisplayLogs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
                 <HeaderContent>
