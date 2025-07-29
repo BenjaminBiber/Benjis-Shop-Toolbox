@@ -37,7 +37,6 @@
                 <HeaderContent>
                     <MudTh>Name</MudTh>
                     <MudTh>Pfad</MudTh>
-                    <MudTh>Shop</MudTh>
                     <MudTh>Link</MudTh>
                     <MudTh></MudTh>
                     <MudTh>Wird im Shop verwendet</MudTh>
@@ -45,7 +44,6 @@
                 <RowTemplate>
                     <MudTd DataLabel="Name">@context.Name</MudTd>
                     <MudTd DataLabel="Pfad">@context.Path</MudTd>
-                    <MudTd DataLabel="Shop">@_selectedSite</MudTd>
                     <MudTd DataLabel="Link">@(context.LinkExists ? "Ja" : "Nein")</MudTd>
                     <MudTd>
                         @if (context.LinkExists)
