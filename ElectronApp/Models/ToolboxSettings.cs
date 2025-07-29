@@ -17,6 +17,12 @@ namespace Benjis_Shop_Toolbox.Models
         public bool RestartShopOnThemeChange { get; set; }
 
         /// <summary>
+        /// Delay in seconds between stopping and starting a site when restarting.
+        /// Must be at least one second.
+        /// </summary>
+        public int RestartDelaySeconds { get; set; } = 3;
+
+        /// <summary>
         /// Gibt an, ob aufeinanderfolgende identische Logeinträge gebündelt angezeigt werden sollen.
         /// </summary>
         public bool BundleLogs { get; set; }
