@@ -13,7 +13,7 @@
                 <MudCheckBox @bind-Value="_linkAfterClone" Color="Color.Primary" Label="Als Symlink hinzufügen und in shop.yaml eintragen" />
             </div>
             <div class="col">
-                <MudCheckBox @bind-Value="_linkAfterClone" Color="Color.Primary" Label="Nach dem Klonen in Rider öffnen" />
+                <MudCheckBox @bind-Value="_openInRider" Color="Color.Primary" Label="Nach dem Klonen in Rider öffnen" />
             </div>
         </div>
     </DialogContent>
@@ -25,6 +25,8 @@
 
 @code {
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string ShopYamlPath { get; set; } = string.Empty;
+    [Parameter] public string ShopThemesPath { get; set; } = string.Empty;
     private string _gitUrl = string.Empty;
     private bool _linkAfterClone;
     private bool _openInRider;
@@ -38,14 +40,14 @@
             {
                 var repoName = Path.GetFileNameWithoutExtension(_gitUrl.TrimEnd('/')
                     .Split('/').Last());
-                ThemeService.LinkAndOverwrite(repoName);
+                ThemeService.LinkAndOverwrite(repoName, ShopThemesPath, ShopYamlPath);
             }
 
             if (success && _openInRider)
             {
                 var repoName = Path.GetFileNameWithoutExtension(_gitUrl.TrimEnd('/')
                     .Split('/').Last());
-                var theme = ThemeService.GetThemeByName(repoName);
+                var theme = ThemeService.GetThemeByName(repoName, ShopThemesPath, ShopYamlPath);
                 SolutionOpener.OpenSolutionInRider(theme.ThemeFolder);
             }
 

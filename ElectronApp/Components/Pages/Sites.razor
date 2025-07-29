@@ -35,6 +35,7 @@
                     <MudTh>Status</MudTh>
                     <MudTh>Shop</MudTh>
                     <MudTh>shop.yaml</MudTh>
+                    <MudTh>Themes</MudTh>
                     <MudTh></MudTh>
                 </HeaderContent>
                 <RowTemplate>
@@ -45,12 +46,10 @@
                     <MudTd>
                         <MudCheckBox Value="GetSiteSetting(context).IsShop" ValueChanged="@((bool v) => ToggleShop(context, v))" />
                     </MudTd>
+                    <MudTd DataLabel="shop.yaml">@GetSiteSetting(context).ShopYamlPath</MudTd>
+                    <MudTd DataLabel="Themes">@GetSiteSetting(context).ShopThemesPath</MudTd>
                     <MudTd>
-                        <MudTextField Value="GetSiteSetting(context).ShopYamlPath" ValueChanged="@((string v) => UpdateYamlPath(context, v))" Disabled="!GetSiteSetting(context).IsShop" Variant="Variant.Outlined"
-                                      Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen"
-                                      OnAdornmentClick="@(() => ChooseYaml(context))" />
-                    </MudTd>
-                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Disabled="!GetSiteSetting(context).IsShop" OnClick="@(() => OpenPathsDialog(context))" />
                         <MudIconButton Icon="@Icons.Material.Filled.Start" Color="Color.Success" OnClick="@(() => StartSite(context))" />
                         <MudIconButton Icon="@Icons.Material.Filled.RestartAlt" Color="Color.Warning" OnClick="@(() => RestartSite(context))" />
                         <MudIconButton Icon="@Icons.Material.Filled.Stop" Color="Color.Error" OnClick="@(() => StopSite(context))" />
@@ -275,6 +274,17 @@
         if (!string.IsNullOrEmpty(path))
         {
             UpdateYamlPath(name, path);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenPathsDialog(string name)
+    {
+        var parameters = new DialogParameters { ["SiteName"] = name };
+        var dlg = DialogService.Show<SitePathsDialog>("Shop Pfade", parameters);
+        var result = await dlg.Result;
+        if (!result.Canceled)
+        {
             StateHasChanged();
         }
     }
