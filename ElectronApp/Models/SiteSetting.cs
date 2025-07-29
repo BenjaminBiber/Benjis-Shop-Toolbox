@@ -10,5 +10,9 @@ namespace Benjis_Shop_Toolbox.Models
         public string Name { get; set; } = string.Empty;
         public bool IsShop { get; set; }
         public string? ShopYamlPath { get; set; }
+        /// <summary>
+        /// Optional path to the themes folder of this shop.
+        /// </summary>
+        public string? ShopThemesPath { get; set; }
     }
 }

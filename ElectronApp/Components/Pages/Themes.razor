@@ -16,6 +16,12 @@
         <MudText Typo="Typo.h5">Themes</MudText>
         <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="OpenCloneDialog" />
     </div>
+    <MudSelect T="string" Value="_selectedSite" ValueChanged="OnSiteChanged" Label="Shop" Variant="Variant.Filled" Class="mb-4">
+        @foreach (var site in Settings.SiteSettings.Where(s => s.IsShop))
+        {
+            <MudSelectItem Value="@site.Name">@site.Name</MudSelectItem>
+        }
+    </MudSelect>
     @if (_isLoading)
     {
         <div class="d-flex justify-content-center my-3">
@@ -31,6 +37,7 @@
                 <HeaderContent>
                     <MudTh>Name</MudTh>
                     <MudTh>Pfad</MudTh>
+                    <MudTh>Shop</MudTh>
                     <MudTh>Link</MudTh>
                     <MudTh></MudTh>
                     <MudTh>Wird im Shop verwendet</MudTh>
@@ -38,6 +45,7 @@
                 <RowTemplate>
                     <MudTd DataLabel="Name">@context.Name</MudTd>
                     <MudTd DataLabel="Pfad">@context.Path</MudTd>
+                    <MudTd DataLabel="Shop">@_selectedSite</MudTd>
                     <MudTd DataLabel="Link">@(context.LinkExists ? "Ja" : "Nein")</MudTd>
                     <MudTd>
                         @if (context.LinkExists)
@@ -67,10 +75,23 @@
 @code {
     private IEnumerable<IGrouping<string, ThemeInfo>>? _groupedThemes;
     private bool _isLoading;
+    private string? _selectedSite;
     private ToolboxSettings Settings => SettingsService.Settings;
+    private SiteSetting? SelectedSetting => Settings.SiteSettings.FirstOrDefault(s => s.Name == _selectedSite);
+
+    private async Task OnSiteChanged(string? name)
+    {
+        _selectedSite = name;
+        await LoadAsync();
+    }
 
     protected override async Task OnInitializedAsync()
     {
+        var first = Settings.SiteSettings.FirstOrDefault(s => s.IsShop);
+        if (first != null)
+        {
+            _selectedSite = first.Name;
+        }
         await LoadAsync();
     }
 
@@ -96,7 +117,15 @@
     {
         _isLoading = true;
         StateHasChanged();
-        _groupedThemes = await Task.Run(() => ThemeService.GetThemes()
+        var setting = SelectedSetting;
+        if (setting == null)
+        {
+            _groupedThemes = null;
+            _isLoading = false;
+            StateHasChanged();
+            return;
+        }
+        _groupedThemes = await Task.Run(() => ThemeService.GetThemes(setting.ShopThemesPath ?? string.Empty, setting.ShopYamlPath ?? string.Empty)
             .GroupBy(t => t.Repo)
             .OrderBy(g => g.Key)
             .ToList());
@@ -106,7 +135,13 @@
 
     private void Load()
     {
-        _groupedThemes = ThemeService.GetThemes()
+        var setting = SelectedSetting;
+        if (setting == null)
+        {
+            _groupedThemes = null;
+            return;
+        }
+        _groupedThemes = ThemeService.GetThemes(setting.ShopThemesPath ?? string.Empty, setting.ShopYamlPath ?? string.Empty)
             .GroupBy(t => t.Repo)
             .OrderBy(g => g.Key)
             .ToList();
@@ -118,7 +153,9 @@
         StateHasChanged();
         try
         {
-            var result = ThemeService.SetThemeOverwrite(info);
+            var setting = SelectedSetting;
+            if (setting == null) return;
+            var result = ThemeService.SetThemeOverwrite(setting.ShopYamlPath ?? string.Empty, info);
             if (result)
             {
                 await LoadAsync();
@@ -211,19 +248,30 @@
     
     private async Task Create(ThemeInfo info)
     {
-        ThemeService.CreateLink(info);
+        var setting = SelectedSetting;
+        if (setting == null) return;
+        ThemeService.CreateLink(setting.ShopThemesPath ?? string.Empty, info);
         await LoadAsync();
     }
 
     private async Task Remove(ThemeInfo info)
     {
-        ThemeService.RemoveLink(info);
+        var setting = SelectedSetting;
+        if (setting == null) return;
+        ThemeService.RemoveLink(setting.ShopThemesPath ?? string.Empty, info);
         await LoadAsync();
     }
 
     private async Task OpenCloneDialog()
     {
-        var dlg = DialogService.Show<CloneThemeDialog>("Repo klonen");
+        var parameters = new DialogParameters();
+        var setting = SelectedSetting;
+        if (setting != null)
+        {
+            parameters.Add("ShopYamlPath", setting.ShopYamlPath ?? string.Empty);
+            parameters.Add("ShopThemesPath", setting.ShopThemesPath ?? string.Empty);
+        }
+        var dlg = DialogService.Show<CloneThemeDialog>("Repo klonen", parameters);
         var result = await dlg.Result;
         if (!result.Canceled)
         {

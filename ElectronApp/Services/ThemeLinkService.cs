@@ -16,18 +16,18 @@ namespace Benjis_Shop_Toolbox.Services
             _notifications = notifications;
         }
 
-        public IEnumerable<ThemeInfo> GetThemes()
+        public IEnumerable<ThemeInfo> GetThemes(string shopThemesPath, string shopYamlPath)
         {
             try
             {
-                if (string.IsNullOrEmpty(_settings.Settings.ShopYamlPath))
+                if (string.IsNullOrEmpty(shopYamlPath))
                 {
                     return new List<ThemeInfo>();
                 }
 
-                var config = ShopYamlLoader.LoadConfiguration(_settings.Settings.ShopYamlPath);
+                var config = ShopYamlLoader.LoadConfiguration(shopYamlPath);
                 var repo = _settings.Settings.RepoPath;
-                var shop = _settings.Settings.ShopThemesPath;
+                var shop = shopThemesPath;
                 var themes = new List<ThemeInfo>();
                 if (Directory.Exists(repo))
                 {
@@ -53,15 +53,15 @@ namespace Benjis_Shop_Toolbox.Services
             }
         }
 
-        public ThemeInfo GetThemeByName(string repoName)
+        public ThemeInfo GetThemeByName(string repoName, string shopThemesPath, string shopYamlPath)
         {
-            var themes = GetThemes();
+            var themes = GetThemes(shopThemesPath, shopYamlPath);
             return themes.FirstOrDefault(x => x.Name.ToLower() == repoName.ToLower()) ?? new ThemeInfo();
         }
         
-        public bool SetThemeOverwrite(ThemeInfo theme)
+        public bool SetThemeOverwrite(string shopYamlPath, ThemeInfo theme)
         {
-            if (string.IsNullOrEmpty(_settings.Settings.ShopYamlPath))
+            if (string.IsNullOrEmpty(shopYamlPath))
             {
                 _notifications.Error("Kein Pfad zur shop.yaml konfiguriert.");
                 return false;
@@ -69,9 +69,9 @@ namespace Benjis_Shop_Toolbox.Services
 
             try
             {
-                var config = ShopYamlLoader.LoadConfiguration(_settings.Settings.ShopYamlPath);
+                var config = ShopYamlLoader.LoadConfiguration(shopYamlPath);
                 config.ThemeOverwrite = theme.Name;
-                ShopYamlLoader.UpdateConfig(_settings.Settings.ShopYamlPath, theme.Name);
+                ShopYamlLoader.UpdateConfig(shopYamlPath, theme.Name);
                 _notifications.Success($"Theme wurde auf {theme.Name} gesetzt.");
                 return true;
             }
@@ -82,11 +82,11 @@ namespace Benjis_Shop_Toolbox.Services
             }
         }
         
-        public bool CreateLink(ThemeInfo theme)
+        public bool CreateLink(string shopThemesPath, ThemeInfo theme)
         {
             try
             {
-                var linkPath = Path.Combine(_settings.Settings.ShopThemesPath, theme.Name);
+                var linkPath = Path.Combine(shopThemesPath, theme.Name);
                 if (!Directory.Exists(linkPath) && !File.Exists(linkPath))
                 {
                     Directory.CreateSymbolicLink(linkPath, theme.Path);
@@ -101,11 +101,11 @@ namespace Benjis_Shop_Toolbox.Services
             }
         }
 
-        public bool RemoveLink(ThemeInfo theme)
+        public bool RemoveLink(string shopThemesPath, ThemeInfo theme)
         {
             try
             {
-                var linkPath = Path.Combine(_settings.Settings.ShopThemesPath, theme.Name);
+                var linkPath = Path.Combine(shopThemesPath, theme.Name);
                 if (File.Exists(linkPath))
                 {
                     File.Delete(linkPath);
@@ -125,21 +125,21 @@ namespace Benjis_Shop_Toolbox.Services
             }
         }
 
-        public bool LinkAndOverwrite(string repoName)
+        public bool LinkAndOverwrite(string repoName, string shopThemesPath, string shopYamlPath)
         {
             try
             {
-                var themes = GetThemes().Where(t => t.Repo == repoName).ToList();
+                var themes = GetThemes(shopThemesPath, shopYamlPath).Where(t => t.Repo == repoName).ToList();
                 foreach (var theme in themes)
                 {
                     if (!theme.LinkExists)
                     {
-                        CreateLink(theme);
+                        CreateLink(shopThemesPath, theme);
                     }
                 }
                 if (themes.Count > 0)
                 {
-                    SetThemeOverwrite(themes[0]);
+                    SetThemeOverwrite(shopYamlPath, themes[0]);
                 }
                 return true;
             }
