@@ -3,3 +3,4 @@
 - Log filtering
 - Favicon ändern
 - Responsive
+- Einstellbare Wartezeit beim Neustart von Sites

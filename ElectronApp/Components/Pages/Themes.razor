@@ -139,7 +139,8 @@
         }
     }
     
-    private readonly TimeSpan RestartDelay = TimeSpan.FromSeconds(3);
+    private TimeSpan RestartDelay =>
+        TimeSpan.FromSeconds(Math.Max(1, Settings.RestartDelaySeconds));
     
     private void StartIisApp()
     {
