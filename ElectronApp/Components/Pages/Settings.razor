@@ -4,6 +4,7 @@
 @using ElectronNET.API.Entities
 @using Microsoft.Web.Administration
 @inject SettingsService SettingsService
+@inject MessageCheckerService MessageChecker
 @inject ISnackbar Snackbar
 @inject FileDialogService FileDialog
 
@@ -22,6 +23,12 @@
     <MudTextField @bind-Value="Setting.ShopYamlPath" Label="Pfad zur shop.yaml" Variant="Variant.Filled" Class="mb-2"
                   Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseYaml" />
     <MudSelect T="int" @bind-Value="Setting.AutoRefreshSeconds" Label="Auto Refresh (Sekunden)" Class="mb-2">
+        @foreach (var reloadTime in ReloadTime.ReloadTimes)
+        {
+            <MudSelectItem Value="@(Int32.Parse(reloadTime.Value.TotalSeconds.ToString()))">@reloadTime.Key</MudSelectItem>
+        }
+    </MudSelect>
+    <MudSelect T="int" @bind-Value="Setting.MessageCheckSeconds" Label="Nachrichten prüfen (Sekunden)" Class="mb-2">
         @foreach (var reloadTime in ReloadTime.ReloadTimes)
         {
             <MudSelectItem Value="@(Int32.Parse(reloadTime.Value.TotalSeconds.ToString()))">@reloadTime.Key</MudSelectItem>
@@ -64,6 +71,7 @@
         if (success)
         {
             Snackbar.Add("Einstellungen gespeichert", Severity.Success);
+            MessageChecker.UpdateInterval();
         }
         else
         {

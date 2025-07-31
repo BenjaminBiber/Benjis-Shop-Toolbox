@@ -17,6 +17,7 @@ builder.Logging.AddConsole();
 
 builder.Services.AddMudServices();
 builder.Services.AddSingleton<SettingsService>();
+builder.Services.AddSingleton<MessageCheckerService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<SolutionOpener>();
 builder.Services.AddScoped<FileDialogService>();

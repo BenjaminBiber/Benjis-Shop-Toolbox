@@ -8,6 +8,7 @@ namespace Benjis_Shop_Toolbox.Models
         public string? LogName { get; set; } = "4SELLERS";
         public int AutoRefreshSeconds { get; set; }
         public bool AutoRefreshEnabled { get; set; }
+        public int MessageCheckSeconds { get; set; } = 60;
         public bool LoadOnStartup { get; set; }
         public bool OnlySinceRestart { get; set; }
         public string RepoPath { get; set; }
