@@ -1,14 +1,16 @@
-﻿@page "/My4Sellers"
+@page "/My4Sellers"
 @using ElectronApp.Models
 @using Microsoft.AspNetCore.Html
-@using Newtonsoft.Json
+@inject MessageCheckerService MessageChecker
+@implements IDisposable
+
 <h3>My4Sellers</h3>
 
-@if(result1 != null && result1.Any())
+@if (MessageChecker.Messages.Any())
 {
-    @foreach (var ding in result1)
+    foreach (var ding in MessageChecker.Messages)
     {
-        @foreach (var item in ding.content)
+        foreach (var item in ding.content)
         {
             @((MarkupString)item)
         }
@@ -16,29 +18,15 @@
 }
 
 @code {
-    private List<DataItem> result1;
-    
     protected override async Task OnInitializedAsync()
     {
-        string url = "https://automation.benjaminbiber.de/webhook/c8500a7e-2e2d-4fdd-9d52-271eb2f15038"; // <--- Ersetze mit deiner echten URL
-
-        using (HttpClient client = new HttpClient())
-        {
-            try
-            {
-                // JSON von URL abrufen
-                HttpResponseMessage response = await client.GetAsync(url);
-                response.EnsureSuccessStatusCode();
-                string responseBody = await response.Content.ReadAsStringAsync();
-
-                // In C#-Modell deserialisieren
-                result1 = JsonConvert.DeserializeObject<List<DataItem>>(responseBody);
-            }
-            catch (HttpRequestException e)
-            {
-                Console.WriteLine($"Fehler beim HTTP-Request: {e.Message}");
-            }
-        }
+        MessageChecker.OnChange += StateHasChanged;
+        await MessageChecker.CheckNowAsync();
+        MessageChecker.MarkAsRead();
     }
 
+    public void Dispose()
+    {
+        MessageChecker.OnChange -= StateHasChanged;
+    }
 }
