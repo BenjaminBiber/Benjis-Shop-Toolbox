@@ -41,7 +41,8 @@ namespace Benjis_Shop_Toolbox.Services
             return new ToolboxSettings();
         }
 
-        public bool Save(string? iis = null, string? repoPath = null, string? shopPath = null)
+        public bool Save(string? iis = null, string? repoPath = null, string? shopPath = null,
+            string? extensionRepoPath = null, string? extensionShopPath = null)
         {
             if (!string.IsNullOrEmpty(iis))
             {
@@ -54,6 +55,14 @@ namespace Benjis_Shop_Toolbox.Services
             if (!string.IsNullOrEmpty(shopPath))
             {
                 Settings.ShopThemesPath = shopPath;
+            }
+            if (!string.IsNullOrEmpty(extensionRepoPath))
+            {
+                Settings.ExtensionRepoPath = extensionRepoPath;
+            }
+            if (!string.IsNullOrEmpty(extensionShopPath))
+            {
+                Settings.ShopExtensionsPath = extensionShopPath;
             }
 
             try

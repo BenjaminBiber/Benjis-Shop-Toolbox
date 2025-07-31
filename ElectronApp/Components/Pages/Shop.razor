@@ -114,7 +114,10 @@
             _config = ShopYamlLoader.LoadConfiguration(info.ShopYamlPath);
             _config.DatabaseConnections ??= new List<DatabaseConnection>();
             _config.ApplicationConfiguration ??= new ApplicationConfiguration();
-            _config.Extensions ??= new Extensions();
+            if (_config.Extensions == null)
+            {
+                _config.Extensions = new Extensions();
+            }
             _config.MainAssembly ??= new MainAssembly();
             _config.LicenseService ??= new LicenseService();
             _config.ApiConnection ??= new ApiConnection();

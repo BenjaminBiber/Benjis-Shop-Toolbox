@@ -21,6 +21,7 @@ builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<SolutionOpener>();
 builder.Services.AddScoped<FileDialogService>();
 builder.Services.AddScoped<ThemeLinkService>();
+builder.Services.AddScoped<ExtensionService>();
 builder.WebHost.UseElectron(args);
 
 AppInfo.StartTime = DateTime.Now;

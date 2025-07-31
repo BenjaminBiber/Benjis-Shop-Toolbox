@@ -8,6 +8,8 @@
                       Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseYaml" />
         <MudTextField @bind-Value="_themePath" Label="Themes Ordner" Variant="Variant.Filled" Class="mb-2"
                       Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseTheme" />
+        <MudTextField @bind-Value="_extensionPath" Label="Extensions Ordner" Variant="Variant.Filled" Class="mb-2"
+                      Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseExtension" />
     </DialogContent>
     <DialogActions>
         <MudButton Color="Color.Primary" OnClick="Save">Speichern</MudButton>
@@ -24,6 +26,7 @@
 
     private string _yamlPath = string.Empty;
     private string _themePath = string.Empty;
+    private string _extensionPath = string.Empty;
 
     protected override void OnInitialized()
     {
@@ -32,6 +35,7 @@
         {
             _yamlPath = setting.ShopYamlPath ?? string.Empty;
             _themePath = setting.ShopThemesPath ?? string.Empty;
+            _extensionPath = setting.ShopExtensionsPath ?? string.Empty;
         }
     }
 
@@ -54,6 +58,15 @@
         }
     }
 
+    private void ChooseExtension()
+    {
+        var path = FileDialog.OpenFolder("Extensions Ordner auswählen", _extensionPath);
+        if (!string.IsNullOrEmpty(path))
+        {
+            _extensionPath = path;
+        }
+    }
+
     private void Save()
     {
         var setting = SettingsService.Settings.SiteSettings.FirstOrDefault(s => s.Name == SiteName);
@@ -61,6 +74,7 @@
         {
             setting.ShopYamlPath = _yamlPath;
             setting.ShopThemesPath = _themePath;
+            setting.ShopExtensionsPath = _extensionPath;
             SettingsService.Save();
         }
         MudDialog.Close(DialogResult.Ok(true));
