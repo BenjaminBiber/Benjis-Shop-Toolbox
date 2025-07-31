@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Collections.Generic;
 using Benjis_Shop_Toolbox.Models;
 
 namespace Benjis_Shop_Toolbox.Services
@@ -15,6 +16,86 @@ public class ExtensionService
     {
         _settings = settings;
         _notifications = notifications;
+    }
+
+    public IEnumerable<ExtensionProjectInfo> GetExtensionProjects()
+    {
+        var repo = _settings.Settings.ExtensionRepoPath;
+        var projects = new List<ExtensionProjectInfo>();
+        try
+        {
+            if (!Directory.Exists(repo))
+            {
+                return projects;
+            }
+
+            foreach (var extensionDir in Directory.GetDirectories(repo))
+            {
+                var extensionName = Path.GetFileName(extensionDir);
+                foreach (var projectDir in Directory.GetDirectories(extensionDir))
+                {
+                    var csproj = Directory
+                        .EnumerateFiles(projectDir, "*.csproj", SearchOption.TopDirectoryOnly)
+                        .FirstOrDefault();
+                    if (!string.IsNullOrEmpty(csproj))
+                    {
+                        projects.Add(new ExtensionProjectInfo(extensionName,
+                            Path.GetFileName(projectDir), csproj));
+                    }
+                }
+            }
+
+            return projects;
+        }
+        catch (Exception ex)
+        {
+            _notifications.Error($"Fehler beim Laden der Projekte: {ex.Message}");
+            return projects;
+        }
+    }
+
+    public async Task<bool> BuildProjectAsync(string csprojPath)
+    {
+        if (string.IsNullOrEmpty(csprojPath) || !File.Exists(csprojPath))
+        {
+            _notifications.Error("Projektdatei nicht gefunden.");
+            return false;
+        }
+
+        try
+        {
+            var psi = new ProcessStartInfo("dotnet", $"build \"{csprojPath}\"")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false
+            };
+
+            using var proc = Process.Start(psi);
+            if (proc == null)
+            {
+                _notifications.Error("Build konnte nicht gestartet werden.");
+                return false;
+            }
+
+            await proc.WaitForExitAsync();
+            if (proc.ExitCode == 0)
+            {
+                _notifications.Success("Build abgeschlossen.");
+                return true;
+            }
+
+            var error = await proc.StandardError.ReadToEndAsync();
+            _notifications.Error(string.IsNullOrWhiteSpace(error)
+                ? "Build fehlgeschlagen."
+                : $"Build fehlgeschlagen: {error}");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _notifications.Error($"Fehler beim Build: {ex.Message}");
+            return false;
+        }
     }
 
     public IEnumerable<ExtensionInfo> GetExtensions(string shopExtensionsPath)
