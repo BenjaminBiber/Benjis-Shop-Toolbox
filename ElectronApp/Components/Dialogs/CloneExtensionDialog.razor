@@ -1,0 +1,71 @@
+@using System.IO
+@using Benjis_Shop_Toolbox.Services
+@inject ExtensionService ExtensionService
+@inject ISnackbar Snackbar
+@inject SolutionOpener SolutionOpener
+
+<MudDialog MaxWidth="MaxWidth.Small" FullWidth="true">
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-4">Repository klonen</MudText>
+        <MudTextField @bind-Value="_gitUrl" Label="Git URL" Variant="Variant.Filled" Class="mb-2" />
+        <div class="row">
+            <div class="col">
+                <MudCheckBox @bind-Value="_linkAfterClone" Color="Color.Primary" Label="Als Symlink hinzufügen" />
+            </div>
+            <div class="col">
+                <MudCheckBox @bind-Value="_openInRider" Color="Color.Primary" Label="Nach dem Klonen in Rider öffnen" />
+            </div>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="Clone">Klonen</MudButton>
+        <MudButton Color="Color.Default" OnClick="Cancel">Abbrechen</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string ShopExtensionsPath { get; set; } = string.Empty;
+    private string _gitUrl = string.Empty;
+    private bool _linkAfterClone;
+    private bool _openInRider;
+
+    private async Task Clone()
+    {
+        if (!string.IsNullOrWhiteSpace(_gitUrl))
+        {
+            var success = await ExtensionService.CloneRepositoryAsync(_gitUrl);
+            if (success && _linkAfterClone)
+            {
+                var repoName = Path.GetFileNameWithoutExtension(_gitUrl.TrimEnd('/')
+                    .Split('/').Last());
+                var ext = ExtensionService.GetExtensionByName(repoName, ShopExtensionsPath);
+                if (!string.IsNullOrEmpty(ext.Name))
+                {
+                    ExtensionService.CreateLink(ShopExtensionsPath, ext);
+                }
+            }
+
+            if (success && _openInRider)
+            {
+                var repoName = Path.GetFileNameWithoutExtension(_gitUrl.TrimEnd('/')
+                    .Split('/').Last());
+                var ext = ExtensionService.GetExtensionByName(repoName, ShopExtensionsPath);
+                if (!string.IsNullOrEmpty(ext.ExtensionFolder))
+                {
+                    SolutionOpener.OpenSolutionInRider(ext.ExtensionFolder);
+                }
+            }
+
+            if (!success)
+            {
+                Snackbar.Add("Klonen fehlgeschlagen", Severity.Error);
+                MudDialog.Close(DialogResult.Ok(false));
+                return;
+            }
+        }
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    void Cancel() => MudDialog.Cancel();
+}

@@ -34,8 +34,12 @@
     <MudNumericField T="int" @bind-Value="Setting.RestartDelaySeconds" Label="Neustart-Wartezeit (Sekunden)" Variant="Variant.Filled" Class="mb-2" Min="1" />
     <MudTextField @bind-Value="Setting.RepoPath" Label="Repo Pfad" Variant="Variant.Filled" Class="mb-2"
                   Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseRepo" />
+    <MudTextField @bind-Value="Setting.ExtensionRepoPath" Label="Extension Repo Pfad" Variant="Variant.Filled" Class="mb-2"
+                  Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseExtensionRepo" />
     <MudTextField @bind-Value="Setting.ShopThemesPath" Label="Shop Themes Pfad" Variant="Variant.Filled" Class="mb-2"
                   Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseShop" />
+    <MudTextField @bind-Value="Setting.ShopExtensionsPath" Label="Shop Extensions Pfad" Variant="Variant.Filled" Class="mb-2"
+                  Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseShopExtensions" />
     <MudButton OnClick="Save" Color="Color.Primary" Variant="Variant.Filled" Class="mt-4 mr-2">Speichern</MudButton>
     <MudButton OnClick="ExportSettings" Color="Color.Secondary" Variant="Variant.Filled" Class="mt-4">Exportieren</MudButton>
 </MudPaper>
@@ -97,12 +101,30 @@
         }
     }
 
+    private void ChooseExtensionRepo()
+    {
+        var path = FileDialog.OpenFolder("Extension Repo Ordner auswählen", Setting.ExtensionRepoPath);
+        if (!string.IsNullOrEmpty(path))
+        {
+            Setting.ExtensionRepoPath = path;
+        }
+    }
+
     private void ChooseShop()
     {
         var path = FileDialog.OpenFolder("Shop Themes Ordner auswählen", Setting.ShopThemesPath);
         if (!string.IsNullOrEmpty(path))
         {
             Setting.ShopThemesPath = path;
+        }
+    }
+
+    private void ChooseShopExtensions()
+    {
+        var path = FileDialog.OpenFolder("Shop Extensions Ordner auswählen", Setting.ShopExtensionsPath);
+        if (!string.IsNullOrEmpty(path))
+        {
+            Setting.ShopExtensionsPath = path;
         }
     }
 

@@ -14,5 +14,9 @@ namespace Benjis_Shop_Toolbox.Models
         /// Optional path to the themes folder of this shop.
         /// </summary>
         public string? ShopThemesPath { get; set; }
+        /// <summary>
+        /// Optional path to the extensions folder of this shop.
+        /// </summary>
+        public string? ShopExtensionsPath { get; set; }
     }
 }

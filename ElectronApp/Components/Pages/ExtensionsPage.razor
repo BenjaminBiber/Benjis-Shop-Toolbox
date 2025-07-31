@@ -1,0 +1,154 @@
+@page "/extensions"
+@using System.Diagnostics
+@using Benjis_Shop_Toolbox.Models
+@using Benjis_Shop_Toolbox.Services
+@using ElectronApp.Components.Dialogs
+@using MudBlazor
+@inject ExtensionService ExtensionService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject SettingsService SettingsService
+@inject SolutionOpener SolutionOpener
+
+<MudPaper Class="pa-4" Elevation="4">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <MudText Typo="Typo.h5">Extensions</MudText>
+        <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="OpenCloneDialog" />
+    </div>
+    <MudSelect T="string" Value="_selectedSite" ValueChanged="OnSiteChanged" Label="Shop" Variant="Variant.Filled" Class="mb-4">
+        @foreach (var site in Settings.SiteSettings.Where(s => s.IsShop))
+        {
+            <MudSelectItem Value="@site.Name">@site.Name</MudSelectItem>
+        }
+    </MudSelect>
+    @if (_isLoading)
+    {
+        <div class="d-flex justify-content-center my-3">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
+    else if (_groupedExtensions != null)
+    {
+        foreach (var group in _groupedExtensions)
+        {
+            <MudText Typo="Typo.h6" Class="mt-2">@group.Key</MudText>
+            <MudTable Items="group" Hover="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Pfad</MudTh>
+                    <MudTh>Link</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Name">@context.Name</MudTd>
+                    <MudTd DataLabel="Pfad">@context.Path</MudTd>
+                    <MudTd DataLabel="Link">@(context.LinkExists ? "Ja" : "Nein")</MudTd>
+                    <MudTd>
+                        @if (context.LinkExists)
+                        {
+                            <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Error" OnClick="@(async () => await Remove(context))">Entfernen</MudButton>
+                        }
+                        else
+                        {
+                            <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary" OnClick="@(async () => await Create(context))">Anlegen</MudButton>
+                        }
+                        <MudMenu Icon="@Icons.Material.Filled.OpenInNew" Class="ml-2">
+                            <MudMenuItem OnClick="@(() => OpenDirectoryInExplorer(context.Path))" Label="Explorer" />
+                            <MudMenuItem OnClick="@(() => OpenSolution(context))" Label="Rider" />
+                        </MudMenu>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    }
+</MudPaper>
+
+@code {
+    private IEnumerable<IGrouping<string, ExtensionInfo>>? _groupedExtensions;
+    private bool _isLoading;
+    private string? _selectedSite;
+    private ToolboxSettings Settings => SettingsService.Settings;
+    private SiteSetting? SelectedSetting => Settings.SiteSettings.FirstOrDefault(s => s.Name == _selectedSite);
+
+    private async Task OnSiteChanged(string? name)
+    {
+        _selectedSite = name;
+        await LoadAsync();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var first = Settings.SiteSettings.FirstOrDefault(s => s.IsShop);
+        if (first != null)
+        {
+            _selectedSite = first.Name;
+        }
+        await LoadAsync();
+    }
+
+    public static void OpenDirectoryInExplorer(string path)
+    {
+        if (Directory.Exists(path))
+        {
+            Process.Start("explorer.exe", path);
+        }
+    }
+
+    private void OpenSolution(ExtensionInfo info)
+    {
+        Snackbar.Add($"{info.Name} wird in Rider geöffnet...", Severity.Info);
+        SolutionOpener.OpenSolutionInRider(info.ExtensionFolder);
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        StateHasChanged();
+        var setting = SelectedSetting;
+        if (setting == null)
+        {
+            _groupedExtensions = null;
+            _isLoading = false;
+            StateHasChanged();
+            return;
+        }
+        _groupedExtensions = await Task.Run(() => ExtensionService.GetExtensions(setting.ShopExtensionsPath ?? string.Empty)
+            .GroupBy(t => t.Repo)
+            .OrderBy(g => g.Key)
+            .ToList());
+        _isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task Create(ExtensionInfo info)
+    {
+        var setting = SelectedSetting;
+        if (setting == null) return;
+        ExtensionService.CreateLink(setting.ShopExtensionsPath ?? string.Empty, info);
+        await LoadAsync();
+    }
+
+    private async Task Remove(ExtensionInfo info)
+    {
+        var setting = SelectedSetting;
+        if (setting == null) return;
+        ExtensionService.RemoveLink(setting.ShopExtensionsPath ?? string.Empty, info);
+        await LoadAsync();
+    }
+
+    private async Task OpenCloneDialog()
+    {
+        var parameters = new DialogParameters();
+        var setting = SelectedSetting;
+        if (setting != null)
+        {
+            parameters.Add("ShopExtensionsPath", setting.ShopExtensionsPath ?? string.Empty);
+        }
+        var dlg = DialogService.Show<CloneExtensionDialog>("Repo klonen", parameters);
+        var result = await dlg.Result;
+        if (!result.Canceled)
+        {
+            await LoadAsync();
+        }
+    }
+}

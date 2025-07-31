@@ -23,6 +23,8 @@
   </ItemGroup>
   <ItemGroup>
     <AdditionalFiles Include="Components\Dialogs\CloneThemeDialog.razor" />
+    <AdditionalFiles Include="Components\Dialogs\CloneExtensionDialog.razor" />
+    <AdditionalFiles Include="Components\Pages\ExtensionsPage.razor" />
     <AdditionalFiles Include="Components\Dialogs\LogEntryDialog.razor" />
     <AdditionalFiles Include="Components\Dialogs\SettingsDialog.razor" />
     <AdditionalFiles Include="Components\Layout\MainLayout.razor" />

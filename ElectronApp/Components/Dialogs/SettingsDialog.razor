@@ -32,8 +32,12 @@
         <MudSwitch @bind-Value="Setting.RestartShopOnThemeChange" T="bool" Color="Color.Primary">Bei Theme wechsel Shop neustarten</MudSwitch>
         <MudTextField @bind-Value="Setting.RepoPath" Label="Repo Pfad" Variant="Variant.Filled" Class="mb-2"
                       Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseRepo" />
+        <MudTextField @bind-Value="Setting.ExtensionRepoPath" Label="Extension Repo Pfad" Variant="Variant.Filled" Class="mb-2"
+                      Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseExtensionRepo" />
         <MudTextField @bind-Value="Setting.ShopThemesPath" Label="Shop Themes Pfad" Variant="Variant.Filled" Class="mb-2"
                       Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseShop" />
+        <MudTextField @bind-Value="Setting.ShopExtensionsPath" Label="Shop Extensions Pfad" Variant="Variant.Filled" Class="mb-2"
+                      Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseShopExtensions" />
     </DialogContent>
     <DialogActions>
         <MudButton Color="Color.Primary" OnClick="Save">Speichern</MudButton>
@@ -96,12 +100,30 @@
         }
     }
 
+    private void ChooseExtensionRepo()
+    {
+        var path = FileDialog.OpenFolder("Extension Repo Ordner auswählen", Setting.ExtensionRepoPath);
+        if (!string.IsNullOrEmpty(path))
+        {
+            Setting.ExtensionRepoPath = path;
+        }
+    }
+
     private void ChooseShop()
     {
         var path = FileDialog.OpenFolder("Shop Themes Ordner auswählen", Setting.ShopThemesPath);
         if (!string.IsNullOrEmpty(path))
         {
             Setting.ShopThemesPath = path;
+        }
+    }
+
+    private void ChooseShopExtensions()
+    {
+        var path = FileDialog.OpenFolder("Shop Extensions Ordner auswählen", Setting.ShopExtensionsPath);
+        if (!string.IsNullOrEmpty(path))
+        {
+            Setting.ShopExtensionsPath = path;
         }
     }
 
