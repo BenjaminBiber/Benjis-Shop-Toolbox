@@ -3,6 +3,7 @@ using ElectronApp.Components;
 using MudBlazor.Services;
 using ElectronNET.API;
 using ElectronNET.API.Entities;
+using OpenAI.Chat;
 using App = ElectronApp.Components.App;
 using WebHostBuilderExtensions = ElectronNET.API.WebHostBuilderExtensions;
 
@@ -14,7 +15,12 @@ builder.Services.AddRazorComponents()
 
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
+builder.Services.AddSingleton<ChatClient>(serviceProvider =>
+{
+    var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? "token";
 
+    return new ChatClient("gpt-4.1-mini", apiKey);
+});
 builder.Services.AddMudServices();
 builder.Services.AddSingleton<SettingsService>();
 builder.Services.AddScoped<NotificationService>();

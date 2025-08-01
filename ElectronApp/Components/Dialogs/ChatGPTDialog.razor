@@ -1,0 +1,106 @@
+﻿@using Benjis_Shop_Toolbox.Services
+@using ElectronNET.API.Entities
+@using ElectronApp.Models
+@using Markdig
+@using OpenAI.Chat
+@using ChatMessage = ElectronApp.Models.ChatMessage
+@using Size = MudBlazor.Size
+@inject ChatClient ChatClient
+
+<MudDialog MaxWidth="MaxWidth.Small" FullWidth="true">
+    <DialogContent>
+            <div Class="pa-4">
+                <MudStack Spacing="2">
+                    <div class="w-100">
+                        @foreach (var message in messages)
+                        {
+                            <MudChat ChatPosition="@message.Position">
+                                <MudAvatar>
+                                    @if (!string.IsNullOrEmpty(message.ImageSrc))
+                                    {
+                                        <MudImage Src="@message.ImageSrc"/>
+                                    }
+                                    else
+                                    {
+                                        @message.Initials
+                                    }
+                                </MudAvatar>
+                                <MudChatBubble>
+                                    @((MarkupString)Markdown.ToHtml(message.Text))
+                                </MudChatBubble>
+                            </MudChat>
+                        }
+                        @if (isLoading)
+                        {
+                            <MudChat ChatPosition="ChatBubblePosition.Start">
+                                <MudAvatar>
+                                    AI
+                                </MudAvatar>
+                                <MudChatBubble>
+                                    <MudProgressCircular Color="Color.Primary" Size="Size.Large"></MudProgressCircular>
+                                </MudChatBubble>
+                            </MudChat>
+                        }
+                    </div>
+                    <MudTextField Disabled="disableInput" @bind-Value="userInput" Label="Deine Frage" OnKeyDown="args => OnKeyDown(args)" Variant="Variant.Filled" Adornment="Adornment.End"
+                                  AdornmentIcon="@Icons.Material.Filled.Send" OnAdornmentClick="SendMessage"/>
+                </MudStack>
+            </div>
+    </DialogContent>
+    <DialogActions>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    private string userInput;
+    private List<ChatMessage> messages => AppInfo.Messages;
+    private bool disableInput = false;
+    private bool isLoading = false;
+    
+    private async Task OnKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            await SendMessage();
+        }
+    }
+    
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(userInput)) return;
+        disableInput = true;
+        isLoading = true;
+        StateHasChanged();
+        // Add user message
+        var userMsg = new ChatMessage(userInput, ChatBubblePosition.End, "DU");
+        messages.Add(userMsg);
+        
+        var history = new List<OpenAI.Chat.ChatMessage>();
+        foreach (var msg in messages)
+        {
+            if (msg.Position == ChatBubblePosition.End)
+                history.Add(new UserChatMessage(msg.Text));
+            else
+                history.Add(new AssistantChatMessage(msg.Text));
+        }
+
+        var ops = new ChatCompletionOptions()
+        {
+            MaxOutputTokenCount = 5000
+            
+        };
+        
+        ChatCompletion completion = await ChatClient.CompleteChatAsync(history.Count > 10 ? history.TakeLast(10) : history, ops);
+        
+        userInput = string.Empty;
+        if (!string.IsNullOrEmpty(completion.Content[0].Text))
+        {
+            var reply = completion.Content[0].Text;
+            messages.Add(new ChatMessage(reply, ChatBubblePosition.Start, "AI"));
+        }
+        disableInput = false;
+        isLoading = false;
+        StateHasChanged();
+    }
+}

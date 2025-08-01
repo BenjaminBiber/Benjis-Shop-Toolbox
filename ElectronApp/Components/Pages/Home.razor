@@ -59,8 +59,11 @@
     </div>
     <div class="col-12 col-lg-9 h-100">
         <div class="row mb-3">
-            <div class="col-3">
+            <div class="col-2">
                 <MudTextField Variant="Variant.Text" @bind-Value="_searchText" Immediate="true" Label="Suche" Class="w-100"/>
+            </div>
+            <div class="col-1">
+                <MudButton OnClick="ShowChatgptDialog">C</MudButton>
             </div>
             <div class="col-2">
                 <MudSelect T="MessageType" MultiSelection="true" MultiSelectionTextFunc="@(new Func<List<string>, string>(GetMultiSelectionTextMessage))" SelectedValues="_selectedMessageTypes" SelectedValuesChanged="@(async levels => await SelectedLevelsChanged(levels))" Label="LogMeldung">
@@ -447,6 +450,18 @@
         StartTimer();
     }   
 
+    private void ShowChatgptDialog()
+    {
+        var options = new DialogOptions
+        {
+            CloseButton = true,
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            BackdropClick = true,
+        };
+        DialogService.Show<ChatGPTDialog>("", options);
+    }
+    
     private void ShowLogDetails(TableRowClickEventArgs<LogEntry> args)
     {
         var parameters = new DialogParameters<LogEntryDialog> { {x => x.Entry, args.Item} };
