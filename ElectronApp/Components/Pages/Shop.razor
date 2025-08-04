@@ -74,6 +74,48 @@
             }
         }
         
+        @if (_config.ApiConnection != null)
+        {
+            <div class="row">
+                <div class="col">
+                    <MudText Typo="Typo.subtitle2">Api Connection</MudText>
+                    <MudPaper Class="pa-2 mb-2" Elevation="2">
+                        <div class="row">
+                            <div class="col-12">
+                                <MudTextField @bind-Value="_config.ApiConnection.Token" Label="Token" Variant="Variant.Outlined" Class="mb-2"></MudTextField>
+                            </div>
+                            <div class="col-12">
+                                <MudTextField @bind-Value="_config.ApiConnection.Url" Label="Url" Variant="Variant.Outlined" Class="mb-2"></MudTextField>
+                            </div>
+                        </div>
+                    </MudPaper>
+                </div>
+                <div class="col">
+                    <MudText Typo="Typo.subtitle2">Lizenz Server</MudText>
+                    <MudPaper Class="pa-2 mb-2" Elevation="2">
+                        <div class="row">
+                            <div class="col-12">
+                                <MudTextField @bind-Value="_config.LicenseService.Address" Label="Adresse" Variant="Variant.Outlined" Class="mb-2"></MudTextField>
+                            </div>
+                            <div class="col-12">
+                                <MudTextField @bind-Value="_config.LicenseService.CustomerNumber" Label="Kundennummer" Variant="Variant.Outlined" Class="mb-2"></MudTextField>
+                            </div>
+                            <div class="col-12">
+                                <MudTextField @bind-Value="_config.LicenseService.UserName" Label="Benutzername" Variant="Variant.Outlined" Class="mb-2"></MudTextField>
+                            </div>
+                            <div class="col-12">
+                                <MudTextField @bind-Value="_config.LicenseService.Password" Label="Passwort" Variant="Variant.Outlined" Class="mb-2"></MudTextField>
+                            </div>
+                            <div class="col-12 d-flex align-items-center justify-content-center">
+                                <MudSwitch @bind-Value="_config.LicenseService.IsStaging" Label="Ist Staging?" Color="Color.Primary" Class="mb-2"></MudSwitch>
+                            </div>
+                        </div>
+                    </MudPaper>
+                </div>
+            </div>
+          
+        }
+        
         <MudButton OnClick="Save" Color="Color.Primary" Variant="Variant.Filled" Class="mt-4">Speichern</MudButton>
     }
     else if (!string.IsNullOrEmpty(_selectedSite))

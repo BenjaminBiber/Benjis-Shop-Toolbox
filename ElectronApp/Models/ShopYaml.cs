@@ -62,6 +62,10 @@ public class MainAssembly
 public class LicenseService
 {
     public string Address { get; set; }
+    public string CustomerNumber { get; set; } 
+    public string UserName { get; set; } 
+    public string Password { get; set; } 
+    public bool IsStaging { get; set; } 
 }
 
 public static class ShopYamlLoader

@@ -10,13 +10,15 @@
 @using MudBlazor
 @implements IDisposable
 
+@{
+    var color = String.IsNullOrEmpty(Settings.IisAppName) ? Color.Default : GetColor();
+}
+
 <div class="row h-100">
+    @*ACTION ROW*@
     <div class="col-12 col-lg-3">
         <div class="row mb-3 mb-lg-0">
             <div class="col-4 col-lg-10">
-                @{
-                    var color = String.IsNullOrEmpty(Settings.IisAppName) ? Color.Default : GetColor();
-                }
                 <MudBadge Overlap="true" Dot="true" Class="w-100" Origin="Origin.TopRight" Color="color">
                     <MudSelect Value="Settings.IisAppName" ValueChanged="@((string? s) => SettingsService.Save(s))" Label="IIS App" Variant="Variant.Outlined" Class="mb-2 mt-2">
                         @foreach (var site in manager.Sites)
@@ -29,84 +31,79 @@
                     </MudSelect>
                 </MudBadge>
             </div>
-            <div class="col-4 col-lg-1 d-flex align-items-center justify-content-start justify-content-lg-center">
+            <div class="col-1 col-lg-1 d-flex align-items-center justify-content-start justify-content-lg-center">
                 <MudMenu Icon="@Icons.Material.Filled.OpenInNew" Class="mx-0 my-0" AriaLabel="Öffne IIS App im Browser">
-                    @if(!String.IsNullOrEmpty(Settings.IisAppName))
+                    @if (!String.IsNullOrEmpty(Settings.IisAppName))
                     {
                         @foreach (var binding in manager.Sites[Settings.IisAppName]?.Bindings ?? Enumerable.Empty<Binding>())
                         {
                             var url = GetSiteUrl(binding);
                             if (url != null)
                             {
-                                <MudMenuItem OnClick="@(() => OpenInBrowser(url))" Label="@url" />
+                                <MudMenuItem OnClick="@(() => OpenInBrowser(url))" Label="@url"/>
                             }
                         }
                     }
                 </MudMenu>
             </div>
-            <div class="col-4 d-flex justify-content-evenly align-items-center d-lg-none">
-                <MudIconButton Color="Color.Success" Icon="@Icons.Material.Filled.Start" Variant="Variant.Filled" OnClick="StartIisApp">Start</MudIconButton>
-                <MudIconButton Color="Color.Warning" Icon="@Icons.Material.Filled.RestartAlt" Variant="Variant.Filled" OnClick="RestartIisApp">Neustart</MudIconButton>
-                <MudIconButton Color="Color.Error" Icon="@Icons.Material.Filled.Stop" Variant="Variant.Filled" OnClick="StopIisApp">Stop</MudIconButton>
+            <div class="col-7 d-flex col-lg-12 justify-content-evenly gap-3 flex-lg-column align-items-center">
+                <MudButton Color="Color.Success" Class="w-100" StartIcon="@Icons.Material.Filled.Start" Variant="Variant.Filled" OnClick="StartIisApp">Start</MudButton>
+                <MudButton Color="Color.Warning" Class="w-100" StartIcon="@Icons.Material.Filled.RestartAlt" Variant="Variant.Filled" OnClick="RestartIisApp">Neustart</MudButton>
+                <MudButton Color="Color.Error" Class="w-100" StartIcon="@Icons.Material.Filled.Stop" Variant="Variant.Filled" OnClick="StopIisApp">Stop</MudButton>
+            </div>
+        </div>
+    </div>
+    
+    @*FILTER AND SEARCH*@
+    <div class="col-12 col-lg-9" style="height: calc(100dvh - var(--mud-appbar-height) - 2rem);">
+        <div class="row mb-3">
+            @*SEARCH*@
+            <div class="col">
+                <MudTextField Variant="Variant.Text" @bind-Value="_searchText" Immediate="true" Label="Suche" Class="w-100"/>
+            </div>
+            @*FILTER*@
+            <div class="col-1">
+                <MudIconButton Icon="@Icons.Material.Filled.FilterAlt" OnClick="HandlePopOver"></MudIconButton>
+                <div @onclick="HandlePopOver" class="@(_isPopOverOpen ? "position-absolute" : "d-none")" style="background: rgba(1,1,1,0.1); z-index: 3; height: 100dvh; width: 100vw; left: 0; top: 0"></div>
+                <MudPopover Class="pa-6" Open="@_isPopOverOpen" AnchorOrigin="Origin.BottomRight">
+                    <div class="d-flex gap-3 flex-column">
+                        <MudText Class="fw-bold fs-3">Filter</MudText>
+                        <MudSelect T="MessageType" MultiSelection="true" MultiSelectionTextFunc="@(new Func<List<string>, string>(GetMultiSelectionTextMessage))" SelectedValues="_selectedMessageTypes" SelectedValuesChanged="@(async levels => await SelectedLevelsChanged(levels))" Label="LogMeldung">
+                            @foreach (var level in Enum.GetValues<MessageType>())
+                            {
+                                <MudSelectItem Value="@level">@level.GetDescription()</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudSelect T="LogLevel" MultiSelection="true" MultiSelectionTextFunc="@(new Func<List<string>, string>(GetMultiSelectionText))" SelectedValues="_selectedLevels" SelectedValuesChanged="@(async levels => await SelectedLevelsChanged(levels))" Label="Ebene">
+                            @foreach (var level in Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All))
+                            {
+                                <MudSelectItem Value="@level">@level.GetDescription()</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudSelect T="ReloadOption" Value="_logOptions" ValueChanged="@(async (ReloadOption l) => await LoadLogs(l))" Label="Zeitpunkt">
+                            @foreach (var level in Enum.GetValues<ReloadOption>())
+                            {
+                                <MudSelectItem Value="@level">@level.GetDescription()</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudSelect T="double" Value="_refreshSeconds" ValueChanged="@((double l) => HandleTimer(l))" Label="Logs neu laden">
+                            @foreach (var reloadTime in ReloadTime.ReloadTimes)
+                            {
+                                <MudSelectItem Value="@reloadTime.Value.TotalSeconds">@reloadTime.Key</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </div>
+                </MudPopover>
+            </div>
+            @*RELOAD*@
+            <div class="col-1">
+                <MudIconButton Icon="@Icons.Material.Filled.Autorenew" OnClick="LoadLogs"></MudIconButton>
             </div>
         </div>
         
-        <MudStack Row="false" Class="d-none d-lg-flex mr-17" Spacing="2">
-            <MudButton Color="Color.Success" StartIcon="@Icons.Material.Filled.Start" Variant="Variant.Filled" OnClick="StartIisApp">Start</MudButton>
-            <MudButton Color="Color.Warning" StartIcon="@Icons.Material.Filled.RestartAlt" Variant="Variant.Filled" OnClick="RestartIisApp">Neustart</MudButton>
-            <MudButton Color="Color.Error" StartIcon="@Icons.Material.Filled.Stop" Variant="Variant.Filled" OnClick="StopIisApp">Stop</MudButton>
-        </MudStack>
-    </div>
-    <div class="col-12 col-lg-9 h-100">
-        <div class="row mb-3">
-            <div class="col-3">
-                <MudTextField Variant="Variant.Text" @bind-Value="_searchText" Immediate="true" Label="Suche" Class="w-100"/>
-            </div>
-            <div class="col-2">
-                <MudSelect T="MessageType" MultiSelection="true" MultiSelectionTextFunc="@(new Func<List<string>, string>(GetMultiSelectionTextMessage))" SelectedValues="_selectedMessageTypes" SelectedValuesChanged="@(async levels => await SelectedLevelsChanged(levels))" Label="LogMeldung">
-                    @foreach (var level in Enum.GetValues<MessageType>())
-                    {
-                        <MudSelectItem Value="@level">@level.GetDescription()</MudSelectItem>
-                    }
-                </MudSelect>
-            </div>
-            <div class="col-2">
-                <MudSelect T="LogLevel" MultiSelection="true" MultiSelectionTextFunc="@(new Func<List<string>, string>(GetMultiSelectionText))" SelectedValues="_selectedLevels" SelectedValuesChanged="@(async levels => await SelectedLevelsChanged(levels))" Label="Ebene">
-                    @foreach (var level in Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All))
-                    {
-                        <MudSelectItem Value="@level">@level.GetDescription()</MudSelectItem>
-                    }
-                </MudSelect>
-            </div>
-            <div class="col-2">
-                <MudSelect T="ReloadOption" Value="_logOptions" ValueChanged="@(async (ReloadOption l) => await LoadLogs(l))" Label="Zeitpunkt">
-                    @foreach (var level in Enum.GetValues<ReloadOption>())
-                    {
-                        <MudSelectItem Value="@level">@level.GetDescription()</MudSelectItem>
-                    }
-                </MudSelect>
-            </div>
-            <div class="col-2">
-                <MudSelect T="double" Value="_refreshSeconds" ValueChanged="@((double l) => HandleTimer(l))" Label="Logs neu laden">
-                    @foreach (var reloadTime in ReloadTime.ReloadTimes)
-                    {
-                        <MudSelectItem Value="@reloadTime.Value.TotalSeconds">@reloadTime.Key</MudSelectItem>
-                    }
-                </MudSelect>
-            </div>
-            <div class="col-1">
-                <MudIconButton Icon="@Icons.Material.Filled.Autorenew" OnClick="@(async () => await LoadLogs())"></MudIconButton>
-            </div>
-        </div>
-        @if (_isLoading)
+        @if (DisplayLogs.Any())
         {
-            <div class="position-absolute mr-auto ml-auto d-flex justify-content-center my-3">
-                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
-            </div>
-        }
-        else if (DisplayLogs.Any())
-        {
-            <MudTable Style="height: 85dvh" Height="95%" FixedFooter="true" FixedHeader="true" Items="DisplayLogs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
+            <MudTable Style="height: 90%" Height="90%" Loading="_isLoading" FixedFooter="true" FixedHeader="true" Items="DisplayLogs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
                 <HeaderContent>
                     <MudTh>Zeit</MudTh>
                     <MudTh>Ebene</MudTh>
@@ -238,6 +235,7 @@
     private string _searchText = string.Empty;
     private bool _isLoading;
     private ReloadOption reload;
+    private bool _isPopOverOpen;
     
     private DateTime SelectedSince => _logOptions == ReloadOption.AlleLogs
         ? DateTime.MinValue
@@ -542,6 +540,11 @@
             // Optional: Fehlerbehandlung
             Console.WriteLine($"Fehler beim Öffnen: {ex.Message}");
         }
+    }
+
+    private void HandlePopOver()
+    {
+        _isPopOverOpen = !_isPopOverOpen;
     }
 
 }
