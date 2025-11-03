@@ -1,0 +1,139 @@
+﻿@page "/WidgetPage"
+@using Microsoft.EntityFrameworkCore
+@using Toolbox.Components.Dialogs
+@using Toolbox.Data.Models
+@using Toolbox.Data.Models.Extensions
+@using Toolbox.Data.Services
+@inject IConnectionStringResolver Resolver
+@inject IExternalDbContextFactory ShopFactory
+@inject SettingsService SettingsService
+@inject IisService IisService
+@inject SqlBuilder SqlBuilder
+@inject IDialogService DialogService
+@inject NotificationService NotificationService
+
+<div class="row p-4">
+    <MudText Typo="Typo.h5">Widgets</MudText>   
+    <div class="col-11">
+        <MudSelect Variant="Variant.Outlined" Value="(SelectedShopSetting ?? Settings.ShopSettingsList.FirstOrDefault()).SiteId" ValueChanged="ChangeSelectedShop" T="long">
+            @foreach (var shopPaths in Settings.ShopSettingsList)
+            {
+                <MudSelectItem Value="shopPaths.SiteId">@IisService.GetSiteNameById(shopPaths.SiteId) (@shopPaths.GetShopYamlContent().ZionConfiguration.DatabaseConnections.FirstOrDefault().ToString())</MudSelectItem>
+            }
+        </MudSelect>
+    </div>
+    <div class="col-1 d-flex align-items-center justify-content-center">
+        <MudTooltip Text="Ausgewählte Widgets als SQL exportieren">
+            <MudIconButton Disabled="!_selectedWidgets.Any()" Icon="@Icons.Material.Filled.Publish" OnClick="ExportWidgets" Color="Color.Primary"/>
+        </MudTooltip>
+        @* <MudTooltip Text="Neues Widget hinzufügen"> *@
+        @*     <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary"/> *@
+        @* </MudTooltip> *@
+    </div>
+</div>
+
+@if (Widgets.Any())
+{
+    <div class="row g-0 px-3 g- d-flex align-items-start justify-content-center gap-3">
+          <MudPaper Class="col-12 mx-3 p-4">
+                <MudTable @bind-SelectedItems="_selectedWidgets" MultiSelection="true" Loading="_loading" Elevation="0" Items="Widgets" Hover="true" Dense="true">
+                    <HeaderContent>
+                    <MudTh>WidgetId</MudTh>
+                    <MudTh>ShopId</MudTh>
+                    <MudTh>WidgetType</MudTh>
+                    <MudTh>Label</MudTh>
+                    <MudTh>LocationKey</MudTh>
+                    <MudTh>Config</MudTh>
+                    <MudTh>PublishAt</MudTh>
+                    <MudTh>PublishUntil</MudTh>
+                    <MudTh>Sorting</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="WidgetId">@context.WidgetId</MudTd>
+                    <MudTd DataLabel="ShopId">@context.ShopId</MudTd>
+                    <MudTd DataLabel="WidgetType">@(context.WidgetType != null ? context.WidgetType.Label : "---")</MudTd>
+                    <MudTd DataLabel="Label">@context.Label</MudTd>
+                    <MudTd DataLabel="LocationKey">@context.LocationKey</MudTd>
+                    <MudTd DataLabel="Config">@context.Config</MudTd>
+                    <MudTd DataLabel="PublishAt">@context.PublishAt</MudTd>
+                    <MudTd DataLabel="PublishUntil">@context.PublishUntil</MudTd>
+                    <MudTd DataLabel="Sorting">@context.Sorting</MudTd>
+                </RowTemplate>
+            </MudTable>
+            </MudPaper>
+        </div>
+}
+else
+{
+    <div class="d-flex justify-content-center my-3">
+        <MudAlert Icon="@Icons.Material.Filled.Info" Variant="Variant.Filled" Severity="Severity.Info">Keine Widgets für die aktuell ausgewählte Seite vorhanden</MudAlert>
+    </div>   
+}
+
+@code {
+    private bool _loading = true;
+    private List<Widget> Widgets = [];
+    private ToolboxSettings Settings => SettingsService.Settings;
+    private ShopSetting? SelectedShopSetting => Settings.GetShopSettingForCurrentSite();
+    private HashSet<Widget> _selectedWidgets = [];
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWidgets();
+    }
+    
+    private async Task ExportWidgets()
+    {
+        var insertStatement = _selectedWidgets.ToList().GetInsertStatement(SqlBuilder);
+        var options = new DialogOptions()
+        {
+            FullWidth = true,
+            MaxWidth = MaxWidth.Large,
+            CloseButton = true,
+            BackdropClick = true
+        };
+        var parameters = new DialogParameters<SQLDialog>()
+        {
+            { x => x.SqlText, insertStatement }
+        };
+        await DialogService.ShowAsync<SQLDialog>("Widget Insert Statement", parameters, options);
+    }
+    
+    private async Task LoadWidgets()
+    {
+        _loading = true;
+        
+        if (SelectedShopSetting == null || SelectedShopSetting.GetConnectionString() == null)
+        {
+            return;
+        }
+
+        try
+        {
+            Resolver.SetCurrent(SelectedShopSetting.GetConnectionString());
+            using var db = ShopFactory.Create();
+            Widgets = await db.Widgets.ToListAsync();
+        }
+        catch (Exception e)
+        {
+            NotificationService.Error(e.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+    
+    private async Task ChangeSelectedShop(long siteId)
+    {
+        var siteName = IisService.GetSiteNameById(siteId);
+        if (!string.IsNullOrEmpty(siteName))
+        {
+            Settings.IisAppName = siteName;
+            SettingsService.SaveSettings();
+        }
+
+        await LoadWidgets();
+    }
+    
+}

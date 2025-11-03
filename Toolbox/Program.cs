@@ -60,6 +60,7 @@ builder.Services.AddScoped<AppInfoService>();
 builder.Services.AddScoped<IAppInfoService, AppInfoService>();
 builder.Services.AddScoped<IisService>();
 builder.Services.AddScoped<DatabaseConnectionService>();
+builder.Services.AddScoped<SqlBuilder>();
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())

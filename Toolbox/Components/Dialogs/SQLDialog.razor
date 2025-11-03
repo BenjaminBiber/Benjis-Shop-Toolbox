@@ -1,0 +1,9 @@
+﻿@page "/SQLDialog"
+@using Blazor.AceEditorJs
+
+<AceJsEditor Style="min-height: 40dvh;" @bind-Value ="@SqlText" Options="_opt"></AceJsEditor>
+
+@code {
+    [Parameter] public string SqlText { get; set; } = "";
+    readonly AceEditorOptions _opt = new() { IsReadOnly = false, Language = AceLanguage.sqlserver, Theme = AceTheme.sqlserver };
+}
