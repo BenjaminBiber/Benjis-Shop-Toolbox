@@ -1,0 +1,54 @@
+name: Release Build
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      changelog: ${{ steps.release.outputs.changelog }}
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          release-type: simple
+          skip-github-pull-request: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+      - name: Debug Release Output
+        run: |
+          echo "Release created: ${{ steps.release.outputs.release_created }}"
+          echo "Tag: ${{ steps.release.outputs.tag_name }}"
+          echo "Changelog: ${{ steps.release.outputs.changelog }}"
+
+
+  build:
+    needs: release
+    if: ${{ needs.release.outputs.release_created == 'true' }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Publish self-contained EXE
+        run: dotnet publish Benjis-Shop-Toolbox/Benjis-Shop-Toolbox.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release.outputs.tag_name }}
+          body: ${{ needs.release.outputs.changelog }}
+          files: publish/Benjis-Shop-Toolbox.exe

@@ -1,0 +1,101 @@
+@page "/sites"
+@using Toolbox.Data.Services
+@using Toolbox.Data.Models
+@using Microsoft.Web.Administration
+@using Toolbox.Components.Dialogs
+@using Toolbox.Services
+@inject Toolbox.Services.SettingsService SettingsService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject IisService IisService
+
+<MudPaper Class="pa-4" Elevation="4">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <MudText Typo="Typo.h5">IIS-Seiten</MudText>
+    </div>
+    
+    <MudTable Items="_sites" Hover="true">
+        <HeaderContent>
+            <MudTh>Name</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Aktionen</MudTh>
+            <MudTh>Shop-Pfade</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Name" Class="fw-bold fs-6">@context.Name</MudTd>
+            <MudTd DataLabel="Status">
+                <MudIcon Icon="@Icons.Material.Filled.Circle" Color="GetStateIconColor(context.State)"></MudIcon>
+                @GetState(context.State)
+            </MudTd>
+            <MudTd>
+                <MudButtonGroup Variant="Variant.Filled" OverrideStyles="false">
+                    <MudButton Size="Size.Small" OnClick="@(() => IisService.StartIisApp(context))" Color="Color.Success" Variant="Variant.Filled">Start</MudButton>
+                    <MudButton Size="Size.Small" OnClick="@(() => IisService.StopIisApp(context))" Color="Color.Error" Variant="Variant.Filled" Class="ms-1">Stop</MudButton>
+                    <MudButton Size="Size.Small" OnClick="@(() => IisService.RestartIisApp(context))" Color="Color.Warning" Variant="Variant.Filled" Class="ms-1">Neustarten</MudButton>
+                </MudButtonGroup>
+            </MudTd>
+            <MudTd>
+                <MudButton Color="Color.Primary" Size="Size.Small" Variant="Variant.Filled" OnClick="@(() => EditPaths(context.Id))">@(Settings.ShopSettingsList.Any(x => x.SiteId == context.Id) ? "Pfade bearbeiten" : "Pfade hinzufügen")</MudButton>
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+</MudPaper>
+
+@code {
+    private ToolboxSettings Settings => SettingsService.Settings;
+    private List<Site> _sites = new();
+
+    private String GetState(ObjectState state)
+    {
+        return state switch
+        {
+            ObjectState.Started => "Gestartet",
+            ObjectState.Starting => "Wird gestartet",
+            ObjectState.Stopped => "Gestoppt",
+            ObjectState.Stopping => "Wird gestoppt",
+            ObjectState.Unknown => "Unbekannt",
+            _ => "Unbekannt"
+        };
+    }
+
+    private Color GetStateIconColor(ObjectState state)
+    {
+        return state switch
+        {
+            ObjectState.Started => Color.Success,
+            ObjectState.Starting => Color.Warning,
+            ObjectState.Stopped => Color.Error,
+            ObjectState.Stopping => Color.Error,
+            ObjectState.Unknown => Color.Warning,
+            _ => Color.Dark
+        };
+    }
+    
+    protected override void OnInitialized()
+    {
+        try
+        {
+            using var manager = new ServerManager();
+            _sites = manager.Sites.ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fehler beim Laden der Sites: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task EditPaths(long siteId)
+    {
+        var parameters = new DialogParameters<SitePathsDialog> {{x => x.SiteId, siteId}};
+        var options = new DialogOptions()
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true,
+            BackdropClick = false
+        };
+        await DialogService.ShowAsync<SitePathsDialog>("Shop-Pfade", parameters, options);
+    }
+}
+
+

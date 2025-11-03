@@ -1,0 +1,322 @@
+@page "/shop"
+@using System.Diagnostics
+@using System.IO
+@using Toolbox.Data.Services
+@using Toolbox.Data.Models
+@using Microsoft.Web.Administration
+@using Toolbox.Components.Dialogs
+@using Toolbox.Data.Models.ShopYaml
+@using Toolbox.Services
+@inject Toolbox.Services.SettingsService SettingsService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject IisService IisService
+@inject DatabaseConnectionService DBCService
+
+<MudPaper Class="pa-4" Elevation="0">
+    <MudText Typo="Typo.h5" Class="mb-2">Shop</MudText>
+    <div class="row mb-5">
+        <div class="col-9">
+            <MudSelect Variant="Variant.Outlined" Value="(SelectedSetting ?? Settings.ShopSettingsList.FirstOrDefault()).SiteId" ValueChanged="OnSiteChanged" T="long">
+                @foreach (var shopPaths in Settings.ShopSettingsList)
+                {
+                    <MudSelectItem Value="shopPaths.SiteId">@IisService.GetSiteNameById(shopPaths.SiteId)</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+        <div class="col-3 justify-content-around align-items-center d-flex gap-2">
+            <MudButtonGroup Size="Size.Large" Color="Color.Dark" Variant="Variant.Outlined">
+                <MudTooltip Text="Start">
+                    <MudIconButton Color="Color.Success" Icon="@Icons.Material.Filled.Start" OnClick="IisService.StartIisApp"/>
+                </MudTooltip>
+                <MudTooltip Text="Neustart">
+                    <MudIconButton Color="Color.Warning" Icon="@Icons.Material.Filled.RestartAlt" OnClick="@(() => IisService.RestartIisApp())"/>
+                </MudTooltip>
+                <MudTooltip Text="Stop">
+                    <MudIconButton Color="Color.Error" Icon="@Icons.Material.Filled.Stop" OnClick="IisService.StopCurrentIisApp"/>
+                </MudTooltip>
+            </MudButtonGroup>
+            @if (SelectedSetting != null)
+            {
+                <MudTooltip Text="Shop.yaml öffnen in">
+                    <MudMenu Size="Size.Large" Icon="@Icons.Material.Filled.OpenInNew">
+                        <MudMenuItem Icon="@Icons.Material.Filled.Code" OnClick="SelectedSetting.OpenInVsc" Label="Visual Studio Code"/>
+                        <MudMenuItem Icon="@Icons.Material.Filled.FileOpen" OnClick="SelectedSetting.OpenInExplorer" Label="Explorer"/>
+                    </MudMenu>
+                </MudTooltip>
+            }
+            
+            <MudTooltip Text="Speichern">
+                <MudIconButton Size="Size.Large" Color="Color.Info" Disabled="DisableYamlSaveButton()" Icon="@Icons.Material.Filled.Save" OnClick="SaveConfigurationToYaml"/>
+            </MudTooltip>
+        </div>
+    </div>
+    @if (SelectedSetting == null || ShopsystemConfig == null)
+    {
+        <MudAlert Severity="Severity.Info">Kein Shop ausgewählt oder konfiguriert.</MudAlert>
+    }
+    else
+    {
+        <div class="row g-5 p-3">
+            <div class="col-6 mt-3">
+                <div class="row">
+                    <MudPaper Class="p-3 row mt-5" Elevation="4">
+                        <MudText Class="fw-bold" Typo="Typo.body2">Shop Einstellungen</MudText>
+                        <div class="col-6">
+                            <MudNumericField Variant="Variant.Outlined" T="int" @bind-Value="ShopsystemConfig.ZionConfiguration.UserId" Label="UserId" Placeholder="UserId" Min="1" Max="420"></MudNumericField>
+                        </div>
+                        <div class="col-6">
+                            <MudNumericField Variant="Variant.Outlined" T="int" @bind-Value="ShopsystemConfig.ZionConfiguration.ShopId" Label="ShopId" Placeholder="ShopId" Min="1" Max="420"></MudNumericField>
+                        </div>
+                        <div class="col-12">
+                            <MudTextField Immediate="true" T="string" @bind-Value="ShopsystemConfig.ZionConfiguration.BaseTheme" Label="BaseTheme" Placeholder="BaseTheme" Variant="Variant.Outlined"></MudTextField>
+                        </div>
+                        <div class="col-12">
+                            <MudTextField Immediate="true" T="string" @bind-Value="ShopsystemConfig.ZionConfiguration.ThemeOverwrite" Label="ThemeOverwrite" Placeholder="ThemeOverwrite" Variant="Variant.Outlined"></MudTextField>
+                        </div>
+                    </MudPaper>
+                   
+                    <MudPaper Class="p-3 row mt-5" Elevation="4">
+                        <div class="row">
+                            <div class="col-10 d-flex align-items-center justify-content-start">
+                                <MudText Class="fw-bold" Typo="Typo.body2">Datenbank Einstellungen</MudText>
+                            </div>
+                            <div class="col-2 p-0 d-flex justify-content-end gap-4 align-items-center">
+                                <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Save" OnClick="SaveDataBaseConnection" Disabled="DisableSaveConnectionButton()" Color="Color.Primary"></MudIconButton>
+                                <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Delete" OnClick="DeleteDatabaseConnection" Disabled="DisableDeleteConnectionButton()" Color="Color.Error"></MudIconButton>
+                            </div>
+                        </div>
+                        <MudSelect Class="mb-3" T="DatabaseConnection" Value="ShopsystemConfig.ZionConfiguration.DatabaseConnections.FirstOrDefault()" ValueChanged="DatabaseConnectionChanged" Variant="Variant.Filled" Placeholder="Gespeicherte Datenbank-Verbindungen" Label="Gespeicherte Datenbank-Verbindungen">
+                            @foreach (var connection in DatabaseConnections)
+                            {
+                                <MudSelectItem Value="connection">@connection.ToString()</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <div class="col-12 mt-2">
+                            <MudTextField T="string" @bind-Value="SelectedDatabaseConnection.Server" Label="Server" Placeholder="Server" Variant="Variant.Outlined"></MudTextField>
+                        </div>
+                        <div class="col-12">
+                            <MudTextField T="string" @bind-Value="SelectedDatabaseConnection.Database" Label="Database" Placeholder="Database" Variant="Variant.Outlined"></MudTextField>
+                        </div>
+                        <div class="col-12">
+                            <MudTextField T="string" @bind-Value="SelectedDatabaseConnection.User" Label="User" Placeholder="User" Variant="Variant.Outlined"></MudTextField>
+                        </div>
+                        <div class="col-12">
+                            <MudTextField T="string" @bind-Value="SelectedDatabaseConnection.Password" InputType="passwordInputType" AdornmentIcon="@adornmentIcon" Adornment="Adornment.End" OnAdornmentClick="@(() => showPassword = !showPassword)" Label="Password" Placeholder="Password" Variant="Variant.Outlined"></MudTextField>
+                        </div>
+                        <div class="col-6">
+                            <MudNumericField Variant="Variant.Outlined" T="int" @bind-Value="SelectedDatabaseConnection.MaxPoolSize" Label="MaxPoolSize" Placeholder="MaxPoolSize" Min="1" Max="10000"></MudNumericField>
+                        </div>
+                        <div class="col-6 d-flex align-items-center justify-content-center">
+                            <MudCheckBox T="bool" @bind-Value="SelectedDatabaseConnection.Encrypt" Label="Encrypt"></MudCheckBox>
+                        </div>
+                    </MudPaper>
+                </div>
+            </div>
+            <div class="col-6 mt-3">
+                <div class="row">
+                    <MudPaper Class="p-3 row mt-5" Elevation="4">
+                        <MudText Class="fw-bold" Typo="Typo.body2">Application Einstellungen</MudText>
+                        <div class="col-6">
+                            <MudTextField Immediate="true" T="string" @bind-Value="ShopsystemConfig.ZionConfiguration.ApplicationConfiguration.ApplicationType" Label="ApplicationType" Placeholder="ApplicationType" Variant="Variant.Outlined"></MudTextField>
+                        </div>
+                        <div class="col-6">
+                            <MudTextField Immediate="true" T="string" @bind-Value="ShopsystemConfig.ZionConfiguration.ApplicationConfiguration.CacheMode" Label="CacheMode" Placeholder="CacheMode" Variant="Variant.Outlined"></MudTextField>
+                        </div>
+                        <div class="col-6">
+                            <MudTextField Immediate="true" T="string" @bind-Value="ShopsystemConfig.ZionConfiguration.ApplicationConfiguration.DatabaseTpe" Label="DatabaseTpe" Placeholder="DatabaseTpe" Variant="Variant.Outlined"></MudTextField>
+                        </div>
+                        <div class="col-6">
+                            <MudTextField Immediate="true" T="string" @bind-Value="ShopsystemConfig.ZionConfiguration.ApplicationConfiguration.DatabaseVersion" Label="DatabaseVersion" Placeholder="DatabaseVersion" Variant="Variant.Outlined"></MudTextField>
+                        </div>
+                    </MudPaper>
+                    <MudPaper Class="p-3 row mt-5" Elevation="4">
+                        <MudText Class="fw-bold" Typo="Typo.body2">Extensions</MudText>
+                        <div class="col-12">
+                            <MudTextField Immediate="true" T="string" @bind-Value="ShopsystemConfig.ZionConfiguration.Extensions.Directory" Label="Extension-Verzeichnis" Placeholder="Extension-Verzeichnis" Variant="Variant.Outlined"></MudTextField>
+                        </div>
+                    </MudPaper>
+                    <MudPaper Class="p-3 row mt-5" Elevation="4">
+                        <MudText Class="fw-bold" Typo="Typo.body2">Assembly</MudText>
+                        <div class="col-12">
+                            <MudTextField Immediate="true" T="string" @bind-Value="ShopsystemConfig.ZionConfiguration.MainAssembly.AssemblyName" Label="Haupt-Assembly" Placeholder="Haupt-Assembly" Variant="Variant.Outlined"></MudTextField>
+                        </div>
+                    </MudPaper>
+                    <MudPaper Class="p-3 row mt-5" Elevation="4">
+                        <MudText Class="fw-bold" Typo="Typo.body2">Lizenzserver</MudText>
+                        <div class="col-12">
+                            <MudTextField Immediate="true" T="string" @bind-Value="ShopsystemConfig.ZionConfiguration.LicenseService.Address" Label="Adresse" Placeholder="Adresse" Variant="Variant.Outlined"></MudTextField>
+                        </div>
+                        <div class="col-12">
+                            <MudTextField Immediate="true" T="string" @bind-Value="ShopsystemConfig.ZionConfiguration.LicenseService.CustomerNumber" Label="CustomerNumber" Placeholder="CustomerNumber" Variant="Variant.Outlined"></MudTextField>
+                        </div>
+                        <div class="col-6">
+                            <MudTextField Immediate="true" T="string" @bind-Value="ShopsystemConfig.ZionConfiguration.LicenseService.Username" Label="Username" Placeholder="Username" Variant="Variant.Outlined"></MudTextField>
+                        </div>
+                        <div class="col-6">
+                            <MudTextField Immediate="true" T="string" @bind-Value="ShopsystemConfig.ZionConfiguration.LicenseService.Password" Label="Password" Placeholder="Password" Variant="Variant.Outlined"></MudTextField>
+                        </div>
+                        <div class="col-12 d-flex align-items-center justify-content-center">
+                            <MudCheckBox T="bool" @bind-Value="ShopsystemConfig.ZionConfiguration.LicenseService.IsStaging" Label="Ist Staging"></MudCheckBox>
+                        </div>
+                    </MudPaper>
+                </div>
+            </div>
+        </div>
+    }
+</MudPaper>
+
+@code {
+    private ToolboxSettings Settings => SettingsService.Settings;
+    private ShopSetting? SelectedSetting => Settings.GetShopSettingForCurrentSite();
+    private ShopsystemConfig ShopsystemConfig;
+    private List<DatabaseConnection> DatabaseConnections => DBCService.DatabaseConnections;
+    private DatabaseConnection SelectedDatabaseConnection;
+    private bool showPassword;
+    private string adornmentIcon => showPassword ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff;
+    private InputType passwordInputType => showPassword ? InputType.Text : InputType.Password;
+    
+    protected override void OnInitialized()
+    {
+        GetYamlContent();
+        CheckDatabaseConnection();
+    }
+
+    private bool DisableYamlSaveButton()
+    {
+        if (SelectedSetting == null || String.IsNullOrEmpty(SelectedSetting.ShopYamlPath))
+        {
+            return true;
+        }
+        var savedYaml = ShopYamlService.LoadConfiguration(SelectedSetting.ShopYamlPath);
+        return ShopsystemConfig.Equals(savedYaml);
+    }
+    
+    private void DatabaseConnectionChanged(DatabaseConnection databaseConnection)
+    {
+        SelectedDatabaseConnection = databaseConnection;
+        ShopsystemConfig.ZionConfiguration.DatabaseConnections = new List<DatabaseConnection>() { SelectedDatabaseConnection.DeepClone() };
+        ShopYamlService.WriteConfiguration(SelectedSetting.ShopYamlPath, ShopsystemConfig);
+    }
+
+    private void DeleteDatabaseConnection()
+    {
+        DatabaseConnections.Remove(SelectedDatabaseConnection);
+        DBCService.SaveChanges();
+        GetYamlContent();
+        CheckDatabaseConnection();
+    }
+
+    private bool DisableDeleteConnectionButton()
+    {
+        var configs = new List<ShopsystemConfig>();
+        foreach (var shopSetting in Settings.ShopSettingsList)
+        {
+            configs.Add(ShopYamlService.LoadConfiguration(shopSetting.ShopYamlPath));
+        }
+
+        var configConnections = configs.SelectMany(x => x.ZionConfiguration.DatabaseConnections).ToList();
+        var one = configConnections.Any(x => x == SelectedDatabaseConnection);
+        var two = !DisableSaveConnectionButton();
+        return one || two;
+    }
+    
+    private bool DisableSaveConnectionButton()
+    {
+        var first = ShopsystemConfig.ZionConfiguration.DatabaseConnections.FirstOrDefault();
+
+        if (first == null)
+        {
+            return true;
+        }
+        
+        return SelectedDatabaseConnection.Equals(first) || DatabaseConnections.Any(x => x.Equals(SelectedDatabaseConnection));
+    }
+
+    private void SaveDataBaseConnection()
+    {
+        if (SelectedSetting == null)
+        {
+            return;
+        }
+        ShopsystemConfig.ZionConfiguration.DatabaseConnections = new List<DatabaseConnection>() { SelectedDatabaseConnection.DeepClone() };
+        CheckDatabaseConnection();
+        ShopYamlService.WriteConfiguration(SelectedSetting.ShopYamlPath, ShopsystemConfig);
+    }
+    
+    private void CheckDatabaseConnection()
+    {
+        if (ShopsystemConfig == null || (!ShopsystemConfig.ZionConfiguration.DatabaseConnections.Any() && ShopsystemConfig.ZionConfiguration.DatabaseConnections.FirstOrDefault() == null))
+        {
+            return;
+        }
+        var dbConf = ShopsystemConfig.ZionConfiguration.DatabaseConnections.FirstOrDefault();
+        if (dbConf == null)
+        {
+            return;
+        }
+        SelectedDatabaseConnection = dbConf.DeepClone();
+
+        if (!DatabaseConnections.Any(x => x == ShopsystemConfig.ZionConfiguration.DatabaseConnections.FirstOrDefault()))
+        {
+           
+            DatabaseConnections.Add(dbConf);
+            DBCService.SaveChanges();
+        }
+    }
+
+    private void SaveConfigurationToYaml()
+    {
+        ShopYamlService.WriteConfiguration(SelectedSetting.ShopYamlPath, ShopsystemConfig);
+    }
+    
+    private void GetYamlContent()
+    {
+        if (SelectedSetting != null && !String.IsNullOrEmpty(SelectedSetting.ShopYamlPath))
+        {
+            ShopsystemConfig = ShopYamlService.LoadConfiguration(SelectedSetting.ShopYamlPath);
+        }else if (SelectedSetting == null && Settings.ShopSettingsList.Any())
+        {
+            Settings.IisAppName = IisService.GetSiteNameById(Settings.ShopSettingsList.FirstOrDefault().SiteId);
+            SettingsService.SaveSettings();
+            GetYamlContent();
+        }
+    }
+    
+    private Task OnSiteChanged(long site)
+    {
+        Settings.IisAppName = IisService.GetSiteNameById(site);
+        GetYamlContent();
+        CheckDatabaseConnection();
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private async Task EditPaths()
+    {
+        if (SelectedSetting == null)
+        {
+            return;
+        }
+        
+        var parameters = new DialogParameters<SitePathsDialog> {{x => x.SiteId, SelectedSetting.SiteId}};
+        var options = new DialogOptions()
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true,
+            BackdropClick = false
+        };
+        await DialogService.ShowAsync<SitePathsDialog>("Shop-Pfade", parameters, options);
+    }
+    
+    private void OpenThemes()
+    {
+        var path = SelectedSetting?.ThemeFolderPath;
+        if (!string.IsNullOrWhiteSpace(path) && System.IO.Directory.Exists(path))
+        {
+            System.Diagnostics.Process.Start("explorer.exe", path);
+        }
+    }
+}
+

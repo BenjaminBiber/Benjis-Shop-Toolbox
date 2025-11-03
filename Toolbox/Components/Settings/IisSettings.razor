@@ -1,0 +1,100 @@
+﻿@using Toolbox.Data.Common
+@using Toolbox.Data.Models
+@using Toolbox.Services
+@inject SettingsService SettingsService
+@inject FileDialogService FileDialog
+@inject NotificationService NotificationService
+@inject IisService IisService
+@inject ISnackbar Snackbar
+@inject UpdaterService UpdaterSvc
+
+<div class="row g-0 pl-4 flex-column">
+    <div class="col-12 mt-3 d-flex gap-1 align-items-center justify-content-center">
+        <MudText Class="fw-bold" Typo="Typo.body1">Neustart</MudText>
+        <MudDivider Class="w-auto"></MudDivider>
+    </div>
+    <div class="col-12 d-flex flex-column gap-2">
+        <MudNumericField T="int" FullWidth="true" ValueChanged="(int i) => SettingsService.SaveSettingChanges(x => x.RestartDelaySeconds = i, NotificationService)" Value="Setting.RestartDelaySeconds" Label="Zeit zwischen Start und Stop von IIS-Seiten (Sekunden)" Variant="Variant.Text" Class="pl-4" Min="1" />
+        <MudCheckBox Class="p-0" ValueChanged="(bool i) => SettingsService.SaveSettingChanges(x => x.DeleteBundlerOnShopRestart = i, NotificationService)" Value="Setting.DeleteBundlerOnShopRestart" T="bool" Color="Color.Primary">Shop-Bundler beim Neustart löschen</MudCheckBox>
+        <MudCheckBox Class="p-0" ValueChanged="(bool i) => SettingsService.SaveSettingChanges(x => x.DeleteAssetsOnShopRestart = i, NotificationService)" Value="Setting.DeleteAssetsOnShopRestart" T="bool" Color="Color.Primary">Shop-Assets(wwwroot) beim Neustart löschen</MudCheckBox>
+    </div>
+    
+    <div class="col-12 mt-3 d-flex gap-1 align-items-center justify-content-center">
+        <MudText Class="fw-bold" Typo="Typo.body1">Taskbar</MudText>
+        <MudDivider Class="w-auto"></MudDivider>
+    </div>
+    <div class="col-12 d-flex flex-column gap-2 pl-4">
+        <MudSelect Placeholder="Shop zum Starten/Stoppen/Neustarten über die Taskbar" Label="Shop zum Starten/Stoppen/Neustarten über die Taskbar" Variant="Variant.Text" Value="Setting.GetTrayIconSite().Id" ValueChanged="(long i) => SettingsService.SaveSettingChanges(x => x.TrayIconIisSite = i, NotificationService)" T="long">
+            @foreach (var shopPaths in Setting.ShopSettingsList)
+            {
+                <MudSelectItem Value="shopPaths.SiteId">@IisService.GetSiteNameById(shopPaths.SiteId)</MudSelectItem>
+            }
+        </MudSelect>
+    </div>
+</div>
+
+@code {
+    private ToolboxSettings Setting => SettingsService.Settings;
+    private string? _currentVersion;
+    private bool _startingUpdater;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentVersion = GetInformationalVersion();
+    }
+    
+    private void ChooseRepo()
+    {
+        var path = FileDialog.OpenFolder("Repo Ordner auswählen", Setting.ThemeRepositoryPath);
+        if (!string.IsNullOrEmpty(path))
+        {
+            Setting.ThemeRepositoryPath = path;
+        }
+    }
+    
+    private async Task RunUpdaterAsync()
+    {
+        if (_startingUpdater) return;
+        _startingUpdater = true;
+        try
+        {
+            var ok = await UpdaterSvc.TryLaunchUpdaterAsync();
+            if (ok)
+                Snackbar.Add("Updater gestartet.", Severity.Success, cfg => cfg.VisibleStateDuration = 1500);
+            else
+                Snackbar.Add("Updater nicht gefunden oder konnte nicht gestartet werden.", Severity.Warning);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fehler beim Starten des Updaters: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _startingUpdater = false;
+            StateHasChanged();
+        }
+    }
+    
+    private static string? GetInformationalVersion()
+    {
+        try
+        {
+            var asm = typeof(Program).Assembly;
+            var attr = asm.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+                .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
+                .FirstOrDefault();
+            var v = attr?.InformationalVersion ?? asm.GetName().Version?.ToString();
+            if (!string.IsNullOrEmpty(v))
+            {
+                var idx = v.IndexOfAny(new[] { '+', '-' });
+                if (idx > 0) v = v.Substring(0, idx);
+            }
+
+            return v;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+}

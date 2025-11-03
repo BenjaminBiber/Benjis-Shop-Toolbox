@@ -1,0 +1,267 @@
+@page "/themes"
+@using System.Diagnostics
+@using System.IO
+@using Toolbox.Data.Models
+@using Toolbox.Data.Services
+@using Toolbox.Components.Dialogs
+@using Microsoft.Web.Administration
+@using Toolbox.Services
+@using MudBlazor
+@inject Toolbox.Services.ThemeLinkService ThemeService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject Toolbox.Services.SettingsService SettingsService
+@inject SolutionOpener SolutionOpener
+@inject IisService IisService
+
+    @if (_isLoading)
+    {
+        <div class="d-flex justify-content-center my-3">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
+    else if (_groupedThemes != null)
+    {
+        @if (Settings.ShopSettingsList.Any())
+        {        
+            <div class="row p-4 g-0">
+                <MudText Typo="Typo.h5">Themes</MudText>
+                <div class="col-11">
+                    <MudSelect Variant="Variant.Outlined" Value="(SelectedShopSetting ?? Settings.ShopSettingsList.FirstOrDefault()).SiteId" ValueChanged="ChangeSelectedShop" T="long">
+                        @foreach (var shopPaths in Settings.ShopSettingsList)
+                        {
+                            <MudSelectItem Value="shopPaths.SiteId">@IisService.GetSiteNameById(shopPaths.SiteId)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+                <div class="col-1 d-flex align-items-center justify-content-center">
+                    <MudTooltip Text="Neues Theme hinzufügen">
+                        <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="OpenCloneDialog"/>
+                    </MudTooltip>
+                </div>
+            </div>
+        }
+        <div class="row g-0 px-3 g- d-flex align-items-start justify-content-center gap-3">
+          <MudPaper Class="col-12 mx-3 p-4">
+                <MudTable @ref="_table" Filter="new Func<ThemeInfo,bool>(FilterThemes)" Elevation="0" GroupHeaderStyle="background-color:var(--mud-palette-background-gray)" GroupBy="_groupDefinition" Items="_groupedThemes" Hover="true" Dense="true">
+                    <ToolBarContent>
+                        <MudSpacer />
+                        <MudTextField Value="_searchText" ValueChanged="(string s) => SearchChanged(s)" Immediate="true" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+                    </ToolBarContent>
+                    <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Virtuelles Verzeichnis</MudTh>
+                    <MudTh>Wird im Shop verwendet</MudTh>
+                    <MudTh>öffnen</MudTh>
+                </HeaderContent>
+                <GroupHeaderTemplate>
+                    <MudTh Class="mud-table-cell-custom-group" colspan="5"><MudText Class="fw-bold" Typo="Typo.h6">@($"{context.Key}")</MudText></MudTh>
+                </GroupHeaderTemplate>
+                <RowTemplate>
+                    <MudTd DataLabel="Name">@context.Name</MudTd>
+                    <MudTd>
+                        @if (context.LinkExists)
+                        {
+                            <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Error" OnClick="@(async () => await Remove(context))">Entfernen</MudButton>
+                        }
+                        else
+                        {
+                            <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary" OnClick="@(async () => await Create(context))">Anlegen</MudButton>
+                        }
+                    </MudTd>
+                    <MudTd>
+                        <MudCheckBox Disabled="context.IsThemeOverwrite || !context.LinkExists" Value="context.IsThemeOverwrite" ValueChanged="@(async (bool t) => await ThemeOverwriteChanged(context))" Color="Color.Primary"/>
+                    </MudTd>
+                    <MudTd>
+                        <MudTooltip Text="Öffnen in">
+                            <MudMenu Icon="@Icons.Material.Filled.OpenInNew">
+                                <MudMenuItem OnClick="@(() => OpenDirectoryInExplorer(context.Path))" Label="Explorer"/>
+                                <MudMenuItem OnClick="@(() => OpenSolution(context))" Label="Rider"/>
+                            </MudMenu>
+                        </MudTooltip>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+            </MudPaper>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex justify-content-center my-3">
+            <MudAlert Icon="@Icons.Material.Filled.Info" Variant="Variant.Filled" Severity="Severity.Info">Keine Themes für die aktuell ausgewählte Seite vorhanden</MudAlert>
+        </div>    
+    }
+
+@code {
+    private List<ThemeInfo> _groupedThemes;
+    private bool _isLoading;
+    private ToolboxSettings Settings => SettingsService.Settings;
+    private ShopSetting? SelectedShopSetting => Settings.GetShopSettingForCurrentSite();
+    private MudTable<ThemeInfo> _table = null!;
+    private string _searchText = string.Empty;
+    
+    private TableGroupDefinition<ThemeInfo> _groupDefinition = new()
+    {
+        GroupName = "Group",
+        Indentation = true,
+        Expandable = true,
+        Selector = (e) => e.Repo,
+        IsInitiallyExpanded = false
+    };
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task SearchChanged(string? searchValue)
+    {
+        _searchText = searchValue ?? string.Empty;
+
+        var groups = _groupedThemes
+            .GroupBy(t => t.ThemeFolder ?? string.Empty)
+            .ToList();
+
+        bool MatchesSearch(ThemeInfo i) =>
+            string.IsNullOrWhiteSpace(_searchText)
+            || (i.Name?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ?? false)
+            || (i.ThemeFolder?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ?? false);
+
+        var visibleGroups = groups
+            .Where(g => g.Any(MatchesSearch))
+            .ToList();
+
+        if (visibleGroups.Count == 1)
+        {
+            _table.ExpandAllGroups();
+
+            var firstMatch = visibleGroups[0]
+                                 .FirstOrDefault(i => MatchesSearch(i)) 
+                             ?? visibleGroups[0].FirstOrDefault();
+
+            if (firstMatch is not null)
+                await _table.ScrollToItemAsync(firstMatch);
+        }
+        else
+        {
+            _table.CollapseAllGroups();
+        }
+    }
+    
+    private bool FilterThemes(ThemeInfo info)
+    {
+        return info.Name.Contains(_searchText.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+    
+    public static void OpenDirectoryInExplorer(string path)
+    {
+        if (Directory.Exists(path))
+        {
+            Process.Start("explorer.exe", path);
+        }
+        else
+        {
+            Console.WriteLine("Ordner existiert nicht: " + path);
+        }
+    }
+
+    private void OpenSolution(ThemeInfo info)
+    {
+        Snackbar.Add($"{info.Name} wird in Rider geöffnet...", Severity.Info);
+        SolutionOpener.OpenSolutionInRider(info.ThemeFolder);
+    }
+
+    private async Task ChangeSelectedShop(long siteId)
+    {
+        var siteName = IisService.GetSiteNameById(siteId);
+        if (!string.IsNullOrEmpty(siteName))
+        {
+            Settings.IisAppName = siteName;
+            SettingsService.SaveSettings();
+            await LoadAsync();
+        }
+    }
+    
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        StateHasChanged();
+        var setting = SelectedShopSetting;
+        if (setting == null)
+        {
+            _groupedThemes = null;
+            _isLoading = false;
+            StateHasChanged();
+            return;
+        }
+
+        _groupedThemes = ThemeService.GetThemes(setting.ThemeFolderPath ?? string.Empty, setting.ShopYamlPath ?? string.Empty).ToList();
+        _isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task ThemeOverwriteChanged(ThemeInfo info)
+    {
+        _isLoading = true;
+        StateHasChanged();
+        try
+        {
+            var setting = SelectedShopSetting;
+            if (setting == null) return;
+            var result = ThemeService.SetThemeOverwrite(setting.ShopYamlPath ?? string.Empty, info);
+            if (result)
+            {
+                await LoadAsync();
+                if (Settings.RestartShopOnThemeChange)
+                {
+                    await IisService.RestartIisApp();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fehler beim Ändern der Theme-Überschreibung: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task Create(ThemeInfo info)
+    {
+        var setting = SelectedShopSetting;
+        if (setting == null) return;
+        ThemeService.CreateLink(setting.ThemeFolderPath ?? string.Empty, info);
+        await LoadAsync();
+    }
+
+    private async Task Remove(ThemeInfo info)
+    {
+        var setting = SelectedShopSetting;
+        if (setting == null) return;
+        ThemeService.RemoveLink(setting.ThemeFolderPath ?? string.Empty, info);
+        await LoadAsync();
+    }
+
+    private async Task OpenCloneDialog()
+    {
+        var parameters = new DialogParameters();
+        var setting = SelectedShopSetting;
+        if (setting != null)
+        {
+            parameters.Add("ShopYamlPath", setting.ShopYamlPath ?? string.Empty);
+            parameters.Add("ShopThemesPath", setting.ThemeFolderPath ?? string.Empty);
+        }
+        var dlg = await DialogService.ShowAsync<CloneThemeDialog>("Repo klonen", parameters);
+        var result = await dlg.Result;
+        if (!result.Canceled)
+        {
+            await LoadAsync();
+        }
+    }
+}
+
+
+

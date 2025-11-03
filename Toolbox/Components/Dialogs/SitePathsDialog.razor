@@ -1,0 +1,83 @@
+@using Toolbox.Data.Services
+@using Toolbox.Services
+@using System.IO
+@using Toolbox.Data.Models
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-4">Shop Pfade bearbeiten</MudText>
+        <MudTextField @bind-Value="_yamlPath" Label="shop.yaml" Variant="Variant.Filled" Class="mb-2"
+                      Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseYaml" />
+        <MudTextField @bind-Value="_themePath" Label="Themes Ordner" Variant="Variant.Filled" Class="mb-2"
+                      Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseTheme" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="Save">Speichern</MudButton>
+        <MudButton Color="Color.Default" OnClick="Cancel">Abbrechen</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public long SiteId { get; set; }
+
+    [Inject] SettingsService SettingsService { get; set; } = default!;
+    [Inject] FileDialogService FileDialog { get; set; } = default!;
+
+    private string _yamlPath = string.Empty;
+    private string _themePath = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        var setting = SettingsService.Settings.ShopSettingsList.FirstOrDefault(s => s.SiteId == SiteId);
+        if (setting != null)
+        {
+            _yamlPath = setting.ShopYamlPath ?? string.Empty;
+            _themePath = setting.ThemeFolderPath ?? string.Empty;
+        }
+    }
+
+    private void ChooseYaml()
+    {
+        var filters = new FileFilter[] { new FileFilter { Name = "YAML", Extensions = new[] { "yaml", "yml" } } };
+        var path = FileDialog.OpenFile("shop.yaml auswählen", filters, Path.GetDirectoryName(_yamlPath) ?? string.Empty);
+        if (!string.IsNullOrEmpty(path))
+        {
+            _yamlPath = path;
+        }
+    }
+
+    private void ChooseTheme()
+    {
+        var path = FileDialog.OpenFolder("Themes Ordner auswählen", _themePath);
+        if (!string.IsNullOrEmpty(path))
+        {
+            _themePath = path;
+        }
+    }
+
+    private void Save()
+    {
+        var setting = SettingsService.Settings.ShopSettingsList.FirstOrDefault(s => s.Id == SiteId);
+        if (setting != null)
+        {
+            setting.ShopYamlPath = _yamlPath;
+            setting.ThemeFolderPath = _themePath;
+            SettingsService.SaveSettings();
+        }
+        else
+        {
+            var shopSite = new ShopSetting()
+            {
+                ShopYamlPath = _yamlPath,
+                ThemeFolderPath = _themePath,
+                SiteId = SiteId
+            };
+            SettingsService.Settings.ShopSettingsList.Add(shopSite);
+            SettingsService.SaveSettings();
+        }
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    void Cancel() => MudDialog.Cancel();
+}

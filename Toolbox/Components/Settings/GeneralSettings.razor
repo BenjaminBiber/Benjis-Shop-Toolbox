@@ -1,0 +1,109 @@
+﻿@using Toolbox.Data.Common
+@using Toolbox.Data.Models
+@using Toolbox.Services
+@inject SettingsService SettingsService
+@inject FileDialogService FileDialog
+@inject NotificationService NotificationService
+@inject ISnackbar Snackbar
+@inject UpdaterService UpdaterSvc
+
+<div class="row g-0 pl-4 flex-column">
+    <div class="col-12 mt-3 d-flex gap-1 align-items-center justify-content-center">
+        <MudText Class="fw-bold" Typo="Typo.body1">Aktuelle Version</MudText>
+        <MudDivider Class="w-auto"></MudDivider>
+    </div>
+    <div class="col-12 d-flex align-items-center gap-2 pl-4">
+        <MudText Class="fw-light" Typo="Typo.body1">@(_currentVersion ?? "unbekannt")</MudText>
+    </div>
+    
+    <div class="col-12 mt-3 d-flex gap-1 align-items-center justify-content-center">
+        <MudText Class="fw-bold" Typo="Typo.body1">Themes</MudText>
+        <MudDivider Class="w-auto"></MudDivider>
+    </div>
+    <div class="col-12 d-flex flex-column gap-2">
+        <MudTextField ValueChanged="(string i) => SettingsService.SaveSettingChanges(x => x.ThemeRepositoryPath = i, NotificationService)" Value="Setting.ThemeRepositoryPath" Label="Repo Pfad" Variant="Variant.Text" Class="pl-4"
+                      Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseRepo"/>
+        <MudCheckBox Class="p-0" ValueChanged="(bool i) => SettingsService.SaveSettingChanges(x => x.RestartShopOnThemeChange = i, NotificationService)" Value="Setting.RestartShopOnThemeChange" T="bool" Color="Color.Primary">Shop bei Theme-Wechsel neustarten</MudCheckBox>
+    </div>
+    
+    <div class="col-12 mt-3 d-flex gap-1 align-items-center justify-content-center">
+        <MudText Class="fw-bold" Typo="Typo.body1">Updater</MudText>
+        <MudDivider Class="w-auto"></MudDivider>
+    </div>
+    <div class="col-12 d-flex align-items-center gap-2 pl-4">
+        <MudTooltip Text="Startet den Updater (Administratorrechte erforderlich).">
+            <MudButton Variant="MudBlazor.Variant.Outlined"
+                       Color="Color.Primary"
+                       Disabled="@_startingUpdater"
+                       StartIcon="@Icons.Material.Filled.SystemUpdate"
+                       OnClick="@RunUpdaterAsync">
+                @(_startingUpdater ? "Starte Updater..." : "Updater ausführen")
+            </MudButton>
+        </MudTooltip>    </div>
+</div>
+
+@code {
+    private ToolboxSettings Setting => SettingsService.Settings;
+    private string? _currentVersion;
+    private bool _startingUpdater;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentVersion = GetInformationalVersion();
+    }
+    
+    private void ChooseRepo()
+    {
+        var path = FileDialog.OpenFolder("Repo Ordner auswählen", Setting.ThemeRepositoryPath);
+        if (!string.IsNullOrEmpty(path))
+        {
+            Setting.ThemeRepositoryPath = path;
+        }
+    }
+    
+    private async Task RunUpdaterAsync()
+    {
+        if (_startingUpdater) return;
+        _startingUpdater = true;
+        try
+        {
+            var ok = await UpdaterSvc.TryLaunchUpdaterAsync();
+            if (ok)
+                Snackbar.Add("Updater gestartet.", Severity.Success, cfg => cfg.VisibleStateDuration = 1500);
+            else
+                Snackbar.Add("Updater nicht gefunden oder konnte nicht gestartet werden.", Severity.Warning);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fehler beim Starten des Updaters: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _startingUpdater = false;
+            StateHasChanged();
+        }
+    }
+    
+    private static string? GetInformationalVersion()
+    {
+        try
+        {
+            var asm = typeof(Program).Assembly;
+            var attr = asm.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+                .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
+                .FirstOrDefault();
+            var v = attr?.InformationalVersion ?? asm.GetName().Version?.ToString();
+            if (!string.IsNullOrEmpty(v))
+            {
+                var idx = v.IndexOfAny(new[] { '+', '-' });
+                if (idx > 0) v = v.Substring(0, idx);
+            }
+
+            return v;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+}

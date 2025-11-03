@@ -1,0 +1,43 @@
+@* @using Toolbox.Data.Services *@
+@* @inject UpdateService UpdateService *@
+@* @inject Toolbox.Services.SettingsService SettingsService *@
+@* *@
+@* <MudDialog> *@
+@*     <DialogContent> *@
+@*       <MudText Typo="Typo.body1">Es ist eine neue Version (@info.Version.ToString(), @info.ReleaseDate.ToString("dd.MM.yyyy")) der Shop Toolbox verfügbar. Es wird empfohlen diese zu installieren</MudText> *@
+@*       <MudText Typo="Typo.body1"></MudText> *@
+@*     </DialogContent> *@
+@*     <DialogActions> *@
+@*         <MudButton Color="Color.Primary" OnClick="UpdateAndExport">Settings Exportieren & Update Installieren</MudButton> *@
+@*         <MudButton Color="Color.Primary" OnClick="Update">Update Installieren</MudButton> *@
+@*     </DialogActions> *@
+@* </MudDialog> *@
+@* *@
+@* @code { *@
+@*      *@
+@*     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!; *@
+@*     private ReleaseInfo info = new(); *@
+@*      *@
+@*     protected override async Task OnInitializedAsync() *@
+@*     { *@
+@*         info = UpdateService.LoadNewestVersion(); *@
+@*         await Task.CompletedTask; *@
+@*     } *@
+@* *@
+@*     private void Submit() => MudDialog.Close(DialogResult.Ok(true)); *@
+@* *@
+@*     private void Cancel() => MudDialog.Cancel(); *@
+@* *@
+@*     public void UpdateAndExport() *@
+@*     { *@
+@*         SettingsService.Export(); *@
+@*         Update(); *@
+@*     } *@
+@* *@
+@*     public void Update() *@
+@*     { *@
+@*         UpdateService.UpdateApp(info); *@
+@*         Submit(); *@
+@*     } *@
+@* } *@
+@* *@

@@ -1,0 +1,460 @@
+@page "/"
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject Toolbox.Services.SettingsService SettingsService
+@inject Toolbox.Services.AppInfoService AppInfoService
+@using Toolbox.Data.Models
+@using Toolbox.Data.Models.Logs
+@using Toolbox.Data.Common
+@using Toolbox.Data.Services
+@using Toolbox.Components.Dialogs
+@using Microsoft.Web.Administration
+@using Toolbox.Services
+@using Toolbox.Data.Models.Extensions
+@inject IisService IisService
+@using MudBlazor
+@implements IDisposable
+
+@{
+    var color = String.IsNullOrEmpty(Settings.IisAppName) ? Color.Default : GetColor();
+}
+
+<div class="row h-100">
+    @*ACTION ROW*@
+    <div class="col-12 pl-5 pt-3 col-lg-3">
+        <div class="row mb-3 mb-lg-0">
+            <div class="col-4 col-lg-10">
+                <MudBadge Overlap="true" Dot="true" Class="w-100" Origin="Origin.TopRight" Color="color">
+                    <MudSelect Value="Settings.IisAppName" ValueChanged="@((string? s) => SettingsService.ChangeSelectedIisApp(s))" Label="IIS App" Variant="Variant.Outlined" Class="mb-2 mt-2">
+                        @foreach (var site in manager.Sites)
+                        {
+                            if (site != null)
+                            {
+                                <MudSelectItem Value="@site.Name">@site.Name</MudSelectItem>
+                            }
+                        }
+                    </MudSelect>
+                </MudBadge>
+            </div>
+            <div class="col-1 col-lg-1 d-flex align-items-center justify-content-start justify-content-lg-center">
+                <MudMenu Icon="@Icons.Material.Filled.OpenInNew" Class="mx-0 my-0" AriaLabel="Öffne IIS App im Browser">
+                    @if (!String.IsNullOrEmpty(Settings.IisAppName))
+                    {
+                        @foreach (var binding in manager.Sites[Settings.IisAppName]?.Bindings ?? Enumerable.Empty<Binding>())
+                        {
+                            @if (binding.GetSiteUrl() != null)
+                            {
+                                <MudMenuItem OnClick="@(() => binding.OpenInBrowser())" Label="@binding.GetSiteUrl()"/>
+                            }
+                        }
+                    }
+                </MudMenu>
+            </div>
+            <div class="col-7 d-flex col-lg-12 justify-content-evenly gap-3 flex-lg-column align-items-center">
+                <MudButton Color="Color.Success" Class="w-100" StartIcon="@Icons.Material.Filled.Start" Variant="Variant.Filled" OnClick="@IisService.StartIisApp">Start</MudButton>
+                <MudButton Color="Color.Warning" Class="w-100" StartIcon="@Icons.Material.Filled.RestartAlt" Variant="Variant.Filled" OnClick="@(() => IisService.RestartIisApp())">Neustart</MudButton>
+                <MudButton Color="Color.Error" Class="w-100" StartIcon="@Icons.Material.Filled.Stop" Variant="Variant.Filled" OnClick="@IisService.StopCurrentIisApp">Stop</MudButton>
+            
+                @if (showEasterEgg)
+                {
+                    <MudButton Color="Color.Error" Class="w-100" Style="opacity: 0 !important;" StartIcon="@Icons.Material.Filled.Stop" Variant="Variant.Filled" OnClick="ShowDialogEasterEgg">Stop</MudButton>
+                }
+                
+            </div>
+        </div>
+    </div>
+
+    @*FILTER AND SEARCH*@
+    <div class="col-12 col-lg-9" style="height: calc(100dvh - var(--mud-appbar-height) - 2rem);">
+        <div class="row mb-3">
+            @*SEARCH*@
+            <div class="col">
+                <MudTextField Variant="Variant.Text" @bind-Value="_searchText" Immediate="true" Label="Suche" Class="w-100"/>
+            </div>
+            @*FILTER*@
+            <div class="col-1">
+                <MudIconButton Icon="@Icons.Material.Filled.FilterAlt" OnClick="HandlePopOver"></MudIconButton>
+                <div @onclick="HandlePopOver" class="@(_isPopOverOpen ? "position-absolute" : "d-none")" style="background: rgba(1,1,1,0.1); z-index: 3; height: 100dvh; width: 100vw; left: 0; top: 0"></div>
+                <MudPopover Class="pa-6" Open="@_isPopOverOpen" AnchorOrigin="Origin.BottomRight">
+                    <div class="d-flex gap-3 flex-column">
+                        <MudText Class="fw-bold fs-3">Filter</MudText>
+                        <MudSelect T="MessageType" MultiSelection="true" MultiSelectionTextFunc="@(new Func<List<string>, string>(GetMultiSelectionTextMessage))" SelectedValues="_selectedMessageTypes" SelectedValuesChanged="@(async levels => await SelectedLevelsChanged(levels))" Label="LogMeldung">
+                            @foreach (var level in Enum.GetValues<MessageType>())
+                            {
+                                <MudSelectItem Value="@level">@level.GetDescription()</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudSelect T="LogLevel" MultiSelection="true" MultiSelectionTextFunc="@(new Func<List<string>, string>(GetMultiSelectionText))" SelectedValues="_selectedLevels" SelectedValuesChanged="@(async levels => await SelectedLevelsChanged(levels))" Label="Ebene">
+                            @foreach (var level in Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All))
+                            {
+                                <MudSelectItem Value="@level">@level.GetDescription()</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudSelect T="ReloadOption" Value="reload" ValueChanged="@(async (ReloadOption l) => await LoadLogs(l))" Label="Zeitpunkt">
+                            @foreach (var level in Enum.GetValues<ReloadOption>())
+                            {
+                                <MudSelectItem Value="@level">@level.GetDescription()</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudSelect T="double" Value="_refreshSeconds" ValueChanged="@((double l) => HandleTimer(l))" Label="Logs neu laden">
+                            @foreach (var reloadTime in ReloadTime.ReloadTimes)
+                            {
+                                <MudSelectItem Value="@reloadTime.Value.TotalSeconds">@reloadTime.Key</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </div>
+                </MudPopover>
+            </div>
+            @*RELOAD*@
+            <div class="col-1">
+                <MudIconButton Icon="@Icons.Material.Filled.Autorenew" OnClick="LoadLogs"></MudIconButton>
+            </div>
+        </div>
+
+        @if (DisplayLogs.Any())
+        {
+            <MudTable Style="height: 90%" Height="90%" Loading="_isLoading" FixedFooter="true" FixedHeader="true" Items="DisplayLogs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
+                <HeaderContent>
+                    <MudTh><MudTableSortLabel SortBy="new Func<LogEntry, object>(x=>x.Time)">Zeit</MudTableSortLabel></MudTh>
+                    <MudTh>Ebene</MudTh>
+                    <MudTh>Nachricht</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Zeit">@context.Time</MudTd>
+                    <MudTd DataLabel="Ebene">
+                        <MudChip T="string" Color="@GetColor(context.Level)" Icon="@GetIcon(context.Level)" Variant="Variant.Filled">@context.Level</MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Nachricht">
+                        @Highlight(context.ParsedMessage.GetFormattedMessage(_selectedMessageTypes))
+                        @if (context.Count > 1)
+                        {
+                            <span class="ms-1">(x@context.Count)</span>
+                        }
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 50, 100, int.MaxValue }"
+                                   RowsPerPageString="Logs pro Seite"
+                                   InfoFormat="{first_item}-{last_item} von {all_items}"
+                                   AllItemsText="Alle"
+                                   HorizontalAlignment="HorizontalAlignment.Right"/>
+                </PagerContent>
+            </MudTable>
+        }
+        else
+        {
+            <div class="row">
+                <div class="col d-flex align-items-center justify-content-center">
+                    <MudAlert Class="w-100">Keine Logs gefunden.</MudAlert>
+                </div>
+            </div>
+        }
+
+    </div>
+</div>
+
+@code {
+    private ServerManager manager = new();
+    
+    private System.Timers.Timer? _timer;
+    private bool _autoRefresh;
+    private int _refreshSeconds = 0;
+    private DateTime _lastShopRestart = DateTime.Now;
+    private DateTime _appStartTime = DateTime.Now;
+    private ReloadOption reload = ReloadOption.SeitStartDerAnwendung;
+    private bool _onlySinceRestart;
+    private bool _isLoading;
+    private List<LogEntry> _logs = new();
+    private List<LogEntry> _displayLogs = new();
+    private string _searchText = string.Empty;
+    private LogService? _logService;
+    private bool _isPopOverOpen = false;
+    private HashSet<LogLevel> _selectedLevels = new(Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All));
+    private HashSet<MessageType> _selectedMessageTypes = new(Enum.GetValues<MessageType>());
+    private bool showEasterEgg = false;
+    
+    private IEnumerable<LogEntry> DisplayLogs => FilterAndBundle(_displayLogs);
+
+    private async Task SelectedLevelsChanged(IEnumerable<LogLevel> levels)
+    {
+        _selectedLevels = levels.ToHashSet();
+        await LoadLogs();
+    }
+
+    private async Task SelectedLevelsChanged(IEnumerable<MessageType> levels)
+    {
+        _selectedMessageTypes = levels.ToHashSet();
+        await LoadLogs();
+    }
+
+    private IEnumerable<LogEntry> FilterAndBundle(IEnumerable<LogEntry> source)
+    {
+        if (_searchText.ToLower() == "andy ist der beste")
+        {
+            showEasterEgg = true;
+            _searchText = string.Empty;
+            StateHasChanged();
+        }
+        
+        var filtered = string.IsNullOrWhiteSpace(_searchText)
+            ? source
+            : source.Where(e => (e.ParsedMessage?.GetFormattedMessage(_selectedMessageTypes) ?? e.Message)
+                                    .Contains(_searchText, StringComparison.OrdinalIgnoreCase));
+
+        if (!Settings.BundleLogs)
+        {
+            foreach (var e in filtered)
+                yield return e;
+            yield break;
+        }
+
+        LogEntry? current = null;
+        foreach (var log in filtered.OrderByDescending(l => l.Time))
+        {
+            if (current == null)
+            {
+                current = new LogEntry
+                {
+                    Time = log.Time,
+                    Level = log.Level,
+                    Message = log.Message,
+                    Count = log.Count,
+                    ParsedMessage = log.ParsedMessage
+                };
+            }
+            else if (current.Level == log.Level &&
+                     current.ParsedMessage.GetFormattedMessage(_selectedMessageTypes) == log.ParsedMessage.GetFormattedMessage(_selectedMessageTypes))
+            {
+                current.Count += log.Count;
+            }
+            else
+            {
+                yield return current;
+                current = new LogEntry
+                {
+                    Time = log.Time,
+                    Level = log.Level,
+                    Message = log.Message,
+                    Count = log.Count,
+                    ParsedMessage = log.ParsedMessage
+                };
+            }
+        }
+        if (current != null)
+        {
+            yield return current;
+        }
+    }
+
+    private async Task ShowDialogEasterEgg()
+    {
+        var options = new DialogOptions()
+        {
+            FullWidth = true,
+            MaxWidth = MaxWidth.Medium
+        };
+        await DialogService.ShowAsync<EasterEggDialog>("Glücksrad", options);
+        showEasterEgg = false;
+    }
+    
+    private MarkupString Highlight(string message)
+    {
+        if (string.IsNullOrWhiteSpace(_searchText))
+        {
+            return (MarkupString)System.Net.WebUtility.HtmlEncode(message);
+        }
+
+        var encoded = System.Net.WebUtility.HtmlEncode(message);
+        var pattern = System.Text.RegularExpressions.Regex.Escape(_searchText);
+        var highlighted = System.Text.RegularExpressions.Regex.Replace(encoded, pattern,
+            m => $"<mark>{m.Value}</mark>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return (MarkupString)$"<span style=\"font-size:smaller\">{highlighted}</span>";
+
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var appInfo = await AppInfoService.GetAsync();
+        _appStartTime = appInfo.StartTime;
+       
+        if (SettingsService.IsConfigured)
+        {
+            await ApplySettings();
+        }
+        
+        if ((DateTime.Now - appInfo.IisRestartTime).Hours >= 1)
+        {
+            var tmp = reload;
+            reload = ReloadOption.AlleLogs;
+            await LoadLogs();
+            reload = tmp;
+        }
+    }
+
+    private async Task ApplySettings()
+    {
+        _logService = new LogService(Settings.LogName!);
+        _autoRefresh = Settings.AutoRefreshEnabled;
+        _refreshSeconds = Settings.AutoRefreshSeconds;
+        _onlySinceRestart = Settings.OnlySinceRestart;
+        reload = _onlySinceRestart ? ReloadOption.SeitLetztemNeuladen : ReloadOption.SeitStartDerAnwendung;
+        await LoadLogs();
+        StartTimer();
+    }
+
+    private void HandleTimer(double seconds)
+    {
+        _refreshSeconds = (int)seconds;
+        if(_refreshSeconds <= 0)
+        {
+            _autoRefresh = false;
+        }
+        else
+        {
+            _autoRefresh = true;
+        }
+        StartTimer();
+    }
+    
+    private async Task LoadLogs()
+    {
+        _isLoading = true;
+        StateHasChanged();
+        var since = reload == ReloadOption.AlleLogs ? DateTime.MinValue  : _onlySinceRestart ? _lastShopRestart : _appStartTime;
+        var logs = await Task.Run(() => _logService?.GetLogs(since, LogLevel.All) ?? Enumerable.Empty<LogEntry>());
+        _logs = logs.ToList();
+        _displayLogs = _logs
+            .Where(l => _selectedLevels.Contains(l.Level))
+            .ToList();
+        _isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadLogs(ReloadOption option)
+    {
+        reload = option;
+        await LoadLogs();
+    }
+
+    private void StartTimer()
+    {
+        _timer?.Stop();
+        _timer?.Dispose();
+        _timer = null;
+
+        if (_autoRefresh && _refreshSeconds > 0)
+        {
+            _timer = new System.Timers.Timer(_refreshSeconds * 1000);
+            _timer.Elapsed += async (_, _) =>
+            {
+                await InvokeAsync(async () =>
+                {
+                    await LoadLogs();
+                    StateHasChanged();
+                });
+            };
+            _timer.AutoReset = true;
+            _timer.Start();
+        }
+    }
+
+    private void ToggleAutoRefresh(bool value)
+    {
+        _autoRefresh = value;
+        StartTimer();
+    }
+
+    private void IntervalChanged(int value)
+    {
+        if (value <= 0) return;
+        _refreshSeconds = value;
+        StartTimer();
+    }
+
+    private async Task ShowLogDetails(TableRowClickEventArgs<LogEntry> args)
+    {
+        var parameters = new DialogParameters<LogEntryDialog> { {x => x.Entry, args.Item} };
+        var options = new DialogOptions
+        {
+            CloseButton = true,
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            BackdropClick = true,
+        };
+        await DialogService.ShowAsync<LogEntryDialog>("", parameters, options);
+    }
+
+    private Color GetColor(LogLevel level) => level switch
+    {
+        LogLevel.Information => Color.Info,
+        LogLevel.Warning => Color.Warning,
+        LogLevel.Error => Color.Error,
+        LogLevel.Critical => Color.Error,
+        _ => Color.Default
+    };
+
+    private Color GetColor() => manager.Sites[Settings.IisAppName].State switch
+    {
+        ObjectState.Started => Color.Success,
+        ObjectState.Starting => Color.Warning,
+        ObjectState.Stopped => Color.Error,
+        ObjectState.Stopping => Color.Warning,
+        _ => Color.Default
+    };
+
+    private string GetIcon(LogLevel level) => level switch
+    {
+        LogLevel.Information => Icons.Material.Filled.Info,
+        LogLevel.Warning => Icons.Material.Filled.Warning,
+        LogLevel.Error => Icons.Material.Filled.Error,
+        LogLevel.Critical => Icons.Material.Filled.PriorityHigh,
+        _ => Icons.Material.Filled.Info
+
+    };
+    private ToolboxSettings Settings => SettingsService.Settings;
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+    }
+
+    private string GetMultiSelectionTextMessage(List<string> selectedValues)
+    {
+        if (Enum.GetValues<MessageType>().Count() == selectedValues.Count)
+        {
+            return "Ganze LogMeldungen";
+        }
+        else if (selectedValues.Count == 0)
+        {
+            return "Keine LogMeldung ausgewählt";
+        }
+        else
+        {
+            return string.Join(", ", selectedValues.Select(v => Enum.Parse<MessageType>(v).GetDescription()));
+        }
+    }
+
+    private string GetMultiSelectionText(List<string> selectedValues)
+    {
+        if (Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All).Count() == selectedValues.Count)
+        {
+            return LogLevel.All.GetDescription();
+        }
+        else if (selectedValues.Count == 0)
+        {
+            return "Keine Ebene ausgewählt";
+        }
+        else
+        {
+            return string.Join(", ", selectedValues.Select(v => Enum.Parse<LogLevel>(v).GetDescription()));
+        }
+    }
+    
+    private void HandlePopOver()
+    {
+        _isPopOverOpen = !_isPopOverOpen;
+    }
+}
+
+
+

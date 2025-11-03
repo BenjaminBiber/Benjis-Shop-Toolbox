@@ -1,0 +1,250 @@
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Xml.Linq;
+
+namespace Toolbox.Versioning;
+
+class Program
+{
+    private static string isccPath = @"C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe";
+    private static string scriptPath = Path.Combine(AppContext.BaseDirectory, "toolbox.iss");
+
+    static void Main(string[] args)
+    {
+        WaitForDebuggerIfRequested("Versioning");
+        var appVersion = GetVersion(args);
+        if (appVersion is null)
+        {
+            Console.Error.WriteLine("Abbruch: Keine gültige Version angegeben.");
+            Environment.Exit(1);
+            return;
+        }
+
+        // 1) Version auch in Toolbox.csproj setzen
+        if (TryUpdateToolboxCsprojVersion(appVersion, out var csprojPath, out var csprojError))
+        {
+            Console.WriteLine($"csproj aktualisiert: {csprojPath} -> Version {appVersion}");
+        }
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Error.WriteLine($"Hinweis: csproj konnte nicht aktualisiert werden: {csprojError}");
+            Console.ResetColor();
+        }
+
+        // 2) Toolbox publishen (Release) in ein temporäres Verzeichnis und Pfad an Inno weiterreichen
+        var publishDir = PublishToolbox(appVersion);
+        if (publishDir is null)
+        {
+            Console.Error.WriteLine("Abbruch: Publish fehlgeschlagen.");
+            Environment.Exit(2);
+            return;
+        }
+
+        // 3) Inno Setup ausführen und Version + PublishDir an das Script übergeben
+        var psi = new ProcessStartInfo
+        {
+            FileName = isccPath,
+            Arguments = $"\"{scriptPath}\" /DMyAppVersion={appVersion} /DMyPublishDir=\"{publishDir}\"",
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+
+        using var process = new Process { StartInfo = psi };
+
+        process.OutputDataReceived += (s, e) => { if (e.Data != null) Console.WriteLine(e.Data); };
+        process.ErrorDataReceived  += (s, e) => { if (e.Data != null) Console.Error.WriteLine(e.Data); };
+
+        process.Start();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+        process.WaitForExit();
+
+        Console.WriteLine($"Exit-Code: {process.ExitCode}");
+    }
+
+    private static string? PublishToolbox(string appVersion)
+    {
+        try
+        {
+            var csproj = FindCsprojPath();
+            if (csproj is null)
+            {
+                Console.Error.WriteLine("Toolbox.csproj nicht gefunden.");
+                return null;
+            }
+
+            var outDir = Path.Combine(Path.GetTempPath(), $"ToolboxPublish_{appVersion}_{Guid.NewGuid():N}");
+            Directory.CreateDirectory(outDir);
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = "dotnet",
+                Arguments = $"publish \"{csproj}\" -c Release -r win-x64 -o \"{outDir}\"",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+
+            using var p = Process.Start(psi);
+            if (p == null) return null;
+            var stdOut = p.StandardOutput.ReadToEnd();
+            var stdErr = p.StandardError.ReadToEnd();
+            p.WaitForExit();
+            if (p.ExitCode != 0)
+            {
+                Console.Error.WriteLine("dotnet publish fehlgeschlagen:");
+                Console.Error.WriteLine(stdOut);
+                Console.Error.WriteLine(stdErr);
+                return null;
+            }
+            return outDir;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Fehler beim Publish: {ex.Message}");
+            return null;
+        }
+    }
+
+    private static void WaitForDebuggerIfRequested(string appName)
+    {
+        try
+        {
+            var env = Environment.GetEnvironmentVariable("TOOLBOX_WAIT_FOR_DEBUGGER");
+            var requested = env == "1" || env?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
+            if (requested && !Debugger.IsAttached)
+            {
+                var pid = Environment.ProcessId;
+                Console.WriteLine($"[{appName}] Warte auf Debugger… PID={pid}");
+                var last = DateTime.UtcNow;
+                while (!Debugger.IsAttached)
+                {
+                    System.Threading.Thread.Sleep(250);
+                    if ((DateTime.UtcNow - last) > TimeSpan.FromSeconds(5))
+                    {
+                        Console.WriteLine($"[{appName}] …warte weiterhin auf Debugger…");
+                        last = DateTime.UtcNow;
+                    }
+                }
+                Console.WriteLine($"[{appName}] Debugger angehängt.");
+            }
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    private static bool TryUpdateToolboxCsprojVersion(string versionText, out string csprojPath, out string error)
+    {
+        csprojPath = string.Empty;
+        error = string.Empty;
+
+        try
+        {
+            var path = FindCsprojPath();
+            if (path is null)
+            {
+                error = "Toolbox.csproj nicht gefunden (Suche ab AppContext.BaseDirectory).";
+                return false;
+            }
+
+            if (!Version.TryParse(versionText, out var v))
+            {
+                error = $"Ungültige Version: {versionText}";
+                return false;
+            }
+
+            var fourPart = $"{v.Major}.{v.Minor}.{(v.Build >= 0 ? v.Build : 0)}.{(v.Revision >= 0 ? v.Revision : 0)}";
+
+            var doc = XDocument.Load(path, LoadOptions.PreserveWhitespace);
+            if (doc.Root is null)
+            {
+                error = "Ungültige csproj-Struktur (Root fehlt).";
+                return false;
+            }
+
+            var ns = doc.Root.Name.Namespace;
+            var propGroups = doc.Root.Elements(ns + "PropertyGroup").ToList();
+            var targetGroup = propGroups.FirstOrDefault(pg => pg.Attribute("Condition") == null)
+                              ?? propGroups.FirstOrDefault();
+            if (targetGroup == null)
+            {
+                targetGroup = new XElement(ns + "PropertyGroup");
+                doc.Root.Add(targetGroup);
+            }
+
+            void SetOrAdd(string name, string value)
+            {
+                var existing = doc.Root!
+                    .Elements(ns + "PropertyGroup")
+                    .Select(pg => pg.Element(ns + name))
+                    .FirstOrDefault(e => e != null);
+                if (existing != null)
+                {
+                    existing.Value = value;
+                }
+                else
+                {
+                    targetGroup.Add(new XElement(ns + name, value));
+                }
+            }
+
+            SetOrAdd("Version", versionText);       // NuGet/Produktversion (3- oder 4-teilig)
+            SetOrAdd("AssemblyVersion", fourPart);   // AssemblyVersion (4-teilig)
+            SetOrAdd("FileVersion", fourPart);       // Dateiversion (4-teilig)
+
+            doc.Save(path);
+            csprojPath = path;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    private static string? FindCsprojPath()
+    {
+        try
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            for (var d = dir; d != null; d = d.Parent)
+            {
+                var byFolder = Path.Combine(d.FullName, "Toolbox", "Toolbox.csproj");
+                if (File.Exists(byFolder)) return byFolder;
+
+                var directMatch = Directory.GetFiles(d.FullName, "Toolbox.csproj", SearchOption.TopDirectoryOnly).FirstOrDefault();
+                if (directMatch != null) return directMatch;
+            }
+        }
+        catch
+        {
+            // ignore
+        }
+        return null;
+    }
+
+    private static string? GetVersion(string[] args)
+    {
+        // 1) Falls als Argument übergeben, zunächst das prüfen
+        if (args is { Length: > 0 })
+        {
+            var candidate = Normalize(args[0]);
+            if (IsValidVersion(candidate))
+            {
+                Console.WriteLine($"Verwende Version aus Argument: {candidate}");
+                return candidate;
+            }
+            Console.Error.WriteLine($"Ungültige Version im Argument: '{args[0]}'");
+        }
+
+        // 2) Interaktive Eingabe mit Anzeige der aktuellen Version und Validierung
+        var currentFromCsproj = TryGetCurrentCsprojVersion(out var currentVer) ? currentVer : null;
