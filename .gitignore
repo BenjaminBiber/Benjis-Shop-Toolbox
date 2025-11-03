@@ -7,3 +7,10 @@ riderModule.iml
 # Scratch/Temp code exports
 tmp_*.txt
 **/tmp_*.txt
+
+# Specific binaries and PDBs to ignore
+[Tt]oolbox.[Dd]ata.pdb
+[Tt]oolbox.[Tt]ray[Ii]con.exe
+[Tt]oolbox.[Tt]ray[Ii]con.pdb
+[Tt]oolbox.[Uu]pdater.exe
+[Tt]oolbox.[Uu]pdater.pdb
