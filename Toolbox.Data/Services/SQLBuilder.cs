@@ -32,17 +32,30 @@ public class SqlBuilder
         }
         
         var sb = new StringBuilder();
-        sb.Append("INSERT INTO ").Append('[').Append(tableName).Append(']')
-            .Append(" (")
-            .Append(string.Join(", ", columns.Select(c => $"[{c.Column}]")))
-            .Append(") VALUES ");
+        // INSERT INTO <Name> + newline
+        sb.Append("INSERT INTO ")
+          .Append('[').Append(tableName).Append(']')
+          .AppendLine();
+
+        // Columns list on its own line
+        sb.Append(" (")
+          .Append(string.Join(", ", columns.Select(c => $"[{c.Column}]")))
+          .Append(')')
+          .AppendLine();
+
+        // VALUES keyword on its own line
+        sb.Append("VALUES")
+          .AppendLine();
         
         for (int i = 0; i < data.Count; i++)
         {
             var row = data[i];
             var values = columns.Select(c => SqlLiteral(c.Selector(row)));
             sb.Append('(').Append(string.Join(", ", values)).Append(')');
-            if (i < data.Count - 1) sb.Append(',');
+            if (i < data.Count - 1)
+            {
+                sb.Append(',').AppendLine();
+            }
         }
 
         sb.Append(';');

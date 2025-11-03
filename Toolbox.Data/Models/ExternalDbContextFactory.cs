@@ -13,7 +13,7 @@ public sealed class ExternalDbContextFactory : IExternalDbContextFactory
     {
         var cs = _resolver.GetCurrent();
         var options = new DbContextOptionsBuilder<ExternalAppDbContext>()
-            .UseSqlServer(cs)
+            .UseSqlServer(cs).EnableDetailedErrors()
             .Options;
         return new ExternalAppDbContext(options);
     }

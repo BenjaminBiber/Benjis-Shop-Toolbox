@@ -14,82 +14,76 @@
 @inject SolutionOpener SolutionOpener
 @inject IisService IisService
 
-    @if (_isLoading)
-    {
-        <div class="d-flex justify-content-center my-3">
-            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
-        </div>
-    }
-    else if (_groupedThemes != null)
-    {
-        @if (Settings.ShopSettingsList.Any())
-        {        
-            <div class="row p-4">
-                <MudText Typo="Typo.h5">Themes</MudText>   
-                <div class="col-4">
-                    <MudSelect Variant="Variant.Outlined" Value="(SelectedShopSetting ?? Settings.ShopSettingsList.FirstOrDefault()).SiteId" ValueChanged="ChangeSelectedShop" T="long">
-                        @foreach (var shopPaths in Settings.ShopSettingsList)
-                        {
-                            <MudSelectItem Value="shopPaths.SiteId">@IisService.GetSiteNameById(shopPaths.SiteId)</MudSelectItem>
-                        }
-                    </MudSelect>
-                </div>
-                <div class="col-7">
-                    <MudTextField Variant="Variant.Outlined" Value="_searchText" ValueChanged="(string s) => SearchChanged(s)" Immediate="true" Placeholder="Suche..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
-                </div>
-                <div class="col-1 d-flex align-items-center justify-content-center">
-                    <MudTooltip Text="Neues Theme hinzufügen">
-                        <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="OpenCloneDialog"/>
-                    </MudTooltip>
-                </div>
+@if (_groupedThemes != null)
+{
+    @if (Settings.ShopSettingsList.Any())
+    {        
+        <div class="row p-4">
+            <MudText Typo="Typo.h5">Themes</MudText>   
+            <div class="col-4">
+                <MudSelect Variant="Variant.Outlined" Value="(SelectedShopSetting ?? Settings.ShopSettingsList.FirstOrDefault()).SiteId" ValueChanged="ChangeSelectedShop" T="long">
+                    @foreach (var shopPaths in Settings.ShopSettingsList)
+                    {
+                        <MudSelectItem Value="shopPaths.SiteId">@IisService.GetSiteNameById(shopPaths.SiteId)</MudSelectItem>
+                    }
+                </MudSelect>
             </div>
-        }
-        <div class="row g-0 px-3 g- d-flex align-items-start justify-content-center gap-3">
-          <MudPaper Class="col-12 mx-3 p-4">
-                <MudTable @ref="_table" Filter="new Func<ThemeInfo,bool>(FilterThemes)" Elevation="0" GroupHeaderStyle="background-color:var(--mud-palette-background-gray)" GroupBy="_groupDefinition" Items="_groupedThemes" Hover="true" Dense="true">
-                    <HeaderContent>
-                    <MudTh>Name</MudTh>
-                    <MudTh>Virtuelles Verzeichnis</MudTh>
-                    <MudTh>Wird im Shop verwendet</MudTh>
-                    <MudTh>öffnen</MudTh>
-                </HeaderContent>
-                <GroupHeaderTemplate>
-                    <MudTh Class="mud-table-cell-custom-group" colspan="5"><MudText Class="fw-bold" Typo="Typo.h6">@($"{context.Key}")</MudText></MudTh>
-                </GroupHeaderTemplate>
-                <RowTemplate>
-                    <MudTd DataLabel="Name">@context.Name</MudTd>
-                    <MudTd>
-                        @if (context.LinkExists)
-                        {
-                            <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Error" OnClick="@(async () => await Remove(context))">Entfernen</MudButton>
-                        }
-                        else
-                        {
-                            <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary" OnClick="@(async () => await Create(context))">Anlegen</MudButton>
-                        }
-                    </MudTd>
-                    <MudTd>
-                        <MudCheckBox Disabled="context.IsThemeOverwrite || !context.LinkExists" Value="context.IsThemeOverwrite" ValueChanged="@(async (bool t) => await ThemeOverwriteChanged(context))" Color="Color.Primary"/>
-                    </MudTd>
-                    <MudTd>
-                        <MudTooltip Text="Öffnen in">
-                            <MudMenu Icon="@Icons.Material.Filled.OpenInNew">
-                                <MudMenuItem OnClick="@(() => OpenDirectoryInExplorer(context.Path))" Label="Explorer"/>
-                                <MudMenuItem OnClick="@(() => OpenSolution(context))" Label="Rider"/>
-                            </MudMenu>
-                        </MudTooltip>
-                    </MudTd>
-                </RowTemplate>
-            </MudTable>
-            </MudPaper>
+            <div class="col-7">
+                <MudTextField Variant="Variant.Outlined" Value="_searchText" ValueChanged="(string s) => SearchChanged(s)" Immediate="true" Placeholder="Suche..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+            </div>
+            <div class="col-1 d-flex align-items-center justify-content-center">
+                <MudTooltip Text="Neues Theme hinzufügen">
+                    <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="OpenCloneDialog"/>
+                </MudTooltip>
+            </div>
         </div>
     }
-    else
-    {
-        <div class="d-flex justify-content-center my-3">
-            <MudAlert Icon="@Icons.Material.Filled.Info" Variant="Variant.Filled" Severity="Severity.Info">Keine Themes für die aktuell ausgewählte Seite vorhanden</MudAlert>
-        </div>    
-    }
+    <div class="row g-0 px-3 g- d-flex align-items-start justify-content-center gap-3">
+      <MudPaper Class="col-12 mx-3 p-4">
+            <MudTable Loading="_isLoading" @ref="_table" Filter="new Func<ThemeInfo,bool>(FilterThemes)" Elevation="0" GroupHeaderStyle="background-color:var(--mud-palette-background-gray)" GroupBy="_groupDefinition" Items="_groupedThemes" Hover="true" Dense="true">
+                <HeaderContent>
+                <MudTh>Name</MudTh>
+                <MudTh>Virtuelles Verzeichnis</MudTh>
+                <MudTh>Wird im Shop verwendet</MudTh>
+                <MudTh>öffnen</MudTh>
+            </HeaderContent>
+            <GroupHeaderTemplate>
+                <MudTh Class="mud-table-cell-custom-group" colspan="5"><MudText Class="fw-bold" Typo="Typo.h6">@($"{context.Key}")</MudText></MudTh>
+            </GroupHeaderTemplate>
+            <RowTemplate>
+                <MudTd DataLabel="Name">@context.Name</MudTd>
+                <MudTd>
+                    @if (context.LinkExists)
+                    {
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Error" OnClick="@(async () => await Remove(context))">Entfernen</MudButton>
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary" OnClick="@(async () => await Create(context))">Anlegen</MudButton>
+                    }
+                </MudTd>
+                <MudTd>
+                    <MudCheckBox Disabled="context.IsThemeOverwrite || !context.LinkExists" Value="context.IsThemeOverwrite" ValueChanged="@(async (bool t) => await ThemeOverwriteChanged(context))" Color="Color.Primary"/>
+                </MudTd>
+                <MudTd>
+                    <MudTooltip Text="Öffnen in">
+                        <MudMenu Icon="@Icons.Material.Filled.OpenInNew">
+                            <MudMenuItem OnClick="@(() => OpenDirectoryInExplorer(context.Path))" Label="Explorer"/>
+                            <MudMenuItem OnClick="@(() => OpenSolution(context))" Label="Rider"/>
+                        </MudMenu>
+                    </MudTooltip>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+        </MudPaper>
+    </div>
+}
+else
+{
+    <div class="d-flex justify-content-center my-3">
+        <MudAlert Icon="@Icons.Material.Filled.Info" Variant="Variant.Filled" Severity="Severity.Info">Keine Themes für die aktuell ausgewählte Seite vorhanden</MudAlert>
+    </div>    
+}
 
 @code {
     private List<ThemeInfo> _groupedThemes;

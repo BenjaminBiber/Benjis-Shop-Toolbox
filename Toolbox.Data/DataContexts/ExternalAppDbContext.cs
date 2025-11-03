@@ -14,9 +14,20 @@ public class ExternalAppDbContext : DbContext
     public DbSet<WidgetsDescription> WidgetsDescriptions => Set<WidgetsDescription>();
     public DbSet<CustomWidgetLocation> CustomWidgetLocations => Set<CustomWidgetLocation>();
     public DbSet<ObjectExtension> ObjectExtensions => Set<Toolbox.Data.ShopsystemModels.ObjectExtension>();
+    public DbSet<WidgetType> WidgetTypes => Set<WidgetType>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<Widget>(b =>
+        {
+            b.HasOne(w => w.WidgetType)
+             .WithMany()
+             .HasForeignKey(w => new { w.WidgetTypeId, w.ShopId })
+             .OnDelete(DeleteBehavior.NoAction);
+
+            b.Navigation(w => w.WidgetType).AutoInclude();
+        });
+
         base.OnModelCreating(modelBuilder);
     }
 }
