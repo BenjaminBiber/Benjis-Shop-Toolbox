@@ -14,3 +14,8 @@ tmp_*.txt
 [Tt]oolbox.[Tt]ray[Ii]con.pdb
 [Tt]oolbox.[Uu]pdater.exe
 [Tt]oolbox.[Uu]pdater.pdb
+
+/Toolbox/TrayPublish/*.exe
+/Toolbox/TrayPublish/*.pdb
+/Toolbox/UpdaterPublish/*.exe
+/Toolbox/UpdaterPublish/*.pdb
