@@ -1,0 +1,69 @@
+251:     public void Info(string message) => Show(message, ToolTipIcon.Info);
+252:     public void Warning(string message) => Show(message, ToolTipIcon.Warning);
+253:     private void Show(string message, ToolTipIcon icon)
+254:     {
+255:         try { tray.BalloonTipTitle = "Toolbox"; tray.BalloonTipText = message; tray.BalloonTipIcon = icon; tray.ShowBalloonTip(3000); } catch { }
+256:     }
+257: }
+258: 
+259: // Minimaler SettingsService fürs Tray – lädt Settings aus der lokalen DB
+260: file sealed class TraySettingsService : ISettingsService
+261: {
+262:     private readonly InternalAppDbContext _db;
+263:     public ToolboxSettings Settings { get; private set; } = new();
+264: 
+265:     public TraySettingsService(InternalAppDbContext db)
+266:     {
+267:         _db = db;
+268:         try
+269:         {
+270:             _db.Database.EnsureCreated();
+271:             Settings = _db.Settings.Include(x => x.ShopSettingsList).FirstOrDefault() ?? new ToolboxSettings();
+272:         }
+273:         catch { Settings = new ToolboxSettings(); }
+274:     }
+275: }
+276: 
+277: // Minimaler AppInfoService fürs Tray – setzt u.a. Restart-Zeit
+278: file sealed class TrayAppInfoService : IAppInfoService
+279: {
+280:     private readonly InternalAppDbContext _db;
+281:     public TrayAppInfoService(InternalAppDbContext db) => _db = db;
+282: 
+283:     public async Task<AppInfo> GetAsync(CancellationToken cancellationToken = default)
+284:     {
+285:         try
+286:         {
+287:             await _db.Database.EnsureCreatedAsync(cancellationToken);
+288:             var info = await _db.Set<AppInfo>().AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+289:             return info ?? new AppInfo { StartTime = DateTime.Now, AppVersion = "0.0.0" };
+290:         }
+291:         catch { return new AppInfo { StartTime = DateTime.Now, AppVersion = "0.0.0" }; }
+292:     }
+293: 
+294:     public async Task SetStartTimeAsync(DateTime startTime, CancellationToken cancellationToken = default)
+295:     {
+296:         try
+297:         {
+298:             await _db.Database.EnsureCreatedAsync(cancellationToken);
+299:             var set = _db.Set<AppInfo>();
+300:             var info = await set.FirstOrDefaultAsync(cancellationToken);
+301:             if (info == null) { info = new AppInfo { StartTime = startTime, AppVersion = "0.0.0" }; await set.AddAsync(info, cancellationToken); }
+302:             else { info.StartTime = startTime; set.Update(info); }
+303:             await _db.SaveChangesAsync(cancellationToken);
+304:         }
+305:         catch { }
+306:     }
+307: 
+308:     public async Task SetLastRestartTimeAsync(DateTime restartTime, CancellationToken cancellationToken = default)
+309:     {
+310:         try
+311:         {
+312:             await _db.Database.EnsureCreatedAsync(cancellationToken);
+313:             var set = _db.Set<AppInfo>();
+314:             var info = await set.FirstOrDefaultAsync(cancellationToken);
+315:             if (info != null) { info.IisRestartTime = restartTime; set.Update(info); await _db.SaveChangesAsync(cancellationToken); }
+316:         }
+317:         catch { }
+318:     }
+319: }

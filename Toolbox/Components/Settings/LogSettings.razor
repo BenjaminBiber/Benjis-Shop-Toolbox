@@ -1,0 +1,36 @@
+﻿@using Toolbox.Data.Common
+@using Toolbox.Data.Models
+@using Toolbox.Services
+@inject SettingsService SettingsService
+@inject FileDialogService FileDialog
+@inject NotificationService NotificationService
+@inject ISnackbar Snackbar
+@inject UpdaterService UpdaterSvc
+
+<div class="row g-0 pl-4 flex-column">
+    <div class="col-12 mt-3 d-flex gap-1 align-items-center justify-content-center">
+        <MudText Class="fw-bold" Typo="Typo.body1">Ereignisanzeige</MudText>
+        <MudDivider Class="w-auto"></MudDivider>
+    </div>
+    <div class="col-12 d-flex flex-column gap-2">
+        <MudTextField ValueChanged="(string i) => SettingsService.SaveSettingChanges(x => x.LogName = i, NotificationService)" Value="Setting.LogName" FullWidth="true" Label="Log-Name" Variant="Variant.Text" Class="pl-4" />
+        <MudSelect ValueChanged="(int i) => SettingsService.SaveSettingChanges(x => x = ChangeAutoLoadSettings(x, i) , NotificationService)" T="int" Value="Setting.AutoRefreshSeconds" FullWidth="true" Label="Zeitlicher Abstand zwischen automatischem Neuladen der Logs" Class="pl-4">
+            @foreach (var reloadTime in ReloadTime.ReloadTimes)
+            {
+                <MudSelectItem Value="@(Int32.Parse(reloadTime.Value.TotalSeconds.ToString()))">@reloadTime.Key</MudSelectItem>
+            }
+        </MudSelect>
+        <MudCheckBox Class="p-0" ValueChanged="(bool i) => SettingsService.SaveSettingChanges(x => x.BundleLogs = i, NotificationService)" Value="Setting.BundleLogs" T="bool" Color="Color.Primary">Gleiche Logs bündeln</MudCheckBox>
+    </div>
+</div>
+
+@code {
+    private ToolboxSettings Setting => SettingsService.Settings;
+
+    private ToolboxSettings ChangeAutoLoadSettings(ToolboxSettings setting, int newValue)
+    {
+        setting.AutoRefreshSeconds = newValue;
+        setting.AutoRefreshEnabled = newValue > 0;
+        return setting;
+    }
+}

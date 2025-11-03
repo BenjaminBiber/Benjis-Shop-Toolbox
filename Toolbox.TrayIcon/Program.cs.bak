@@ -1,0 +1,323 @@
+using System;
+using System.Diagnostics;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Windows.Forms;
+using Microsoft.EntityFrameworkCore;
+using Toolbox.DataContexts;
+using Toolbox.Data.Common;
+using Toolbox.Data.Models;
+using Toolbox.Data.Models.Interfaces;
+using Toolbox.Services;
+
+internal static class Program
+{
+    [STAThread]
+    private static void Main(string[] args)
+    {
+        Application.EnableVisualStyles();
+        Application.SetCompatibleTextRenderingDefault(false);
+        using var ctx = new TrayAppContext();
+
+        var parentPid = ParseParentPid(args);
+        if (parentPid > 0)
+        {
+            try
+            {
+                var parent = Process.GetProcessById(parentPid);
+                _ = Task.Run(() =>
+                {
+                    try { parent.WaitForExit(); } catch { }
+                    try { ctx.Shutdown(); } catch { }
+                });
+            }
+            catch { }
+        }
+
+        Application.Run(ctx);
+    }
+
+    private static int ParseParentPid(string[] args)
+    {
+        try
+        {
+            foreach (var a in args ?? Array.Empty<string>())
+            {
+                var s = a.Trim();
+                if (s.StartsWith("--parent-pid=", StringComparison.OrdinalIgnoreCase) ||
+                    s.StartsWith("--ppid=", StringComparison.OrdinalIgnoreCase))
+                {
+                    var parts = s.Split('=');
+                    if (parts.Length == 2 && int.TryParse(parts[1], out var pid))
+                    {
+                        return pid;
+                    }
+                }
+            }
+        }
+        catch { }
+        return 0;
+    }
+}
+
+sealed class TrayAppContext : ApplicationContext
+{
+    private readonly NotifyIcon _trayIcon;
+    private readonly ContextMenuStrip _menu;
+    private readonly Control _invoker = new();
+    private readonly InternalAppDbContext _db;
+    private readonly IisService _iisService;
+
+    public TrayAppContext()
+    {
+        _invoker.CreateControl();
+
+        // DbContext initialisieren (gleicher Pfad wie Toolbox)
+        try
+        {
+            var appData  = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var dataRoot = Path.Combine(appData, "BenjisToolbox");
+            Directory.CreateDirectory(dataRoot);
+            var dbPath   = Path.Combine(dataRoot, "toolbox.db");
+            var connStr  = $"Data Source={dbPath};Cache=Shared";
+
+            var options = new DbContextOptionsBuilder<InternalAppDbContext>()
+                .UseSqlite(connStr)
+                .Options;
+
+            _db = new InternalAppDbContext(options);
+
+            // Optionale PRAGMAs wie in Toolbox
+            try
+            {
+                var conn = _db.Database.GetDbConnection();
+                conn.Open();
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "PRAGMA journal_mode=WAL;";
+                cmd.ExecuteNonQuery();
+                cmd.CommandText = "PRAGMA foreign_keys=ON;";
+                cmd.ExecuteNonQuery();
+                conn.Close();
+            }
+            catch { }
+        }
+        catch { }
+        _menu = new ContextMenuStrip();
+        _menu.Items.Add("Toolbox öffnen", null, (_, _) => LaunchToolbox());
+        _menu.Items.Add(new ToolStripSeparator());
+        if (_iisService != null)
+        {
+            _menu.Items.Add("Starten (IIS)", null, (_, _) => SafeInvoke(() => _iisService.StartTrayIconSite()));
+            _menu.Items.Add("Stoppen (IIS)", null, (_, _) => SafeInvoke(() => _iisService.StopTrayIconSite()));
+            _menu.Items.Add("Neustarten (IIS)", null, async (_, _) => await SafeInvokeAsync(() => _iisService.RestartTrayIconSite()));
+        }
+        _menu.Items.Add(new ToolStripSeparator());
+        _menu.Items.Add("Beenden", null, (_, _) => Shutdown());
+
+        _trayIcon = new NotifyIcon
+        {
+            Icon = LoadIcon(),
+            Text = "Benjis Toolbox",
+            Visible = true,
+            ContextMenuStrip = _menu
+        };
+
+        // IisService initialisieren (nach Erstellung des TrayIcons für Benachrichtigungen)
+        var notifications = new TrayNotificationService(_trayIcon);
+        var settingsService = new TraySettingsService(_db);
+        var appInfoService = new TrayAppInfoService(_db);
+        _iisService = new IisService(notifications, settingsService, appInfoService);
+
+        _trayIcon.MouseUp += (s, e) =>
+        {
+            if (e.Button is MouseButtons.Right or MouseButtons.Left)
+            {
+                // Position leicht oberhalb des Cursors und innerhalb des Bildschirms zentriert
+                var pos = Cursor.Position;
+                var preferred = _menu.GetPreferredSize(System.Drawing.Size.Empty);
+                var wa = Screen.FromPoint(pos).WorkingArea;
+
+                // oberhalb des Cursors
+                var y = Math.Max(wa.Top, pos.Y - preferred.Height - 6);
+                // grob zentriert über dem Cursor und geclamped an den Bildschirm
+                var x = Math.Min(Math.Max(wa.Left, pos.X - preferred.Width / 2), wa.Right - preferred.Width);
+
+                _menu.Show(new System.Drawing.Point(x, y));
+            }
+        };
+    }
+
+    private static Icon LoadIcon()
+    {
+        try
+        {
+            var baseDir = AppContext.BaseDirectory;
+            var candidate = Path.Combine(baseDir, "favicon.ico");
+            if (File.Exists(candidate))
+                return new Icon(candidate);
+        }
+        catch { }
+        return SystemIcons.Application;
+    }
+
+    private static string? FindToolboxExe()
+    {
+        try
+        {
+            // 1) Same directory (publish scenario)
+            var local = Path.Combine(AppContext.BaseDirectory, "Toolbox.exe");
+            if (File.Exists(local)) return local;
+
+            // 2) Probe typical relative dev path
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            for (var d = dir; d != null; d = d.Parent)
+            {
+                var debug = Path.Combine(d.FullName, "Toolbox", "bin", "Debug", "net9.0-windows10.0.22000.0", "Toolbox.exe");
+                if (File.Exists(debug)) return debug;
+
+                var release = Path.Combine(d.FullName, "Toolbox", "bin", "Release", "net9.0-windows10.0.22000.0", "Toolbox.exe");
+                if (File.Exists(release)) return release;
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    private static void LaunchToolbox()
+    {
+        try
+        {
+            var exe = FindToolboxExe();
+            if (exe == null) return;
+
+            // vermeide mehrfaches Starten
+            var name = Path.GetFileNameWithoutExtension(exe);
+            if (Process.GetProcessesByName(name).Any()) return;
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = exe,
+                UseShellExecute = true
+            });
+        }
+        catch { }
+    }
+
+    public void Shutdown()
+    {
+        try
+        {
+            if (_invoker.IsHandleCreated)
+            {
+                _invoker.BeginInvoke(new Action(() =>
+                {
+                    try { _trayIcon.Visible = false; } catch { }
+                    ExitThread();
+                }));
+            }
+            else
+            {
+                try { _trayIcon.Visible = false; } catch { }
+                ExitThread();
+            }
+        }
+        catch { }
+    }
+
+    protected override void ExitThreadCore()
+    {
+        try { _trayIcon.Dispose(); } catch { }
+        try { _menu.Dispose(); } catch { }
+        try { _db?.Dispose(); } catch { }
+        base.ExitThreadCore();
+    }
+
+    private void SafeInvoke(Action action)
+    {
+        try { action(); }
+        catch (Exception ex) { try { _trayIcon.ShowBalloonTip(3000, "Fehler", ex.Message, ToolTipIcon.Error); } catch { } }
+    }
+
+    private async Task SafeInvokeAsync(Func<Task> action)
+    {
+        try { await action(); }
+        catch (Exception ex) { try { _trayIcon.ShowBalloonTip(3000, "Fehler", ex.Message, ToolTipIcon.Error); } catch { } }
+    }
+}
+
+// Einfache Notification-Implementierung über Tray-Balloons
+file sealed class TrayNotificationService(NotifyIcon tray) : INotificationService
+{
+    public void Success(string message) => Show(message, ToolTipIcon.Info);
+    public void Error(string message) => Show(message, ToolTipIcon.Error);
+    public void Info(string message) => Show(message, ToolTipIcon.Info);
+    public void Warning(string message) => Show(message, ToolTipIcon.Warning);
+    private void Show(string message, ToolTipIcon icon)
+    {
+        try { tray.BalloonTipTitle = "Toolbox"; tray.BalloonTipText = message; tray.BalloonTipIcon = icon; tray.ShowBalloonTip(3000); } catch { }
+    }
+}
+
+// Minimaler SettingsService fürs Tray – lädt Settings aus der lokalen DB
+file sealed class TraySettingsService : ISettingsService
+{
+    private readonly InternalAppDbContext _db;
+    public ToolboxSettings Settings { get; private set; } = new();
+
+    public TraySettingsService(InternalAppDbContext db)
+    {
+        _db = db;
+        try
+        {
+            _db.Database.EnsureCreated();
+            Settings = _db.Settings.Include(x => x.ShopSettingsList).FirstOrDefault() ?? new ToolboxSettings();
+        }
+        catch { Settings = new ToolboxSettings(); }
+    }
+}
+
+// Minimaler AppInfoService fürs Tray – setzt u.a. Restart-Zeit
+file sealed class TrayAppInfoService : IAppInfoService
+{
+    private readonly InternalAppDbContext _db;
+    public TrayAppInfoService(InternalAppDbContext db) => _db = db;
+
+    public async Task<AppInfo> GetAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _db.Database.EnsureCreatedAsync(cancellationToken);
+            var info = await _db.Set<AppInfo>().AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+            return info ?? new AppInfo { StartTime = DateTime.Now};
+        }
+        catch { return new AppInfo { StartTime = DateTime.Now}; }
+    }
+
+    public async Task SetStartTimeAsync(DateTime startTime, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _db.Database.EnsureCreatedAsync(cancellationToken);
+            var set = _db.Set<AppInfo>();
+            var info = await set.FirstOrDefaultAsync(cancellationToken);
+            if (info == null) { info = new AppInfo { StartTime = startTime}; await set.AddAsync(info, cancellationToken); }
+            else { info.StartTime = startTime; set.Update(info); }
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch { }
+    }
+
+    public async Task SetLastRestartTimeAsync(DateTime restartTime, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _db.Database.EnsureCreatedAsync(cancellationToken);
+            var set = _db.Set<AppInfo>();
+            var info = await set.FirstOrDefaultAsync(cancellationToken);
+            if (info != null) { info.IisRestartTime = restartTime; set.Update(info); await _db.SaveChangesAsync(cancellationToken); }
+        }
+        catch { }
+    }
+}
+

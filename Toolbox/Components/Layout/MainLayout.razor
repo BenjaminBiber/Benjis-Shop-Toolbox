@@ -1,0 +1,19 @@
+@using Toolbox.Themes
+@using Toolbox.Components.Layout.TopBar
+@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="@ModernTheme.Morphtheme" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <TopBar />
+    <MudMainContent>
+        <div style="height: calc(100dvh - var(--mud-appbar-height));" class="content">
+            @Body
+        </div>
+    </MudMainContent>
+    
+    
+</MudLayout>

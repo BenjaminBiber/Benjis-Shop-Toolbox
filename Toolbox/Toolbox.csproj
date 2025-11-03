@@ -1,0 +1,103 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows10.0.22000.0</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Version>0.0.7</Version>
+    <AssemblyVersion>0.0.7.0</AssemblyVersion>
+    <FileVersion>0.0.7.0</FileVersion>
+  </PropertyGroup>
+    <PropertyGroup>
+        <NoWarn>$(NoWarn);NU1605</NoWarn>
+    </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="BlazorDesktop" Version="9.0.2" />
+    <PackageReference Include="H.NotifyIcon" Version="2.3.2" />
+    <PackageReference Include="H.NotifyIcon.Wpf" Version="2.3.2" />
+    <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.10">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="MudBlazor" Version="8.13.0" />
+    <PackageReference Include="Microsoft.Web.Administration" Version="11.1.0" />
+    <PackageReference Include="NotifyIconWpf" Version="1.0.0" />
+    <PackageReference Include="YamlDotNet" Version="16.3.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.10" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Update="wwwroot\favicon.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Update="wwwroot\images\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Toolbox.Data\Toolbox.Data.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Toolbox.Updater\Toolbox.Updater.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Toolbox.TrayIcon\Toolbox.TrayIcon.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <_ContentIncludedByDefault Remove="Components\Settings-Test\SettingsField.razor" />
+    <_ContentIncludedByDefault Remove="Components\Settings-Test\Test.razor" />
+  </ItemGroup>
+
+  <!-- Publish Toolbox.Updater alongside Toolbox output and publish -->
+  <PropertyGroup>
+    <UpdaterProject>$(MSBuildProjectDirectory)\..\Toolbox.Updater\Toolbox.Updater.csproj</UpdaterProject>
+    <UpdaterPublishDir>$(IntermediateOutputPath)UpdaterPublish</UpdaterPublishDir>
+    <UpdaterExe>Toolbox.Updater.exe</UpdaterExe>
+  </PropertyGroup>
+
+  <Target Name="PublishUpdaterAfterBuild" AfterTargets="Build" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Exec Command="dotnet publish &quot;$(UpdaterProject)&quot; -c $(Configuration) -r win-x64 -p:PublishSingleFile=true -p:SelfContained=true -p:PublishTrimmed=false -o &quot;$(UpdaterPublishDir)&quot;" />
+    <ItemGroup>
+      <_UpdaterOutput Include="$(UpdaterPublishDir)\$(UpdaterExe)" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_UpdaterOutput)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyUpdaterOnPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <_UpdaterOutputPub Include="$(UpdaterPublishDir)\$(UpdaterExe)" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_UpdaterOutputPub)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Publish Toolbox.TrayIcon alongside Toolbox output and publish -->
+  <PropertyGroup>
+    <TrayProject>$(MSBuildProjectDirectory)\..\Toolbox.TrayIcon\Toolbox.TrayIcon.csproj</TrayProject>
+    <TrayPublishDir>$(IntermediateOutputPath)TrayPublish</TrayPublishDir>
+    <TrayExe>Toolbox.TrayIcon.exe</TrayExe>
+  </PropertyGroup>
+
+  <Target Name="PublishTrayAfterBuild" AfterTargets="Build" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Exec Command="dotnet publish &quot;$(TrayProject)&quot; -c $(Configuration) -r win-x64 -p:PublishSingleFile=true -p:SelfContained=true -p:PublishTrimmed=false -o &quot;$(TrayPublishDir)&quot;" />
+    <ItemGroup>
+      <_TrayOutput Include="$(TrayPublishDir)\$(TrayExe)" />
+      <_TrayOutput Include="$(TrayPublishDir)\favicon.ico" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_TrayOutput)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyTrayOnPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <_TrayOutputPub Include="$(TrayPublishDir)\$(TrayExe)" />
+      <_TrayOutputPub Include="$(TrayPublishDir)\favicon.ico" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_TrayOutputPub)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

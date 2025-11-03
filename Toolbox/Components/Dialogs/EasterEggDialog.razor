@@ -1,0 +1,233 @@
+﻿@using System.IO
+@using MudBlazor
+@using System.Text
+@using System.Text.Json
+
+<MudDialog MaxWidth="MaxWidth.Large">
+    <DialogContent>
+        <div class="egg-root">
+            <div class="wheel-wrapper" style="@GetWrapperStyle()">
+                <div class="pointer"></div>
+                <div class="wheel" style="@GetWheelStyle()">
+                    @if (_segments.Count == 0)
+                    {
+                        <div class="empty">Keine Bilder gefunden</div>
+                    }
+                    else
+                    {
+                        @for (int i = 0; i < _segments.Count; i++)
+                        {
+                            var angle = i * _segmentAngle + _segmentAngle / 2.0; // zentriert in der Sektor-Mitte
+                            <img class="segment-img" src="@_segments[i]" alt="seg-@i" style="@GetSegmentStyle(angle)" />
+                        }
+                    }
+                </div>
+            </div>
+            <div class="controls">
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@_spinning" OnClick="Spin">Drehen</MudButton>
+                @if (!string.IsNullOrWhiteSpace(_resultText))
+                {
+                    <MudText Typo="Typo.body1" Class="ms-3">Gewählt: @_resultText</MudText>
+                }
+            </div>
+            @if (!string.IsNullOrWhiteSpace(_funFactText))
+            {
+                <div class="funfact">
+                    <div class="funfact-title">Fun Fact</div>
+                    <div class="funfact-text">@_funFactText</div>
+                </div>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close" Color="Color.Default">Schließen</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private readonly List<string> _segments = new();
+    private double _segmentAngle => _segments.Count > 0 ? 360.0 / _segments.Count : 0.0;
+    private double _rotationDeg = 0;
+    private double _transitionSeconds = 0.0;
+    private bool _spinning = false;
+    private string? _resultText;
+    private string? _funFactText;
+    private readonly Dictionary<string, string> _funFacts = new(StringComparer.OrdinalIgnoreCase);
+
+    private int _wheelSizePx = 520;   // Durchmesser in Pixel (größer für bessere Sichtbarkeit)
+    private int _wheelPaddingPx = 24; // Innenabstand vom Rand
+    private int _iconEdgeMarginPx = 12; // Abstand des Icon-Randes zum Rad-Rand
+    private const int IconSize = 64;
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            var baseDir = AppContext.BaseDirectory;
+            var dir = Path.Combine(baseDir, "wwwroot", "images", "Easter-Egg");
+            if (Directory.Exists(dir))
+            {
+                var files = Directory.GetFiles(dir)
+                    .Where(f => HasImageExtension(f))
+                    .OrderBy(f => f)
+                    .ToList();
+
+                foreach (var f in files)
+                {
+                    var fileName = Path.GetFileName(f);
+                    var webPath = $"/images/Easter-Egg/{fileName}";
+                    _segments.Add(webPath);
+                }
+                // Try load fun facts from JSON next to images
+                TryLoadFunFacts(Path.Combine(dir, "funfacts.json"));
+            }
+            else
+            {
+                // Fallback path (optional)
+                var factsAlt = Path.Combine(baseDir, "wwwroot", "funfacts.json");
+                TryLoadFunFacts(factsAlt);
+            }
+        }
+        catch { }
+    }
+
+    private void TryLoadFunFacts(string path)
+    {
+        try
+        {
+            if (!File.Exists(path)) return;
+            var json = File.ReadAllText(path);
+            var dict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+            if (dict is null) return;
+            foreach (var kv in dict)
+            {
+                if (!_funFacts.ContainsKey(kv.Key))
+                    _funFacts[kv.Key] = kv.Value;
+            }
+        }
+        catch { /* ignore parse errors */ }
+    }
+
+    private static bool HasImageExtension(string path)
+    {
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        return ext is ".png" or ".jpg" or ".jpeg" or ".gif" or ".webp" or ".bmp" or ".svg";
+    }
+
+    private async Task Spin()
+    {
+        if (_segments.Count == 0 || _spinning) return;
+        _spinning = true;
+        _resultText = null;
+
+        var rnd = new Random();
+        var winIndex = rnd.Next(0, _segments.Count);
+        var cycles = 5; // volle Umdrehungen
+        var targetCenterAngle = winIndex * _segmentAngle + _segmentAngle / 2.0;
+
+        var currentMod = ((_rotationDeg % 360.0) + 360.0) % 360.0;
+        var additional = cycles * 360.0 + (360.0 - targetCenterAngle) - currentMod;
+        if (additional < 0) additional += 360.0;
+
+        _transitionSeconds = 4.0;
+        _rotationDeg += additional;
+
+        StateHasChanged();
+        try { await Task.Delay(TimeSpan.FromSeconds(_transitionSeconds)); } catch { }
+
+        try
+        {
+            _resultText = Path.GetFileNameWithoutExtension(_segments[winIndex]);
+            _funFactText = null;
+            if (!string.IsNullOrWhiteSpace(_resultText))
+            {
+                var key = _resultText;
+                if (_funFacts.TryGetValue(key, out var fact) && !string.IsNullOrWhiteSpace(fact))
+                    _funFactText = fact;
+                else
+                    _funFactText = "Kein Fun-Fact hinterlegt.";
+            }
+        }
+        catch { _resultText = $"Index {winIndex}"; _funFactText = null; }
+        _spinning = false;
+        StateHasChanged();
+    }
+
+    private void Close() => MudDialog.Close();
+
+    private string GetWheelStyle()
+    {
+        var transformPart = $"transform: rotate({_rotationDeg.ToString(System.Globalization.CultureInfo.InvariantCulture)}deg); transition: transform {_transitionSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)}s cubic-bezier(0.17, 0.89, 0.32, 1.28);";
+        var bgPart = GetWheelBackground();
+        return $"{transformPart} {bgPart}";
+    }
+
+    private string GetWrapperStyle()
+    {
+        var size = _wheelSizePx.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return $"width: {size}px; height: {size}px;";
+    }
+
+    private string GetWheelBackground()
+    {
+        if (_segments.Count == 0)
+            return string.Empty;
+
+        // Alternate two subtle theme-tinted colors per segment
+        var colors = new[]
+        {
+            "rgba(13,110,253,0.15)",   // primary tint
+            "rgba(255,193,7,0.15)"     // warning tint
+        };
+
+        // Build conic gradient for colored segments
+        var sb = new StringBuilder();
+        var fromDeg = (-90.0 + (_segmentAngle / 2.0)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var conic = new StringBuilder($"conic-gradient(from {fromDeg}deg, ");
+        for (int i = 0; i < _segments.Count; i++)
+        {
+            var start = (i * _segmentAngle).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var end = (((i + 1) * _segmentAngle)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var color = colors[i % colors.Length];
+            conic.Append($"{color} {start}deg {end}deg");
+            if (i < _segments.Count - 1)
+                conic.Append(", ");
+        }
+        conic.Append(");");
+
+        // Add a soft radial highlight overlay for depth (drawn on top)
+        var radial = "radial-gradient(circle at center, rgba(255,255,255,0.06), rgba(0,0,0,0.10))";
+        sb.Append($"background: {radial}, {conic}; background-blend-mode: multiply;");
+        return sb.ToString();
+    }
+
+    private string GetSegmentStyle(double angle)
+    {
+        // Center image inside its sector using sector centroid and keep it upright
+        var radius = (_wheelSizePx / 2.0) - _wheelPaddingPx;
+        var offset = GetIconOffset(radius);
+        return $"transform: translate(-50%, -50%) rotate({angle.ToString(System.Globalization.CultureInfo.InvariantCulture)}deg) translateY(-{offset.ToString(System.Globalization.CultureInfo.InvariantCulture)}px) rotate(-{angle.ToString(System.Globalization.CultureInfo.InvariantCulture)}deg);";
+    }
+
+    private double GetIconOffset(double radius)
+    {
+        // Positioniere die Bildmitte nahe am Außenrand, mit kleinem Sicherheitsabstand
+        var offset = radius - (IconSize / 2.0) - _iconEdgeMarginPx;
+        return Math.Max(0, offset);
+    }
+}
+
+<style>
+    .egg-root { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+    .wheel-wrapper { position: relative; width: 320px; height: 320px; }
+    .wheel { position: absolute; inset: 0; border-radius: 50%; overflow: visible; box-shadow: inset 0 0 0 2px rgba(0,0,0,0.06); }
+    .pointer { position: absolute; top: -6px; left: 50%; transform: translateX(-50%) rotate(180deg) translateY(-50%); width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 14px solid var(--mud-palette-primary); z-index: 5; }
+    .segment-img { position: absolute; top: 50%; left: 50%; transform-origin: 50% 50%; width: 64px; height: 64px; object-fit: contain; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.3)); }
+    .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--mud-palette-text-primary); font-style: italic; }
+    .controls { display: flex; align-items: center; justify-content: center; }
+    .funfact { margin-top: 8px; max-width: 520px; padding: 10px 12px; border-radius: 10px; background: rgba(13,110,253,0.08); color: var(--mud-palette-text-primary); border: 1px solid rgba(13,110,253,0.2); }
+    .funfact-title { font-weight: 600; margin-bottom: 4px; color: var(--mud-palette-primary); }
+    .funfact-text { white-space: pre-wrap; }
+</style>

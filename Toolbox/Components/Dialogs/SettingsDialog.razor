@@ -1,0 +1,127 @@
+@* @using Toolbox.Data.Models *@
+@* @using Toolbox.Data.Common *@
+@* @using Toolbox.Services *@
+@* @using System.IO *@
+@* @using Microsoft.Web.Administration *@
+@* @inject Toolbox.Services.SettingsService SettingsService *@
+@* @inject ISnackbar Snackbar *@
+@* @inject FileDialogService FileDialog *@
+@* <MudDialog> *@
+@*     <DialogContent> *@
+@*         <MudText Typo="Typo.h6" Class="mb-4">Einstellungen</MudText> *@
+@*         <MudSelect @bind-Value="Setting.IisAppName" Label="IIS App Name" Variant="Variant.Filled" Class="mb-2"> *@
+@*             @foreach (var site in _manager.Sites) *@
+@*             { *@
+@*                 if (site != null) *@
+@*                 { *@
+@*                     <MudSelectItem Value="@site.Name">@site.Name</MudSelectItem> *@
+@*                 } *@
+@*             } *@
+@*         </MudSelect> *@
+@*         <MudTextField @bind-Value="Setting.LogName" Label="Log Name" Variant="Variant.Filled" Class="mb-2" /> *@
+@*         <MudTextField @bind-Value="Setting.ShopYamlPath" Label="Pfad zur shop.yaml" Variant="Variant.Filled" Class="mb-2" *@
+@*                       Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseYaml" /> *@
+@*         <MudSelect T="int" @bind-Value="Setting.AutoRefreshSeconds" Label="Auto Refresh (Sekunden)" Class="mb-2"> *@
+@*             @foreach (var reloadTime in ReloadTime.ReloadTimes) *@
+@*             { *@
+@*                 <MudSelectItem Value="@(Int32.Parse(reloadTime.Value.TotalSeconds.ToString()))">@reloadTime.Key</MudSelectItem> *@
+@*             } *@
+@*         </MudSelect> *@
+@*         <MudSwitch @bind-Value="Setting.LoadOnStartup" T="bool" Color="Color.Primary">Beim Starten der App die Logs laden</MudSwitch> *@
+@*         <MudSwitch @bind-Value="Setting.OnlySinceRestart" T="bool" Color="Color.Primary">Nur Logs seit letztem Neustart</MudSwitch> *@
+@*         <MudSwitch @bind-Value="Setting.RestartShopOnThemeChange" T="bool" Color="Color.Primary">Bei Theme wechsel Shop neustarten</MudSwitch> *@
+@*         <MudTextField @bind-Value="Setting.RepoPath" Label="Repo Pfad" Variant="Variant.Filled" Class="mb-2" *@
+@*                       Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseRepo" /> *@
+@*         <MudTextField @bind-Value="Setting.ShopThemesPath" Label="Shop Themes Pfad" Variant="Variant.Filled" Class="mb-2" *@
+@*                       Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseShop" /> *@
+@*     </DialogContent> *@
+@*     <DialogActions> *@
+@*         <MudButton Color="Color.Primary" OnClick="Save">Speichern</MudButton> *@
+@*         <MudButton Color="Color.Tertiary" OnClick="ImportSettings">Importieren</MudButton> *@
+@*     </DialogActions> *@
+@*   </MudDialog> *@
+@* *@
+@* @code { *@
+@*     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!; *@
+@*     private ToolboxSettings Setting => SettingsService.Settings; *@
+@*     private ServerManager _manager = new ServerManager(); *@
+@* *@
+@*     protected override void OnInitialized() *@
+@*     { *@
+@*         _manager = new Microsoft.Web.Administration.ServerManager(); *@
+@*     } *@
+@* *@
+@*     private void Save() *@
+@*     { *@
+@*         Setting.AutoRefreshEnabled = true; *@
+@*         if (Setting.AutoRefreshSeconds <= 0) *@
+@*         { *@
+@*             Setting.AutoRefreshEnabled = false; *@
+@*         } *@
+@*         var success = SettingsService.Save(); *@
+@*         if (success) *@
+@*         { *@
+@*             Snackbar.Add("Einstellungen gespeichert", Severity.Success); *@
+@*         } *@
+@*         else *@
+@*         { *@
+@*             Snackbar.Add("Fehler beim Speichern der Einstellungen", Severity.Error); *@
+@*         } *@
+@*         MudDialog.Close(); *@
+@*     } *@
+@* *@
+@*     private void ChooseYaml() *@
+@*     { *@
+@*         var filters = new FileFilter[] *@
+@*         { *@
+@*             new FileFilter *@
+@*             { *@
+@*                 Name = "YAML Dateien", *@
+@*                 Extensions = new [] { "yaml", "yml" } *@
+@*             } *@
+@*         }; *@
+@*         var path = FileDialog.OpenFile("shop.yaml auswählen", filters, Path.GetDirectoryName(Setting.ShopYamlPath) ?? string.Empty); *@
+@*         if (!string.IsNullOrEmpty(path)) *@
+@*         { *@
+@*             Setting.ShopYamlPath = path; *@
+@*         } *@
+@*     } *@
+@* *@
+@*     private void ChooseRepo() *@
+@*     { *@
+@*         var path = FileDialog.OpenFolder("Repo Ordner auswählen", Setting.RepoPath); *@
+@*         if (!string.IsNullOrEmpty(path)) *@
+@*         { *@
+@*             Setting.RepoPath = path; *@
+@*         } *@
+@*     } *@
+@* *@
+@*     private void ChooseShop() *@
+@*     { *@
+@*         var path = FileDialog.OpenFolder("Shop Themes Ordner auswählen", Setting.ShopThemesPath); *@
+@*         if (!string.IsNullOrEmpty(path)) *@
+@*         { *@
+@*             Setting.ShopThemesPath = path; *@
+@*         } *@
+@*     } *@
+@* *@
+@*     private void ImportSettings() *@
+@*     { *@
+@*         var filters = new FileFilter[] *@
+@*         { *@
+@*             new FileFilter { Name = "JSON", Extensions = new [] { "json" } } *@
+@*         }; *@
+@*         var path = FileDialog.OpenFile("Einstellungen importieren", filters); *@
+@*         if (!string.IsNullOrEmpty(path)) *@
+@*         { *@
+@*             if (SettingsService.Import(path)) *@
+@*             { *@
+@*                 Snackbar.Add("Einstellungen importiert", Severity.Success); *@
+@*             } *@
+@*             else *@
+@*             { *@
+@*                 Snackbar.Add("Fehler beim Import", Severity.Error); *@
+@*             } *@
+@*         } *@
+@*     } *@
+@* } *@
