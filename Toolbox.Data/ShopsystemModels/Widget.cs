@@ -1,10 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
+﻿using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 
-namespace DBCloner.Models;
+namespace Toolbox.Data.ShopsystemModels;
 
 [PrimaryKey("WidgetId", "ShopId")]
 public partial class Widget

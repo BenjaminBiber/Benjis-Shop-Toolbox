@@ -21,6 +21,22 @@ public class ShopSetting
     {
         ShopYamlService.OpenYamlInVSCode(ShopYamlPath);
     }
+
+    public string? GetConnectionString()
+    {
+        var path = ShopYamlPath;
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            var config =  ShopYamlService.LoadConfiguration(path);
+            if (config == null || config.ZionConfiguration.DatabaseConnections == null ||
+                config.ZionConfiguration.DatabaseConnections.Count == 0)
+            {
+                return string.Empty;
+            }
+            return config.ZionConfiguration.DatabaseConnections.FirstOrDefault().GetConnectionString();
+        }
+        return null;
+    }
     
     public void OpenInExplorer()
     {

@@ -1,10 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
-using Microsoft.EntityFrameworkCore;
+﻿using System.ComponentModel.DataAnnotations;
 
-namespace DBCloner.Models;
+namespace Toolbox.Data.ShopsystemModels;
 
 public partial class CustomWidgetLocation
 {

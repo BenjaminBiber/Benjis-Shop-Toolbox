@@ -96,5 +96,10 @@ public class DatabaseConnection : IEquatable<DatabaseConnection>
     }
 
     public DatabaseConnection DeepClone() => new DatabaseConnection(this);
+
+    public string GetConnectionString()
+    {
+        return $"Server={Server};Database={Database};User Id={User};Password={Password};Encrypt={Encrypt};TrustServerCertificate={TrustServerCertificate};";
+    }
 }
 
