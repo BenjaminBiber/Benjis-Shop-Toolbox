@@ -366,13 +366,8 @@ class Program
             Console.Error.WriteLine($"Ungültige Version im Argument: '{args[0]}'");
         }
 
-        // 2) Interaktive Eingabe mit Anzeige der aktuellen Version und Validierung
         var currentFromCsproj = TryGetCurrentCsprojVersion(out var currentVer) ? currentVer : null;
-        if (!string.IsNullOrWhiteSpace(currentFromCsproj))
-        {
-            Console.WriteLine($"Aktuelle App-Version (csproj): {currentFromCsproj}");
-        }
-
+      
         while (true)
         {
             Console.Write("Bitte neue Versionsnummer eingeben (z.B. 1.2.3 oder 1.2.3.4). ");

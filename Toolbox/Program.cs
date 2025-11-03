@@ -12,9 +12,9 @@ using System.Windows.Media.Imaging;
 using Toolbox.Services;
 using Toolbox.Data.Services;
 using Microsoft.EntityFrameworkCore;
-using Toolbox.DataContexts;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Web.Administration;
+using Toolbox.Data.DataContexts;
 using Toolbox.Data.Models.Interfaces;
 using Application = System.Windows.Application;
 using INotificationService = Toolbox.Data.Models.Interfaces.INotificationService;
@@ -44,7 +44,6 @@ var dataRoot = Path.Combine(appData, "BenjisToolbox");
 Directory.CreateDirectory(dataRoot);
 var dbPath   = Path.Combine(dataRoot, "toolbox.db");
 var connStr  = $"Data Source={dbPath};Cache=Shared";
-
 builder.Services.AddDbContext<InternalAppDbContext>(options => options.UseSqlite(connStr));
 
 builder.Services.AddScoped<SettingsService>();

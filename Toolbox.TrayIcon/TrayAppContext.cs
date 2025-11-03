@@ -6,8 +6,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.EntityFrameworkCore;
+using Toolbox.Data.DataContexts;
 using Toolbox.Data.Models.Interfaces;
-using Toolbox.DataContexts;
 using Toolbox.Services;
 
 sealed class TrayAppContext : ApplicationContext

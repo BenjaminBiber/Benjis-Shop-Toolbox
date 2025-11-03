@@ -3,7 +3,7 @@ using Toolbox.Data.Common;
 using Toolbox.Data.Models;
 using Toolbox.Data.Models.ShopYaml;
 
-namespace Toolbox.DataContexts;
+namespace Toolbox.Data.DataContexts;
 
 public class InternalAppDbContext : DbContext
 {

@@ -3,8 +3,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Toolbox.Data.Common;
+using Toolbox.Data.DataContexts;
 using Toolbox.Data.Models.Interfaces;
-using Toolbox.DataContexts;
 
 sealed class TrayAppInfoService : IAppInfoService
 {
