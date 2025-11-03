@@ -23,7 +23,9 @@ public static class WidgetExtensions
             ("PublishUntil", x => x.PublishUntil),
             ("Sorting", x => x.Sorting),
             ("PrivacyCategoryUId", x => x.PrivacyCategoryUId),
-            ("PrivacyIdentifier", x => x.PrivacyIdentifier)
+            ("PrivacyIdentifier", x => x.PrivacyIdentifier),
+            ("CreatedBy", x => x.CreatedBy),
+            ("CreatedAt", x => x.CreatedAt)
         ]);
     }
 }
