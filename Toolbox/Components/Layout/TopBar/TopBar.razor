@@ -15,6 +15,10 @@
                    Color="Color.Inherit"
                    Edge="Edge.Start"
                    OnClick="@(() => IsOpen = !IsOpen)" />
+    <MudSpacer></MudSpacer>
+    <MudTooltip Text="Hilfe">
+        <MudIconButton Icon="@Icons.Material.Filled.Help" Color="Color.Info" Size="Size.Medium" Href="https://4sellers.atlassian.net/wiki/x/HADPCg"></MudIconButton>
+    </MudTooltip>
 </MudAppBar>
 
 @code {
