@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Web.Administration;
+using Toolbox.Data.DataContexts;
 using Toolbox.Data.Models;
 using Toolbox.Data.Models.Interfaces;
-using Toolbox.DataContexts;
 
 sealed class TraySettingsService : ISettingsService
 {
