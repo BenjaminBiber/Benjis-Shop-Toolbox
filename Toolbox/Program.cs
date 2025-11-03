@@ -15,6 +15,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Web.Administration;
 using Toolbox.Data.DataContexts;
+using Toolbox.Data.Models;
 using Toolbox.Data.Models.Interfaces;
 using Application = System.Windows.Application;
 using INotificationService = Toolbox.Data.Models.Interfaces.INotificationService;
@@ -39,12 +40,17 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<SolutionOpener>();
 builder.Services.AddScoped<FileDialogService>();
 
+//Initialize Internal DB Context
 var appData  = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
 var dataRoot = Path.Combine(appData, "BenjisToolbox");
 Directory.CreateDirectory(dataRoot);
 var dbPath   = Path.Combine(dataRoot, "toolbox.db");
 var connStr  = $"Data Source={dbPath};Cache=Shared";
 builder.Services.AddDbContext<InternalAppDbContext>(options => options.UseSqlite(connStr));
+
+//Initialize External DB Context
+builder.Services.AddSingleton<IConnectionStringResolver, ConnectionStringResolver>();
+builder.Services.AddScoped<IExternalDbContextFactory, ExternalDbContextFactory>();
 
 builder.Services.AddScoped<SettingsService>();
 builder.Services.AddScoped<ISettingsService, SettingsService>();
