@@ -24,15 +24,18 @@
     {
         @if (Settings.ShopSettingsList.Any())
         {        
-            <div class="row p-4 g-0">
-                <MudText Typo="Typo.h5">Themes</MudText>
-                <div class="col-11">
+            <div class="row p-4">
+                <MudText Typo="Typo.h5">Themes</MudText>   
+                <div class="col-4">
                     <MudSelect Variant="Variant.Outlined" Value="(SelectedShopSetting ?? Settings.ShopSettingsList.FirstOrDefault()).SiteId" ValueChanged="ChangeSelectedShop" T="long">
                         @foreach (var shopPaths in Settings.ShopSettingsList)
                         {
                             <MudSelectItem Value="shopPaths.SiteId">@IisService.GetSiteNameById(shopPaths.SiteId)</MudSelectItem>
                         }
                     </MudSelect>
+                </div>
+                <div class="col-7">
+                    <MudTextField Variant="Variant.Outlined" Value="_searchText" ValueChanged="(string s) => SearchChanged(s)" Immediate="true" Placeholder="Suche..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
                 </div>
                 <div class="col-1 d-flex align-items-center justify-content-center">
                     <MudTooltip Text="Neues Theme hinzufügen">
@@ -44,10 +47,6 @@
         <div class="row g-0 px-3 g- d-flex align-items-start justify-content-center gap-3">
           <MudPaper Class="col-12 mx-3 p-4">
                 <MudTable @ref="_table" Filter="new Func<ThemeInfo,bool>(FilterThemes)" Elevation="0" GroupHeaderStyle="background-color:var(--mud-palette-background-gray)" GroupBy="_groupDefinition" Items="_groupedThemes" Hover="true" Dense="true">
-                    <ToolBarContent>
-                        <MudSpacer />
-                        <MudTextField Value="_searchText" ValueChanged="(string s) => SearchChanged(s)" Immediate="true" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
-                    </ToolBarContent>
                     <HeaderContent>
                     <MudTh>Name</MudTh>
                     <MudTh>Virtuelles Verzeichnis</MudTh>
