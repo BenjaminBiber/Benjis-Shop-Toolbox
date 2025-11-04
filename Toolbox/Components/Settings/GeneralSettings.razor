@@ -36,11 +36,11 @@
     </div>
     
     <div class="col-12 mt-3 d-flex gap-1 align-items-center justify-content-center">
-        <MudText Class="fw-bold" Typo="Typo.body1">Allgemein</MudText>
+        <MudText Class="fw-bold" Typo="Typo.body1">Pfade</MudText>
         <MudDivider Class="w-auto"></MudDivider>
     </div>
     <div class="col-12 d-flex flex-column gap-2">
-        <MudTextField ValueChanged="(string i) => SettingsService.SaveSettingChanges(x => x.GeneralFolderPath = i, NotificationService)" Value="Setting.GeneralFolderPath" Label="Allgemeiner Ordner" Variant="Variant.Text" Class="pl-4"
+        <MudTextField ValueChanged="(string i) => SettingsService.SaveSettingChanges(x => x.GeneralFolderPath = i, NotificationService)" Value="Setting.GeneralFolderPath" Label="Shopsystem Ordnerpfad" Variant="Variant.Text" Class="pl-4"
                       Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseGeneralFolder"/>
     </div>
     

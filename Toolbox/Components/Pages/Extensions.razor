@@ -19,10 +19,10 @@
     <div class="row p-4">
         <MudText Typo="Typo.h5">Extensions</MudText>   
         <div class="col-4">
-            <MudSelect Variant="Variant.Outlined" Value="(SelectedShopSetting ?? Settings.ShopSettingsList.FirstOrDefault()).SiteId" ValueChanged="ChangeSelectedShop" T="long">
+            <MudSelect Variant="Variant.Outlined" Value="_selectedShopPath" ValueChanged="ChangeSelectedShop" T="string">
                 @foreach (var shopPaths in Settings.ShopSettingsList)
                 {
-                    <MudSelectItem Value="shopPaths.SiteId">@IisService.GetSiteNameById(shopPaths.SiteId)</MudSelectItem>
+                    <MudSelectItem Value="@shopPaths.ShopYamlPath">@GetShopDisplayName(shopPaths)</MudSelectItem>
                 }
             </MudSelect>
         </div>
@@ -110,7 +110,10 @@ else
     private List<ExtensionInfo> _groupedExtensions;
     private bool _isLoading;
     private ToolboxSettings Settings => SettingsService.Settings;
-    private ShopSetting? SelectedShopSetting => Settings.GetShopSettingForCurrentSite();
+    private string _selectedShopPath = string.Empty;
+    private ShopSetting? SelectedShopSetting =>
+        Settings.ShopSettingsList.FirstOrDefault(s => string.Equals(s.ShopYamlPath, _selectedShopPath, StringComparison.OrdinalIgnoreCase))
+        ?? Settings.GetShopSettingForCurrentSite();
     private MudTable<ExtensionInfo> _table = null!;
     private string _searchText = string.Empty;
     
@@ -125,6 +128,8 @@ else
     
     protected override async Task OnInitializedAsync()
     {
+        var current = Settings.GetShopSettingForCurrentSite();
+        _selectedShopPath = current?.ShopYamlPath ?? Settings.ShopSettingsList.FirstOrDefault()?.ShopYamlPath ?? string.Empty;
         await LoadAsync();
     }
 
@@ -185,32 +190,85 @@ else
         SolutionOpener.OpenSolutionInRider(info.Path);
     }
 
-    private async Task ChangeSelectedShop(long siteId)
+    private async Task ChangeSelectedShop(string shopPath)
     {
-        var siteName = IisService.GetSiteNameById(siteId);
+        _selectedShopPath = shopPath ?? string.Empty;
+        var selected = Settings.ShopSettingsList.FirstOrDefault(s => string.Equals(s.ShopYamlPath, _selectedShopPath, StringComparison.OrdinalIgnoreCase));
+        var siteName = (selected != null) ? IisService.GetSiteNameById(selected.SiteId) : null;
         if (!string.IsNullOrEmpty(siteName))
         {
             Settings.IisAppName = siteName;
             SettingsService.SaveSettings();
-            try
+        }
+        try
+        {
+            var shopRoot = selected != null ? Path.GetDirectoryName(selected.ShopYamlPath) : null;
+            if (!string.IsNullOrWhiteSpace(shopRoot))
             {
-                var shopSetting = Settings.ShopSettingsList.FirstOrDefault(s => s.SiteId == siteId);
-                var shopRoot = shopSetting != null ? Path.GetDirectoryName(shopSetting.ShopYamlPath) : null;
-                if (!string.IsNullOrWhiteSpace(shopRoot))
+                var root = Settings.GeneralFolderPath;
+                var ok = await ShopSystemConfigService.SetShopPathUsingRootAsync(root, shopRoot!);
+                if (!ok)
                 {
-                    var root = Settings.GeneralFolderPath;
-                    var ok = await ShopSystemConfigService.SetShopPathUsingRootAsync(root, shopRoot!);
-                    if (!ok)
+                    Snackbar.Add("shopsystem.json im Allgemeinen Ordner nicht gefunden.", Severity.Warning);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fehler beim Aktualisieren der shopsystem.json: {ex.Message}", Severity.Warning);
+        }
+        await LoadAsync();
+    }
+    
+    private string GetShopDisplayName(ShopSetting s)
+    {
+        var name = IisService.GetSiteNameById(s.SiteId);
+        if (!string.IsNullOrWhiteSpace(name)) return name;
+        try
+        {
+            var yamlPath = s.ShopYamlPath ?? string.Empty;
+            var dir = System.IO.Path.GetDirectoryName(yamlPath) ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(dir)) return yamlPath;
+
+            var segments = dir.Split(new[] { System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
+            string? candidate = null;
+
+            var idxCustomerRoot = Array.FindIndex(segments, p => p.Equals("KundenShops", StringComparison.OrdinalIgnoreCase));
+            if (idxCustomerRoot >= 0 && idxCustomerRoot + 1 < segments.Length)
+            {
+                candidate = segments[idxCustomerRoot + 1];
+            }
+
+            if (candidate == null)
+            {
+                var idxShopSystem = Array.FindIndex(segments, p => p.Equals("Shopsystem", StringComparison.OrdinalIgnoreCase));
+                if (idxShopSystem > 0)
+                {
+                    candidate = segments[idxShopSystem - 1];
+                }
+            }
+
+            if (candidate == null)
+            {
+                for (int i = segments.Length - 1; i >= 0; i--)
+                {
+                    var seg = segments[i];
+                    if (!seg.Equals("Shop", StringComparison.OrdinalIgnoreCase))
                     {
-                        Snackbar.Add("shopsystem.json im Allgemeinen Ordner nicht gefunden.", Severity.Warning);
+                        candidate = seg;
+                        break;
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                Snackbar.Add($"Fehler beim Aktualisieren der shopsystem.json: {ex.Message}", Severity.Warning);
-            }
-            await LoadAsync();
+
+            if (!string.IsNullOrWhiteSpace(candidate)) return candidate;
+
+            var baseName = System.IO.Path.GetFileName(dir);
+            return string.IsNullOrWhiteSpace(baseName) ? dir : baseName;
+        }
+        catch
+        {
+            return s.ShopYamlPath;
         }
     }
     

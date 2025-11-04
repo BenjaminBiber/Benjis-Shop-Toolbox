@@ -100,36 +100,112 @@ public class SettingsService : ISettingsService
     
     public void FillShopPathSettings(SiteCollection siteCollection)
     {
+        // 1) Scan the entire GeneralFolderPath for shops first
+        try
+        {
+            var root = Settings.GeneralFolderPath;
+            if (!string.IsNullOrWhiteSpace(root) && Directory.Exists(root))
+            {
+                foreach (var shopFolder in EnumerateShopFolders(root))
+                {
+                    var yamlLower = Path.Combine(shopFolder, "shop.yaml");
+                    var yamlUpper = Path.Combine(shopFolder, "Shop.yaml");
+                    var yamlPath = File.Exists(yamlUpper) ? yamlUpper : yamlLower;
+                    if (!File.Exists(yamlPath)) continue;
+
+                    var themesPath = Path.Combine(shopFolder, "Themes");
+                    if (!Directory.Exists(themesPath)) continue;
+
+                    if (!Settings.ShopSettingsList.Any(x =>
+                            string.Equals(x.ShopYamlPath, yamlPath, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        Settings.ShopSettingsList.Add(new ShopSetting
+                        {
+                            SiteId = long.MinValue, // not bound to an IIS site
+                            ShopYamlPath = yamlPath,
+                            ThemeFolderPath = themesPath
+                        });
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // ignore scanning errors
+        }
+
+        // 2) Then augment with IIS sites (if any) for paths not already present
         foreach (var site in siteCollection)
         {
-            if (site == null)
-            {
-                continue;  
-            }
-            
-            string physicalPath = site.GetSitePath();
+            if (site == null) continue;
 
+            var physicalPath = site.GetSitePath();
             if (site.IsShop())
             {
-                if (!Settings.ShopSettingsList.Any(x => x.SiteId == site.Id))
+                var yamlPath = Path.Combine(physicalPath, "Shop.yaml");
+                var themesPath = Path.Combine(physicalPath, "Themes");
+                if (!Settings.ShopSettingsList.Any(x =>
+                        x.SiteId == site.Id ||
+                        string.Equals(x.ShopYamlPath, yamlPath, StringComparison.OrdinalIgnoreCase)))
                 {
-                    var shopSetting = new ShopSetting()
+                    Settings.ShopSettingsList.Add(new ShopSetting
                     {
                         SiteId = site.Id,
-                        ShopYamlPath = physicalPath + @"\Shop.yaml",
-                        ThemeFolderPath = physicalPath + @"\Themes"
-                    };
-                    Settings.ShopSettingsList.Add(shopSetting);
+                        ShopYamlPath = yamlPath,
+                        ThemeFolderPath = themesPath
+                    });
                 }
             }
         }
         SaveSettings();
     }
+
+    private static IEnumerable<string> EnumerateShopFolders(string root)
+    {
+        var ignore = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".git", ".svn", ".hg", ".vs", ".idea", ".vscode",
+            "bin", "obj", "packages", "node_modules"
+        };
+
+        var q = new Queue<string>();
+        q.Enqueue(root);
+        while (q.Count > 0)
+        {
+            string current;
+            try { current = q.Dequeue(); }
+            catch { yield break; }
+
+            string[] subdirs;
+            try { subdirs = Directory.GetDirectories(current, "*", SearchOption.TopDirectoryOnly); }
+            catch { subdirs = Array.Empty<string>(); }
+
+            foreach (var sub in subdirs)
+            {
+                var name = Path.GetFileName(sub);
+                if (ignore.Contains(name)) continue;
+
+                // Heuristik: Shop-Ordner enthält Shop.yaml/shop.yaml und Themes
+                var hasYaml = File.Exists(Path.Combine(sub, "Shop.yaml")) || File.Exists(Path.Combine(sub, "shop.yaml"));
+                var hasThemes = Directory.Exists(Path.Combine(sub, "Themes"));
+                if (hasYaml && hasThemes)
+                {
+                    yield return sub;
+                }
+                else
+                {
+                    q.Enqueue(sub);
+                }
+            }
+        }
+    }
     
     public bool AreThereAllShopPathSettings(SiteCollection siteCollection)
     {
         Load();
-        return Settings.ShopSettingsList.Count == siteCollection.Count;
+        // Als 'gefüllt' gilt bereits, wenn mindestens ein ShopSetting existiert.
+        // Die eigentliche Befüllung scannt zuerst den GeneralFolderPath, danach IIS.
+        return Settings.ShopSettingsList != null && Settings.ShopSettingsList.Any();
     }
     
     public bool ChangeSelectedIisApp(string iis)
