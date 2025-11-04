@@ -25,6 +25,15 @@
                       Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseRepo"/>
         <MudCheckBox Class="p-0" ValueChanged="(bool i) => SettingsService.SaveSettingChanges(x => x.RestartShopOnThemeChange = i, NotificationService)" Value="Setting.RestartShopOnThemeChange" T="bool" Color="Color.Primary">Shop bei Theme-Wechsel neustarten</MudCheckBox>
     </div>
+
+    <div class="col-12 mt-3 d-flex gap-1 align-items-center justify-content-center">
+        <MudText Class="fw-bold" Typo="Typo.body1">Extensions</MudText>
+        <MudDivider Class="w-auto"></MudDivider>
+    </div>
+    <div class="col-12 d-flex flex-column gap-2">
+        <MudTextField ValueChanged="(string i) => SettingsService.SaveSettingChanges(x => x.ExtensionsRepositoryPath = i, NotificationService)" Value="Setting.ExtensionsRepositoryPath" Label="Extensions Repo Pfad" Variant="Variant.Text" Class="pl-4"
+                      Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseExtensionsRepo"/>
+    </div>
     
     <div class="col-12 mt-3 d-flex gap-1 align-items-center justify-content-center">
         <MudText Class="fw-bold" Typo="Typo.body1">Updater</MudText>
@@ -39,7 +48,8 @@
                        OnClick="@RunUpdaterAsync">
                 @(_startingUpdater ? "Starte Updater..." : "Updater ausführen")
             </MudButton>
-        </MudTooltip>    </div>
+        </MudTooltip>
+    </div>
 </div>
 
 @code {
@@ -58,6 +68,15 @@
         if (!string.IsNullOrEmpty(path))
         {
             Setting.ThemeRepositoryPath = path;
+        }
+    }
+
+    private void ChooseExtensionsRepo()
+    {
+        var path = FileDialog.OpenFolder("Extensions Repo Ordner auswählen", Setting.ExtensionsRepositoryPath);
+        if (!string.IsNullOrEmpty(path))
+        {
+            Setting.ExtensionsRepositoryPath = path;
         }
     }
     

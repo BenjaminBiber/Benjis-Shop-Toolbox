@@ -9,6 +9,7 @@ public class ToolboxSettings
     public string? IisAppName { get; set; }
     public string? LogName { get; set; }
     public string ThemeRepositoryPath { get; set; }
+    public string ExtensionsRepositoryPath { get; set; }
     public int AutoRefreshSeconds { get; set; } 
     public bool AutoRefreshEnabled { get; set; }
     public bool OnlySinceRestart { get; set; } 
@@ -30,6 +31,7 @@ public class ToolboxSettings
         LogName = "4SELLERS";
         AutoRefreshSeconds = 60;
         ThemeRepositoryPath = "C:\\Dev_Git\\KundenThemes";
+        ExtensionsRepositoryPath = "C:\\Dev_Git\\Extensions";
         AutoRefreshEnabled = false;
         OnlySinceRestart = true;
         RestartShopOnThemeChange = true;
