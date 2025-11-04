@@ -1,0 +1,96 @@
+@using Toolbox.Data.ShopsystemModels
+
+<MudDialog MaxWidth="MaxWidth.Medium">
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-4">Widget bearbeiten</MudText>
+        <MudForm @ref="_form">
+            <div class="row g-3">
+                <div class="col-6">
+                    <MudNumericField T="int" Label="WidgetId" Variant="Variant.Outlined" @bind-Value="_model.WidgetId" />
+                </div>
+                <div class="col-6">
+                    <MudNumericField T="short" Label="ShopId" Variant="Variant.Outlined" @bind-Value="_model.ShopId" />
+                </div>
+
+                <div class="col-12">
+                    <MudNumericField T="int" Label="WidgetTypeId" Variant="Variant.Outlined" @bind-Value="_model.WidgetTypeId" />
+                </div>
+
+                <div class="col-12">
+                    <MudTextField T="string" Label="Label" Variant="Variant.Outlined" @bind-Value="_model.Label" />
+                </div>
+
+                <div class="col-12">
+                    <MudTextField T="string" Label="LocationKey" Variant="Variant.Outlined" @bind-Value="_model.LocationKey" />
+                </div>
+
+                <div class="col-12">
+                    <MudTextField T="string" Label="Config" Variant="Variant.Outlined" @bind-Value="_model.Config" Lines="4" />
+                </div>
+
+                <div class="col-6">
+                    <MudTextField T="DateTime" Label="PublishAt" Variant="Variant.Outlined"
+                                  @bind-Value="_model.PublishAt"
+                                  InputType="InputType.DateTimeLocal"
+                                  Format="yyyy-MM-ddTHH:mm" />
+                </div>
+                <div class="col-6">
+                    <MudTextField T="DateTime?" Label="PublishUntil" Variant="Variant.Outlined"
+                                  @bind-Value="_model.PublishUntil"
+                                  InputType="InputType.DateTimeLocal"
+                                  Format="yyyy-MM-ddTHH:mm" />
+                </div>
+
+                <div class="col-12">
+                    <MudNumericField T="int" Label="Sorting" Variant="Variant.Outlined" @bind-Value="_model.Sorting" />
+                </div>
+            </div>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="Save">Speichern</MudButton>
+        <MudButton Color="Color.Default" OnClick="Cancel">Abbrechen</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public Widget? Widget { get; set; }
+
+    private MudForm? _form;
+    private Widget _model = new();
+
+    protected override void OnInitialized()
+    {
+        if (Widget is not null)
+        {
+            _model = new Widget
+            {
+                WidgetId = Widget.WidgetId,
+                ShopId = Widget.ShopId,
+                WidgetTypeId = Widget.WidgetTypeId,
+                Label = Widget.Label,
+                LocationKey = Widget.LocationKey,
+                Config = Widget.Config,
+                PublishAt = Widget.PublishAt,
+                PublishUntil = Widget.PublishUntil,
+                Sorting = Widget.Sorting
+            };
+        }
+    }
+
+    private async Task Save()
+    {
+        if (_form is not null)
+        {
+            await _form.Validate();
+            if (!_form.IsValid)
+                return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(_model));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
+
