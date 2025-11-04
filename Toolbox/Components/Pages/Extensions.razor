@@ -1,0 +1,100 @@
+﻿@using Toolbox.Components.Dialogs
+@page "/extensions"
+@using MudBlazor
+@inject IDialogService Dialogs
+@inject Toolbox.Services.SettingsService SettingsService
+@inject Toolbox.Services.ExtensionsService ExtService
+@inject Toolbox.Data.Services.SolutionOpener SolutionOpener
+@using Toolbox.Data.Models
+
+<div class="row p-4">
+    <MudText Typo="Typo.h5">Extensions</MudText>
+    <div class="col-11 d-flex align-items-center">
+        <MudText Class="fw-light" Typo="Typo.body2">Repo Pfad: @SettingsService.Settings.ExtensionsRepositoryPath</MudText>
+    </div>
+    <div class="col-1 d-flex align-items-center justify-content-center">
+        <MudTooltip Text="Extension-Repo klonen">
+            <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="OpenCloneDialog"/>
+        </MudTooltip>
+    </div>
+</div>
+
+<div class="row g-0 px-3 d-flex align-items-start justify-content-center gap-3">
+  <MudPaper Class="col-12 mx-3 p-4">
+    <MudTable Items="_extensions" Loading="_loading" Hover="true" Dense="true">
+        <HeaderContent>
+            <MudTh>Name</MudTh>
+            <MudTh>Ordner</MudTh>
+            <MudTh>Lösung</MudTh>
+            <MudTh>Projekte</MudTh>
+            <MudTh>Aktionen</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Name">@context.Name</MudTd>
+            <MudTd DataLabel="Ordner">@context.Path</MudTd>
+            <MudTd DataLabel="Lösung">@(context.HasSolution ? "Ja" : "Nein")</MudTd>
+            <MudTd DataLabel="Projekte">@(context.HasProjects ? "Ja" : "Nein")</MudTd>
+            <MudTd>
+                <MudTooltip Text="Explorer öffnen">
+                    <MudIconButton Icon="@Icons.Material.Filled.FolderOpen" Color="Color.Info" Size="Size.Small" OnClick="@(() => OpenDirectory(context.Path))"/>
+                </MudTooltip>
+                <MudTooltip Text="In Rider öffnen" Disabled="!context.HasSolution">
+                    <MudIconButton Disabled="!context.HasSolution" Icon="@Icons.Material.Filled.Code" Color="Color.Default" Size="Size.Small" OnClick="@(() => OpenInRider(context.Path))"/>
+                </MudTooltip>
+                <MudTooltip Text="Build (dotnet build)">
+                    <MudIconButton Icon="@Icons.Material.Filled.Build" Color="Color.Primary" Size="Size.Small" OnClick="@(() => Build(context.Path))"/>
+                </MudTooltip>
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+  </MudPaper>
+</div>
+
+@code {
+    private bool _loading;
+    private List<ExtensionInfo> _extensions = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+        _extensions = ExtService.GetExtensions().ToList();
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private async Task OpenCloneDialog()
+    {
+        var dlg = await Dialogs.ShowAsync<CloneExtensionDialog>("Repo klonen");
+        var result = await dlg.Result;
+        if (!result.Canceled)
+        {
+            await LoadAsync();
+        }
+    }
+
+    public static void OpenDirectory(string path)
+    {
+        if (System.IO.Directory.Exists(path))
+        {
+            System.Diagnostics.Process.Start("explorer.exe", path);
+        }
+    }
+
+    private void OpenInRider(string path)
+    {
+        SolutionOpener.OpenSolutionInRider(path);
+    }
+
+    private async Task Build(string path)
+    {
+        await ExtService.BuildAsync(path);
+    }
+}
+
+

@@ -1,0 +1,51 @@
+@using Toolbox.Services
+@inject ExtensionsService Extensions
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-4">Extension-Repository klonen</MudText>
+        <MudTextField @bind-Value="_gitUrl" Label="Git URL" Variant="Variant.Filled" Class="mb-2" />
+        <MudCheckBox @bind-Value="_buildAfterClone" Color="Color.Primary" Label="Nach dem Klonen bauen (dotnet build)" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="Clone">Klonen</MudButton>
+        <MudButton Color="Color.Default" OnClick="Cancel">Abbrechen</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    private string _gitUrl = string.Empty;
+    private bool _buildAfterClone;
+
+    private async Task Clone()
+    {
+        if (string.IsNullOrWhiteSpace(_gitUrl))
+        {
+            Snackbar.Add("Bitte eine Git URL angeben.", Severity.Warning);
+            return;
+        }
+
+        var (ok, dir) = await Extensions.CloneRepositoryAsync(_gitUrl);
+        if (!ok)
+        {
+            MudDialog.Close(DialogResult.Ok(false));
+            return;
+        }
+
+        if (_buildAfterClone && dir is not null)
+        {
+            var built = await Extensions.BuildAsync(dir);
+            if (!built)
+            {
+                Snackbar.Add("Build fehlgeschlagen.", Severity.Error);
+            }
+        }
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    void Cancel() => MudDialog.Cancel();
+}
+

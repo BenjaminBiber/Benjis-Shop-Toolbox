@@ -55,6 +55,7 @@ builder.Services.AddScoped<IExternalDbContextFactory, ExternalDbContextFactory>(
 builder.Services.AddScoped<SettingsService>();
 builder.Services.AddScoped<ISettingsService, SettingsService>();
 builder.Services.AddScoped<ThemeLinkService>();
+builder.Services.AddScoped<ExtensionsService>();
 builder.Services.AddSingleton<UpdaterService>();
 builder.Services.AddScoped<AppInfoService>();
 builder.Services.AddScoped<IAppInfoService, AppInfoService>();
