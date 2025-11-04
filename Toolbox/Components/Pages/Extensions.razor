@@ -1,100 +1,325 @@
-﻿@using Toolbox.Components.Dialogs
-@page "/extensions"
-@using MudBlazor
-@inject IDialogService Dialogs
-@inject Toolbox.Services.SettingsService SettingsService
-@inject Toolbox.Services.ExtensionsService ExtService
-@inject Toolbox.Data.Services.SolutionOpener SolutionOpener
+﻿@page "/extensions"
+@using System.Diagnostics
+@using System.IO
+@using Toolbox.Components.Dialogs
 @using Toolbox.Data.Models
+@using Toolbox.Data.Services
+@using Toolbox.ExtensionMethods
+@inject NotificationService NotificationService
+@inject ExtensionsService ExtensionsService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject Toolbox.Services.SettingsService SettingsService
+@inject SolutionOpener SolutionOpener
+@inject IisService IisService
 
-<div class="row p-4">
-    <MudText Typo="Typo.h5">Extensions</MudText>
-    <div class="col-11 d-flex align-items-center">
-        <MudText Class="fw-light" Typo="Typo.body2">Repo Pfad: @SettingsService.Settings.ExtensionsRepositoryPath</MudText>
+@if (Settings.ShopSettingsList.Any())
+{        
+    <div class="row p-4">
+        <MudText Typo="Typo.h5">Extensions</MudText>   
+        <div class="col-4">
+            <MudSelect Variant="Variant.Outlined" Value="(SelectedShopSetting ?? Settings.ShopSettingsList.FirstOrDefault()).SiteId" ValueChanged="ChangeSelectedShop" T="long">
+                @foreach (var shopPaths in Settings.ShopSettingsList)
+                {
+                    <MudSelectItem Value="shopPaths.SiteId">@IisService.GetSiteNameById(shopPaths.SiteId)</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+        <div class="col-7">
+            <MudTextField Variant="Variant.Outlined" Value="_searchText" ValueChanged="(string s) => SearchChanged(s)" Immediate="true" Placeholder="Suche..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+        </div>
+        <div class="col-1 d-flex align-items-center justify-content-center">
+            <MudTooltip Text="Extension klonen">
+                <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="OpenCloneDialog"/>
+            </MudTooltip>
+        </div>
     </div>
-    <div class="col-1 d-flex align-items-center justify-content-center">
-        <MudTooltip Text="Extension-Repo klonen">
-            <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="OpenCloneDialog"/>
-        </MudTooltip>
-    </div>
-</div>
+}
 
-<div class="row g-0 px-3 d-flex align-items-start justify-content-center gap-3">
-  <MudPaper Class="col-12 mx-3 p-4">
-    <MudTable Items="_extensions" Loading="_loading" Hover="true" Dense="true">
-        <HeaderContent>
-            <MudTh>Name</MudTh>
-            <MudTh>Ordner</MudTh>
-            <MudTh>Lösung</MudTh>
-            <MudTh>Projekte</MudTh>
-            <MudTh>Aktionen</MudTh>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd DataLabel="Name">@context.Name</MudTd>
-            <MudTd DataLabel="Ordner">@context.Path</MudTd>
-            <MudTd DataLabel="Lösung">@(context.HasSolution ? "Ja" : "Nein")</MudTd>
-            <MudTd DataLabel="Projekte">@(context.HasProjects ? "Ja" : "Nein")</MudTd>
-            <MudTd>
-                <MudTooltip Text="Explorer öffnen">
-                    <MudIconButton Icon="@Icons.Material.Filled.FolderOpen" Color="Color.Info" Size="Size.Small" OnClick="@(() => OpenDirectory(context.Path))"/>
-                </MudTooltip>
-                <MudTooltip Text="In Rider öffnen" Disabled="!context.HasSolution">
-                    <MudIconButton Disabled="!context.HasSolution" Icon="@Icons.Material.Filled.Code" Color="Color.Default" Size="Size.Small" OnClick="@(() => OpenInRider(context.Path))"/>
-                </MudTooltip>
-                <MudTooltip Text="Build (dotnet build)">
-                    <MudIconButton Icon="@Icons.Material.Filled.Build" Color="Color.Primary" Size="Size.Small" OnClick="@(() => Build(context.Path))"/>
-                </MudTooltip>
-            </MudTd>
-        </RowTemplate>
-    </MudTable>
-  </MudPaper>
-</div>
+@if (_groupedExtensions != null)
+{
+    <div class="row g-0 px-3 g- d-flex align-items-start justify-content-center gap-3">
+      <MudPaper Class="col-12 mx-3 p-4">
+            <MudTable Loading="_isLoading" @ref="_table" Filter="new Func<ExtensionInfo,bool>(FilterThemes)" Elevation="0" GroupHeaderStyle="background-color:var(--mud-palette-background-gray)" GroupBy="_groupDefinition" Items="_groupedExtensions" Hover="true" Dense="true">
+                <HeaderContent>
+                <MudTh>Name</MudTh>
+                <MudTh>Install Projekt</MudTh>
+                <MudTh>Data Projekt</MudTh>
+                <MudTh>Shop Projekt</MudTh>
+                <MudTh>ThemeV4</MudTh>
+                <MudTh>Aktionen</MudTh>
+                <MudTh>Öffnen</MudTh>
+            </HeaderContent>
+            <GroupHeaderTemplate>
+                <MudTh Class="mud-table-cell-custom-group" colspan="7"><MudText Class="fw-bold" Typo="Typo.h6">@($"{context.Key}")</MudText></MudTh>
+            </GroupHeaderTemplate>
+            <RowTemplate>
+                <MudTd DataLabel="Name">@context.Name</MudTd>
+                <MudTd DataLabel="Install Projekt">
+                    @if (context.HasInstallProject)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success"></MudIcon>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Data Projekt">
+                    @if (context.HasDataProject)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Warning"></MudIcon>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Shop Projekt">
+                    @if (context.HasShopProject)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Info"></MudIcon>
+                    }
+                </MudTd>
+                <MudTd DataLabel="ThemeV4">
+                    @if (context.HasThemeV4)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Primary"></MudIcon>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Aktionen">
+                    <MudMenu Icon="@Icons.Material.Filled.Build" Color="Color.Error">
+                        <MudMenuItem Label="Extension Builden" OnClick="() => ExtensionsService.BuildAsync(context.Path)"></MudMenuItem>
+                        <MudMenuItem Label="Extension Datenbank Installieren" OnClick="() => InstallExtension(context)"></MudMenuItem>
+                    </MudMenu>
+                </MudTd>
+                <MudTd DataLabel="Öffnen">
+                    <MudTooltip Text="Öffnen in">
+                        <MudMenu Icon="@Icons.Material.Filled.OpenInNew">
+                            <MudMenuItem OnClick="@(() => OpenDirectoryInExplorer(context.Path))" Label="Explorer"/>
+                            <MudMenuItem OnClick="@(() => OpenSolution(context))" Label="Rider"/>
+                        </MudMenu>
+                    </MudTooltip>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+        </MudPaper>
+    </div>
+}
+else
+{
+    <div class="d-flex justify-content-center my-3">
+        <MudAlert Icon="@Icons.Material.Filled.Info" Variant="Variant.Filled" Severity="Severity.Info">Keine Themes für die aktuell ausgewählte Seite vorhanden</MudAlert>
+    </div>    
+}
 
 @code {
-    private bool _loading;
-    private List<ExtensionInfo> _extensions = new();
-
+    private List<ExtensionInfo> _groupedExtensions;
+    private bool _isLoading;
+    private ToolboxSettings Settings => SettingsService.Settings;
+    private ShopSetting? SelectedShopSetting => Settings.GetShopSettingForCurrentSite();
+    private MudTable<ExtensionInfo> _table = null!;
+    private string _searchText = string.Empty;
+    
+    private TableGroupDefinition<ExtensionInfo> _groupDefinition = new()
+    {
+        GroupName = "Group",
+        Indentation = true,
+        Expandable = true,
+        Selector = (e) => e.GetCustomerName(),
+        IsInitiallyExpanded = false
+    };
+    
     protected override async Task OnInitializedAsync()
     {
         await LoadAsync();
     }
 
+    private async Task SearchChanged(string? searchValue)
+    {
+        _searchText = searchValue ?? string.Empty;
+
+        var groups = _groupedExtensions
+            .GroupBy(t => t.GetCustomerName() ?? string.Empty)
+            .ToList();
+
+        bool MatchesSearch(ExtensionInfo i) =>
+            string.IsNullOrWhiteSpace(_searchText)
+            || (i.Name?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ?? false)
+            || (i.GetCustomerName()?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ?? false);
+
+        var visibleGroups = groups
+            .Where(g => g.Any(MatchesSearch))
+            .ToList();
+
+        if (visibleGroups.Count == 1)
+        {
+            _table.ExpandAllGroups();
+
+            var firstMatch = visibleGroups[0]
+                                 .FirstOrDefault(i => MatchesSearch(i)) 
+                             ?? visibleGroups[0].FirstOrDefault();
+
+            if (firstMatch is not null)
+                await _table.ScrollToItemAsync(firstMatch);
+        }
+        else
+        {
+            _table.CollapseAllGroups();
+        }
+    }
+    
+    private bool FilterThemes(ExtensionInfo info)
+    {
+        return info.Name.Contains(_searchText.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+    
+    public static void OpenDirectoryInExplorer(string path)
+    {
+        if (Directory.Exists(path))
+        {
+            Process.Start("explorer.exe", path);
+        }
+        else
+        {
+            Console.WriteLine("Ordner existiert nicht: " + path);
+        }
+    }
+
+    private void OpenSolution(ExtensionInfo info)
+    {
+        Snackbar.Add($"{info.Name} wird in Rider geöffnet...", Severity.Info);
+        SolutionOpener.OpenSolutionInRider(info.Path);
+    }
+
+    private async Task ChangeSelectedShop(long siteId)
+    {
+        var siteName = IisService.GetSiteNameById(siteId);
+        if (!string.IsNullOrEmpty(siteName))
+        {
+            Settings.IisAppName = siteName;
+            SettingsService.SaveSettings();
+            await LoadAsync();
+        }
+    }
+    
     private async Task LoadAsync()
     {
-        _loading = true;
+        _isLoading = true;
         StateHasChanged();
-        _extensions = ExtService.GetExtensions().ToList();
-        _loading = false;
+        var setting = SelectedShopSetting;
+        if (setting == null)
+        {
+            _groupedExtensions = null;
+            _isLoading = false;
+            StateHasChanged();
+            return;
+        }
+
+        _groupedExtensions = ExtensionsService.GetExtensions().ToList();
+        _isLoading = false;
         StateHasChanged();
     }
 
     private async Task OpenCloneDialog()
     {
-        var dlg = await Dialogs.ShowAsync<CloneExtensionDialog>("Repo klonen");
-        var result = await dlg.Result;
-        if (!result.Canceled)
+        var setting = SelectedShopSetting;
+        if (setting == null)
+        {
+            return;
+        }
+        
+        var actions = new List<RepoAction>
+        {
+            new RepoAction
+            {
+                Label = "Nach dem Klonen Builden",
+                ExecuteAsync = dir => ExtensionsService.BuildAsync(dir)
+            },
+            new RepoAction
+            {
+                Label = "Nach dem Klonen die Datenbank installieren",
+                ExecuteAsync = dir => InstallExtension(dir)
+            },
+            new RepoAction
+            {
+                Label = "Nach dem Klonen in Rider öffnen",
+                ExecuteAsync = dir => { OpenDirectoryInExplorer(dir); SolutionOpener.OpenSolutionInRider(dir); return Task.FromResult(true); }
+            }
+        };
+
+        var result = await DialogService.ShowCloneDialog("Extension-Repository klonen", Settings.ExtensionsRepositoryPath, actions);
+        
+        if (!result)
         {
             await LoadAsync();
         }
     }
 
-    public static void OpenDirectory(string path)
+    private async Task<bool> InstallExtension(string dir)
     {
-        if (System.IO.Directory.Exists(path))
+        try
         {
-            System.Diagnostics.Process.Start("explorer.exe", path);
+            var conn = SelectedShopSetting?.GetConnection();
+            if (conn == null)
+            {
+                Snackbar.Add("Keine Datenbankverbindung (shop.yaml) gefunden.", Severity.Warning);
+                return false;
+            }
+
+            var info = new ExtensionInfo
+            {
+                Name = Path.GetFileName(dir),
+                Path = dir,
+                HasSolution = Directory.GetFiles(dir, "*.sln", SearchOption.AllDirectories).Length > 0,
+                HasProjects = Directory.GetFiles(dir, "*.csproj", SearchOption.AllDirectories).Length > 0,
+                HasShopProject = Directory.GetDirectories(dir, "*.Shop", SearchOption.AllDirectories).Length > 0,
+                HasDataProject = Directory.GetDirectories(dir, "*.Data", SearchOption.AllDirectories).Length > 0,
+                HasInstallProject = Directory.GetDirectories(dir, "*.Install", SearchOption.AllDirectories).Length > 0,
+                HasThemeV4 = Directory.GetDirectories(dir, "4SELLERS_Responsive_4", SearchOption.AllDirectories).Length > 0
+            };
+
+            var (ok, log) = await info.InstallWithLogAsync(conn);
+            var title = ok ? $"Installation: {info.Name} (Erfolg)" : $"Installation: {info.Name} (Fehlgeschlagen)";
+            var parameters = new DialogParameters<LogDialog>
+            {
+                { x => x.Title, title },
+                { x => x.LogText, string.IsNullOrEmpty(log) ? "(Kein Logausgabe erhalten)" : log }
+            };
+            await DialogService.ShowAsync<LogDialog>("Installationsprotokoll", parameters, new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+            if (!ok)
+            {
+                Snackbar.Add(string.IsNullOrWhiteSpace(log) ? "Installation fehlgeschlagen." : log, Severity.Error);
+            }
+            return ok;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Installationsfehler: {ex.Message}", Severity.Error);
+            return false;
         }
     }
 
-    private void OpenInRider(string path)
+    private async Task InstallExtension(ExtensionInfo info)
     {
-        SolutionOpener.OpenSolutionInRider(path);
-    }
+        try
+        {
+            var conn = SelectedShopSetting?.GetConnection();
+            if (conn == null)
+            {
+                Snackbar.Add("Keine Datenbankverbindung (shop.yaml) gefunden.", Severity.Warning);
+                return;
+            }
+            var (ok, log) = await info.InstallWithLogAsync(conn);
+            var title = ok ? $"Installation: {info.Name} (Erfolg)" : $"Installation: {info.Name} (Fehlgeschlagen)";
+            var parameters = new DialogParameters<LogDialog>
+            {
+                { x => x.Title, title },
+                { x => x.LogText, string.IsNullOrEmpty(log) ? "(Kein Logausgabe erhalten)" : log }
+            };
+            await DialogService.ShowAsync<LogDialog>("Installationsprotokoll", parameters, new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+            if (!ok)
+            {
+                Snackbar.Add(string.IsNullOrWhiteSpace(log) ? "Installation fehlgeschlagen." : log, Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Installationsfehler: {ex.Message}", Severity.Error);
+        }
+    }}
 
-    private async Task Build(string path)
-    {
-        await ExtService.BuildAsync(path);
-    }
-}
 
 

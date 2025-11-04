@@ -10,11 +10,13 @@ public class ThemeLinkService
 {
     private readonly INotificationService _notifications;
     private readonly SettingsService _settings;
+    private readonly GitRepoService _git;
 
-    public ThemeLinkService(INotificationService notifications, SettingsService settings)
+    public ThemeLinkService(INotificationService notifications, SettingsService settings, GitRepoService git)
     {
         _notifications = notifications;
         _settings = settings;
+        _git = git;
     }
 
     public IEnumerable<ThemeInfo> GetThemes(string shopThemesPath, string shopYamlPath)
@@ -150,56 +152,9 @@ public class ThemeLinkService
 
     public async Task<bool> CloneRepositoryAsync(string gitUrl)
     {
-        if (string.IsNullOrWhiteSpace(gitUrl))
-        {
-            _notifications.Error("Git URL ist leer.");
-            return false;
-        }
-
-        try
-        {
-            var repoFolder = _settings.Settings.ThemeRepositoryPath;
-            Directory.CreateDirectory(repoFolder);
-
-            var namePart = Path.GetFileNameWithoutExtension(gitUrl.TrimEnd('/')
-                .Split('/').Last());
-            var targetDir = Path.Combine(repoFolder, namePart);
-            if (Directory.Exists(targetDir))
-            {
-                _notifications.Warning($"Repository {namePart} existiert bereits.");
-                return false;
-            }
-
-            var psi = new System.Diagnostics.ProcessStartInfo("git", $"clone {gitUrl} \"{targetDir}\"")
-            {
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false
-            };
-
-            using var proc = System.Diagnostics.Process.Start(psi);
-            if (proc == null)
-            {
-                _notifications.Error("Klonvorgang konnte nicht gestartet werden.");
-                return false;
-            }
-
-            await proc.WaitForExitAsync();
-            if (proc.ExitCode == 0)
-            {
-                _notifications.Success($"Repository {namePart} geklont.");
-                return true;
-            }
-            var error = await proc.StandardError.ReadToEndAsync();
-            _notifications.Error(string.IsNullOrWhiteSpace(error) ?
-                "Fehler beim Klonen." : $"Fehler beim Klonen: {error}");
-            return false;
-        }
-        catch (Exception ex)
-        {
-            _notifications.Error($"Fehler beim Klonen: {ex.Message}");
-            return false;
-        }
+        var repoFolder = _settings.Settings.ThemeRepositoryPath;
+        var (ok, _) = await _git.CloneRepositoryAsync(gitUrl, repoFolder);
+        return ok;
     }
 }
 

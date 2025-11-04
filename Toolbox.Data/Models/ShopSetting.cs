@@ -50,4 +50,20 @@ public class ShopSetting
             }
         }
     }
+    
+    public DatabaseConnection GetConnection()
+    {
+        var path = ShopYamlPath;
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            var config =  ShopYamlService.LoadConfiguration(path);
+            if (config == null || config.ZionConfiguration.DatabaseConnections == null ||
+                config.ZionConfiguration.DatabaseConnections.Count == 0)
+            {
+                return new DatabaseConnection();
+            }
+            return config.ZionConfiguration.DatabaseConnections.FirstOrDefault();
+        }
+        return null;
+    }
 }

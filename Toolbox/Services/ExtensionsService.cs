@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using Toolbox.Data.Models;
@@ -10,11 +10,13 @@ public class ExtensionsService
 {
     private readonly INotificationService _notifications;
     private readonly SettingsService _settings;
+    private readonly GitRepoService _git;
 
-    public ExtensionsService(INotificationService notifications, SettingsService settings)
+    public ExtensionsService(INotificationService notifications, SettingsService settings, GitRepoService git)
     {
         _notifications = notifications;
         _settings = settings;
+        _git = git;
     }
 
     public IEnumerable<ExtensionInfo> GetExtensions()
@@ -31,12 +33,20 @@ public class ExtensionsService
                 var name = Path.GetFileName(dir);
                 var hasSln = Directory.GetFiles(dir, "*.sln", SearchOption.AllDirectories).Length > 0;
                 var hasProj = Directory.GetFiles(dir, "*.csproj", SearchOption.AllDirectories).Length > 0;
+                var hasShopProject = Directory.GetDirectories(dir, "*.Shop", SearchOption.AllDirectories).Length > 0;
+                var hasDataProject = Directory.GetDirectories(dir, "*.Data", SearchOption.AllDirectories).Length > 0;
+                var hasInstallProject = Directory.GetDirectories(dir, "*.Install", SearchOption.AllDirectories).Length > 0;
+                var isThemeV4 = Directory.GetDirectories(dir, "4SELLERS_Responsive_4", SearchOption.AllDirectories).Length > 0;
                 list.Add(new ExtensionInfo
                 {
                     Name = name,
                     Path = dir,
                     HasSolution = hasSln,
-                    HasProjects = hasProj
+                    HasProjects = hasProj,
+                    HasShopProject = hasShopProject,
+                    HasDataProject = hasDataProject,
+                    HasInstallProject = hasInstallProject,
+                    HasThemeV4 = isThemeV4
                 });
             }
 
@@ -51,76 +61,11 @@ public class ExtensionsService
 
     public async Task<(bool ok, string? targetDir)> CloneRepositoryAsync(string gitUrl)
     {
-        if (string.IsNullOrWhiteSpace(gitUrl))
-        {
-            _notifications.Error("Git URL ist leer.");
-            return (false, null);
-        }
-
-        try
-        {
-            var repoFolder = _settings.Settings.ExtensionsRepositoryPath;
-            Directory.CreateDirectory(repoFolder);
-
-            var namePart = GetRepoName(gitUrl);
-            var targetDir = Path.Combine(repoFolder, namePart);
-            if (Directory.Exists(targetDir))
-            {
-                _notifications.Warning($"Repository {namePart} existiert bereits.");
-                return (false, targetDir);
-            }
-
-            var psi = new ProcessStartInfo("git", $"clone {gitUrl} \"{targetDir}\"")
-            {
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false
-            };
-
-            using var proc = Process.Start(psi);
-            if (proc == null)
-            {
-                _notifications.Error("Klonvorgang konnte nicht gestartet werden.");
-                return (false, null);
-            }
-
-            await proc.WaitForExitAsync();
-            if (proc.ExitCode == 0)
-            {
-                _notifications.Success($"Repository {namePart} geklont.");
-                return (true, targetDir);
-            }
-            var error = await proc.StandardError.ReadToEndAsync();
-            _notifications.Error(string.IsNullOrWhiteSpace(error) ?
-                "Fehler beim Klonen." : $"Fehler beim Klonen: {error}");
-            return (false, null);
-        }
-        catch (Exception ex)
-        {
-            _notifications.Error($"Fehler beim Klonen: {ex.Message}");
-            return (false, null);
-        }
+        var repoFolder = _settings.Settings.ExtensionsRepositoryPath;
+        return await _git.CloneRepositoryAsync(gitUrl, repoFolder);
     }
 
-    public string GetRepoName(string gitUrl)
-    {
-        if (!Uri.TryCreate(gitUrl, UriKind.Absolute, out var uri))
-            return null;
-
-        var segments = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-
-        // Bei Azure DevOps/TFS steht der Reponame nach "_git"
-        var gitIdx = Array.FindIndex(segments, s => s.Equals("_git", StringComparison.OrdinalIgnoreCase));
-        var candidate = (gitIdx >= 0 && gitIdx < segments.Length - 1)
-            ? segments[gitIdx + 1]
-            : segments[^1];
-
-        // Falls mal ein .git angehängt ist, abknipsen – Punkte im Namen bleiben erhalten
-        if (candidate.EndsWith(".git", StringComparison.OrdinalIgnoreCase))
-            candidate = candidate[..^4];
-
-        return candidate;
-    }
+    public string GetRepoName(string gitUrl) => _git.GetRepoName(gitUrl);
     
     public async Task<bool> BuildAsync(string directory)
     {
@@ -163,7 +108,6 @@ public class ExtensionsService
     private static async Task<bool> RunDotnetBuildAsync(string path)
     {
         var workDir = System.IO.Path.GetDirectoryName(path) ?? Environment.CurrentDirectory;
-        // Use cmd to show a visible window with live output
         var psi = new ProcessStartInfo("cmd.exe", $"/c dotnet build \"{path}\" -c Release")
         {
             UseShellExecute = true,
@@ -178,3 +122,4 @@ public class ExtensionsService
         return proc.ExitCode == 0;
     }
 }
+

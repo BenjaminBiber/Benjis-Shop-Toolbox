@@ -1,0 +1,108 @@
+@using Toolbox.Components.Dialogs
+@using Toolbox.Data.Models
+@inject Toolbox.Services.GitRepoService Git
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-4">@Title</MudText>
+        <MudTextField @bind-Value="_gitUrl" Label="Git URL" Variant="Variant.Filled" Class="mb-2" />
+
+        <MudText Class="mt-2 mb-1" Typo="Typo.subtitle2">Aktionen nach dem Klonen</MudText>
+        <div class="row">
+            @if (_options.Count == 0)
+            {
+                <div class="col-12 d-flex align-items-center justify-content-center w-100">
+                    <MudText Class="mb-2" Typo="Typo.caption">Keine zusätzlichen Aktionen.</MudText>
+                </div>
+            }
+            else
+            {
+                @foreach (var opt in _options)
+                {                
+                    <div class="col-6 d-flex align-items-center justify-content-center">
+                        <MudCheckBox @bind-Value="opt.Selected" Color="Color.Primary" Label="@opt.Label" />
+                    </div>
+                }
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" Disabled="_busy" OnClick="Clone">@(_busy ? "Klonen..." : "Klonen")</MudButton>
+        <MudButton Color="Color.Default" Disabled="_busy" OnClick="Cancel">Abbrechen</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string DestinationRoot { get; set; } = string.Empty;
+    [Parameter] public List<RepoAction> Actions { get; set; } = new();
+    [Parameter] public string Title { get; set; } = "Repository klonen";
+
+    private readonly List<ActionOption> _options = new();
+    private string _gitUrl = string.Empty;
+    private bool _busy;
+
+    protected override void OnInitialized()
+    {
+        foreach (var a in Actions ?? new())
+        {
+            _options.Add(new ActionOption { Label = a.Label, Selected = false, ExecuteAsync = a.ExecuteAsync });
+        }
+    }
+
+    private async Task Clone()
+    {
+        if (string.IsNullOrWhiteSpace(_gitUrl))
+        {
+            Snackbar.Add("Bitte eine Git URL angeben.", Severity.Warning);
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(DestinationRoot))
+        {
+            Snackbar.Add("Kein Zielordner angegeben.", Severity.Error);
+            return;
+        }
+
+        _busy = true;
+        StateHasChanged();
+        try
+        {
+            var (ok, dir) = await Git.CloneRepositoryAsync(_gitUrl, DestinationRoot);
+            if (!ok || string.IsNullOrEmpty(dir))
+            {
+                MudDialog.Close(DialogResult.Ok(false));
+                return;
+            }
+
+            foreach (var opt in _options.Where(o => o.Selected))
+            {
+                try
+                {
+                    if (opt.ExecuteAsync != null)
+                    {
+                        var success = await opt.ExecuteAsync(dir);
+                        if (!success)
+                        {
+                            Snackbar.Add($"Aktion fehlgeschlagen: {opt.Label}", Severity.Error);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Snackbar.Add($"Aktion fehlgeschlagen: {opt.Label} – {ex.Message}", Severity.Error);
+                }
+            }
+
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        finally
+        {
+            _busy = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
+

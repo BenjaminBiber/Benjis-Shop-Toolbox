@@ -1,0 +1,23 @@
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Large">
+    <TitleContent>
+        <MudText Typo="Typo.h6">@Title</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudPaper Class="p-2" Style="max-height:60vh; overflow:auto; background:#0b0b0b; color:#dcdcdc;">
+            <pre style="white-space: pre-wrap;">@LogText</pre>
+        </MudPaper>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Default" OnClick="Close">Schließen</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string Title { get; set; } = "Protokoll";
+    [Parameter] public string LogText { get; set; } = string.Empty;
+
+    private void Close() => MudDialog.Close();
+}
