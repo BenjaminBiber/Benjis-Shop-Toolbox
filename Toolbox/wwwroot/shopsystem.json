@@ -1,0 +1,13 @@
+{
+    "directories": {
+      "shopPath": "C:\\Dev_Git\\Kundenshops\\Kreissler",
+      "apiPath": "C:\\Dev_Git\\Standard\\Shopsystem-V2-V4-26082025\\Api\\Api",
+      "activityServiceTestAppPath": "C:\\Dev_Git\\Standard\\Shopsystem-V2-V4-26082025\\ActivityService\\TestApp\\bin\\Debug\\net8.0-windows",
+      "backOfficePath": "C:\\dev_git\\ShopsystemV2\\BackOffice\\BackOffice.Web\\Web\\",
+      "communicationPath": "C:\\Program Files (x86)\\4SELLERS\\CommunicationService",
+      "erpCommunicationPath": "..\\..\\..\\..\\Shopsystem\\Main\\Connectivity\\ErpCommunication\\WindowsService\\bin\\Debug\\",
+      "officeLineCommunicationPath": "C:\\_DevGit\\Shopsystem\\Connectivity\\OfficeLineCommunication\\WindowsService\\bin\\Debug\\",
+      "orderServicePath": "..\\..\\..\\..\\Shopsystem\\Main\\Connectivity\\OfficeLineCommunication\\OrderService\\"
+    }
+}
+  

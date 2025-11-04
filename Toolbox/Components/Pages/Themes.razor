@@ -7,37 +7,38 @@
 @using Microsoft.Web.Administration
 @using Toolbox.Services
 @using MudBlazor
-@inject Toolbox.Services.ThemeLinkService ThemeService
+@inject ThemeLinkService ThemeService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject Toolbox.Services.SettingsService SettingsService
 @inject SolutionOpener SolutionOpener
 @inject IisService IisService
 
+@if (Settings.ShopSettingsList.Any())
+{        
+    <div class="row p-4">
+        <MudText Typo="Typo.h5">Themes</MudText>   
+        <div class="col-4">
+            <MudSelect Variant="Variant.Outlined" Value="(SelectedShopSetting ?? Settings.ShopSettingsList.FirstOrDefault()).SiteId" ValueChanged="ChangeSelectedShop" T="long">
+                @foreach (var shopPaths in Settings.ShopSettingsList)
+                {
+                    <MudSelectItem Value="shopPaths.SiteId">@IisService.GetSiteNameById(shopPaths.SiteId)</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+        <div class="col-7">
+            <MudTextField Variant="Variant.Outlined" Value="_searchText" ValueChanged="(string s) => SearchChanged(s)" Immediate="true" Placeholder="Suche..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+        </div>
+        <div class="col-1 d-flex align-items-center justify-content-center">
+            <MudTooltip Text="Neues Theme hinzufügen">
+                <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="OpenCloneDialog"/>
+            </MudTooltip>
+        </div>
+    </div>
+}
+
 @if (_groupedThemes != null)
 {
-    @if (Settings.ShopSettingsList.Any())
-    {        
-        <div class="row p-4">
-            <MudText Typo="Typo.h5">Themes</MudText>   
-            <div class="col-4">
-                <MudSelect Variant="Variant.Outlined" Value="(SelectedShopSetting ?? Settings.ShopSettingsList.FirstOrDefault()).SiteId" ValueChanged="ChangeSelectedShop" T="long">
-                    @foreach (var shopPaths in Settings.ShopSettingsList)
-                    {
-                        <MudSelectItem Value="shopPaths.SiteId">@IisService.GetSiteNameById(shopPaths.SiteId)</MudSelectItem>
-                    }
-                </MudSelect>
-            </div>
-            <div class="col-7">
-                <MudTextField Variant="Variant.Outlined" Value="_searchText" ValueChanged="(string s) => SearchChanged(s)" Immediate="true" Placeholder="Suche..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
-            </div>
-            <div class="col-1 d-flex align-items-center justify-content-center">
-                <MudTooltip Text="Neues Theme hinzufügen">
-                    <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="OpenCloneDialog"/>
-                </MudTooltip>
-            </div>
-        </div>
-    }
     <div class="row g-0 px-3 g- d-flex align-items-start justify-content-center gap-3">
       <MudPaper Class="col-12 mx-3 p-4">
             <MudTable Loading="_isLoading" @ref="_table" Filter="new Func<ThemeInfo,bool>(FilterThemes)" Elevation="0" GroupHeaderStyle="background-color:var(--mud-palette-background-gray)" GroupBy="_groupDefinition" Items="_groupedThemes" Hover="true" Dense="true">
@@ -240,14 +241,33 @@ else
 
     private async Task OpenCloneDialog()
     {
-        var parameters = new DialogParameters();
         var setting = SelectedShopSetting;
-        if (setting != null)
+        if (setting == null) return;
+
+        var shopYamlPath = setting.ShopYamlPath ?? string.Empty;
+        var shopThemesPath = setting.ThemeFolderPath ?? string.Empty;
+
+        var actions = new List<RepoAction>
         {
-            parameters.Add("ShopYamlPath", setting.ShopYamlPath ?? string.Empty);
-            parameters.Add("ShopThemesPath", setting.ThemeFolderPath ?? string.Empty);
-        }
-        var dlg = await DialogService.ShowAsync<CloneThemeDialog>("Repo klonen", parameters);
+            new RepoAction
+            {
+                Label = "Als Symlink hinzufügen und in shop.yaml eintragen",
+                ExecuteAsync = dir => Task.FromResult(ThemeService.LinkAndOverwrite(Path.GetFileName(dir), shopThemesPath, shopYamlPath))
+            },
+            new RepoAction
+            {
+                Label = "Nach dem Klonen in Rider öffnen",
+                ExecuteAsync = dir => { OpenDirectoryInExplorer(dir); SolutionOpener.OpenSolutionInRider(dir); return Task.FromResult(true); }
+            }
+        };
+
+        var parameters = new DialogParameters<CloneRepoDialog>
+        {
+            { x => x.DestinationRoot, Settings.ThemeRepositoryPath },
+            { x => x.Actions, actions },
+            { x => x.Title, "Theme-Repository klonen" }
+        };
+        var dlg = await DialogService.ShowAsync<CloneRepoDialog>("Theme klonen", parameters);
         var result = await dlg.Result;
         if (!result.Canceled)
         {

@@ -66,5 +66,35 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 
 [Run]
 ; Start the application automatically after installation
+; Install sqlcmd via winget if not present
+Filename: "cmd.exe"; Parameters: "/c winget install --id Microsoft.sqlcmd --silent --accept-package-agreements --accept-source-agreements"; StatusMsg: "Installiere sqlcmd (falls nicht vorhanden)..."; Flags: runhidden; Check: NeedInstallSqlcmd
 Filename: "{app}\\{#MyAppExeName}"; WorkingDir: "{app}"; Flags: nowait
+
+[Code]
+function IsSqlCmdInstalled(): Boolean;
+var
+  Code: Integer;
+begin
+  Code := -1;
+  if Exec('cmd.exe', '/c where sqlcmd', '', SW_HIDE, ewWaitUntilTerminated, Code) then
+    Result := (Code = 0)
+  else
+    Result := False;
+end;
+
+function WingetAvailable(): Boolean;
+var
+  Code: Integer;
+begin
+  Code := -1;
+  if Exec('cmd.exe', '/c winget --version', '', SW_HIDE, ewWaitUntilTerminated, Code) then
+    Result := (Code = 0)
+  else
+    Result := False;
+end;
+
+function NeedInstallSqlcmd(): Boolean;
+begin
+  Result := (not IsSqlCmdInstalled()) and WingetAvailable();
+end;
 
