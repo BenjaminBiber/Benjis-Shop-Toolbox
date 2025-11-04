@@ -10,7 +10,8 @@ internal static class Program
     {
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
-        using var ctx = new TrayAppContext();
+        var branch = ParseBranchName(args);
+        using var ctx = new TrayAppContext(branch);
 
         var parentPid = ParseParentPid(args);
         if (parentPid > 0)
@@ -47,6 +48,24 @@ internal static class Program
         }
         catch { }
         return 0;
+    }
+
+    private static string? ParseBranchName(string[] args)
+    {
+        try
+        {
+            foreach (var a in args ?? Array.Empty<string>())
+            {
+                var s = a.Trim();
+                if (s.StartsWith("--branch-db=", StringComparison.OrdinalIgnoreCase))
+                {
+                    var parts = s.Split('=');
+                    if (parts.Length == 2) return parts[1];
+                }
+            }
+        }
+        catch { }
+        return null;
     }
 }
 
