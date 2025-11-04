@@ -27,7 +27,7 @@
         <MudSelect Placeholder="Shop zum Starten/Stoppen/Neustarten über die Taskbar" Label="Shop zum Starten/Stoppen/Neustarten über die Taskbar" Variant="Variant.Text" Value="Setting.GetTrayIconSite().Id" ValueChanged="(long i) => SettingsService.SaveSettingChanges(x => x.TrayIconIisSite = i, NotificationService)" T="long">
             @foreach (var shopPaths in Setting.ShopSettingsList)
             {
-                <MudSelectItem Value="shopPaths.SiteId">@IisService.GetSiteNameById(shopPaths.SiteId)</MudSelectItem>
+                <MudSelectItem Value="shopPaths.SiteId">@GetShopDisplayName(shopPaths)</MudSelectItem>
             }
         </MudSelect>
     </div>
@@ -95,6 +95,58 @@
         catch
         {
             return null;
+        }
+    }
+
+    private string GetShopDisplayName(ShopSetting s)
+    {
+        var name = IisService.GetSiteNameById(s.SiteId);
+        if (!string.IsNullOrWhiteSpace(name)) return name;
+        try
+        {
+            var yamlPath = s.ShopYamlPath ?? string.Empty;
+            var dir = System.IO.Path.GetDirectoryName(yamlPath) ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(dir)) return yamlPath;
+
+            var segments = dir.Split(new[] { System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
+            string? candidate = null;
+
+            var idxCustomerRoot = Array.FindIndex(segments, p => p.Equals("KundenShops", StringComparison.OrdinalIgnoreCase));
+            if (idxCustomerRoot >= 0 && idxCustomerRoot + 1 < segments.Length)
+            {
+                candidate = segments[idxCustomerRoot + 1];
+            }
+
+            if (candidate == null)
+            {
+                var idxShopSystem = Array.FindIndex(segments, p => p.Equals("Shopsystem", StringComparison.OrdinalIgnoreCase));
+                if (idxShopSystem > 0)
+                {
+                    candidate = segments[idxShopSystem - 1];
+                }
+            }
+
+            if (candidate == null)
+            {
+                for (int i = segments.Length - 1; i >= 0; i--)
+                {
+                    var seg = segments[i];
+                    if (!seg.Equals("Shop", StringComparison.OrdinalIgnoreCase))
+                    {
+                        candidate = seg;
+                        break;
+                    }
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(candidate)) return candidate;
+
+            var baseName = System.IO.Path.GetFileName(dir);
+            return string.IsNullOrWhiteSpace(baseName) ? dir : baseName;
+        }
+        catch
+        {
+            return s.ShopYamlPath;
         }
     }
 }

@@ -1,4 +1,6 @@
 using System.Linq;
+using System.Collections.Generic;
+using System.IO;
 using Microsoft.EntityFrameworkCore;
 using Toolbox.Data.DataContexts;
 using Toolbox.Data.Models.ShopYaml;
@@ -53,22 +55,100 @@ public class DatabaseConnectionService
 
     public void FillDataBaseConnections()
     {
-        var shops = _settings.Settings.ShopSettingsList;
-        foreach (var shop in shops)
-        {
-            var config = shop.GetShopYamlContent();
-            var connection = config.ZionConfiguration.DatabaseConnections.FirstOrDefault();
-            if (connection == null)
-            {
-                return;
-            }
+        var added = 0;
+        var foundYaml = false;
 
-            if (!DatabaseConnections.Contains(connection))
+        try
+        {
+            var root = _settings.Settings.GeneralFolderPath;
+            if (!string.IsNullOrWhiteSpace(root) && Directory.Exists(root))
             {
-                DatabaseConnections.Add(connection);
+                foreach (var yaml in EnumerateShopYamlFiles(root))
+                {
+                    foundYaml = true;
+                    try
+                    {
+                        var config = ShopYamlService.LoadConfiguration(yaml);
+                        var connection = config?.ZionConfiguration?.DatabaseConnections?.FirstOrDefault();
+                        if (connection == null) continue;
+                        if (!DatabaseConnections.Contains(connection))
+                        {
+                            DatabaseConnections.Add(connection);
+                            added++;
+                        }
+                    }
+                    catch
+                    {
+                        // ignore single yaml errors and continue
+                    }
+                }
             }
         }
+        catch
+        {
+            // ignore scanning errors
+        }
+
+        if (!foundYaml)
+        {
+            var shops = _settings.Settings.ShopSettingsList;
+            foreach (var shop in shops)
+            {
+                try
+                {
+                    var config = shop.GetShopYamlContent();
+                    var connection = config?.ZionConfiguration?.DatabaseConnections?.FirstOrDefault();
+                    if (connection == null) continue;
+                    if (!DatabaseConnections.Contains(connection))
+                    {
+                        DatabaseConnections.Add(connection);
+                        added++;
+                    }
+                }
+                catch
+                {
+                    // ignore
+                }
+            }
+        }
+
         SaveChanges();
+    }
+
+    private static IEnumerable<string> EnumerateShopYamlFiles(string root)
+    {
+        var ignore = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".git", ".svn", ".hg", ".vs", ".idea", ".vscode",
+            "bin", "obj", "packages", "node_modules"
+        };
+
+        var q = new Queue<string>();
+        q.Enqueue(root);
+        while (q.Count > 0)
+        {
+            var dir = q.Dequeue();
+            string[] files;
+            try { files = Directory.GetFiles(dir, "*.yaml", SearchOption.TopDirectoryOnly); }
+            catch { files = Array.Empty<string>(); }
+
+            foreach (var f in files)
+            {
+                if (string.Equals(Path.GetFileName(f), "shop.yaml", StringComparison.OrdinalIgnoreCase))
+                    yield return f;
+            }
+
+            string[] subdirs;
+            try { subdirs = Directory.GetDirectories(dir, "*", SearchOption.TopDirectoryOnly); }
+            catch { subdirs = Array.Empty<string>(); }
+
+            foreach (var sub in subdirs)
+            {
+                var name = Path.GetFileName(sub);
+                if (ignore.Contains(name)) continue;
+                q.Enqueue(sub);
+            }
+        }
     }
     
     private void GetConnections()
