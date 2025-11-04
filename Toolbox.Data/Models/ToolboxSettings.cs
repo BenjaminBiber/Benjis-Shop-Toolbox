@@ -10,6 +10,7 @@ public class ToolboxSettings
     public string? LogName { get; set; }
     public string ThemeRepositoryPath { get; set; }
     public string ExtensionsRepositoryPath { get; set; }
+    public string GeneralFolderPath { get; set; }
     public int AutoRefreshSeconds { get; set; } 
     public bool AutoRefreshEnabled { get; set; }
     public bool OnlySinceRestart { get; set; } 
@@ -32,6 +33,7 @@ public class ToolboxSettings
         AutoRefreshSeconds = 60;
         ThemeRepositoryPath = "C:\\Dev_Git\\KundenThemes";
         ExtensionsRepositoryPath = "C:\\Dev_Git\\Extensions";
+        GeneralFolderPath = "C:\\Dev_Git";
         AutoRefreshEnabled = false;
         OnlySinceRestart = true;
         RestartShopOnThemeChange = true;

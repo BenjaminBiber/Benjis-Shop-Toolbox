@@ -12,6 +12,7 @@
 @inject Toolbox.Services.SettingsService SettingsService
 @inject SolutionOpener SolutionOpener
 @inject IisService IisService
+@inject ShopSystemConfigService ShopSystemConfigService
 
 @if (Settings.ShopSettingsList.Any())
 {        
@@ -191,6 +192,24 @@ else
         {
             Settings.IisAppName = siteName;
             SettingsService.SaveSettings();
+            try
+            {
+                var shopSetting = Settings.ShopSettingsList.FirstOrDefault(s => s.SiteId == siteId);
+                var shopRoot = shopSetting != null ? Path.GetDirectoryName(shopSetting.ShopYamlPath) : null;
+                if (!string.IsNullOrWhiteSpace(shopRoot))
+                {
+                    var root = Settings.GeneralFolderPath;
+                    var ok = await ShopSystemConfigService.SetShopPathUsingRootAsync(root, shopRoot!);
+                    if (!ok)
+                    {
+                        Snackbar.Add("shopsystem.json im Allgemeinen Ordner nicht gefunden.", Severity.Warning);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Fehler beim Aktualisieren der shopsystem.json: {ex.Message}", Severity.Warning);
+            }
             await LoadAsync();
         }
     }
