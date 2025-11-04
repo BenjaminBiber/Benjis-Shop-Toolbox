@@ -40,11 +40,19 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<SolutionOpener>();
 builder.Services.AddScoped<FileDialogService>();
 
-//Initialize Internal DB Context
+//Initialize Internal DB Context (use branch-specific DB in Development)
 var appData  = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
 var dataRoot = Path.Combine(appData, "BenjisToolbox");
 Directory.CreateDirectory(dataRoot);
-var dbPath   = Path.Combine(dataRoot, "toolbox.db");
+
+string? branchName = null;
+if (builder.HostEnvironment.IsDevelopment())
+{
+    branchName = TryGetGitBranchSafe(AppContext.BaseDirectory);
+}
+
+var dbFile   = string.IsNullOrWhiteSpace(branchName) ? "toolbox.db" : $"toolbox_{branchName}.db";
+var dbPath   = Path.Combine(dataRoot, dbFile);
 var connStr  = $"Data Source={dbPath};Cache=Shared";
 builder.Services.AddDbContext<InternalAppDbContext>(options => options.UseSqlite(connStr));
 
@@ -96,7 +104,7 @@ using (var scope = app.Services.CreateScope())
 
 try { app.Services.GetService<UpdaterService>()?.LaunchInBackgroundAsync(); } catch { }
 
-TryStartTrayIconProcess();
+TryStartTrayIconProcess(branchName);
 
 await app.RunAsync();
 
@@ -135,7 +143,7 @@ static async Task WaitForDebuggerIfRequestedAsync(string[] args, string appName)
     }
 }
 
-static void TryStartTrayIconProcess()
+static void TryStartTrayIconProcess(string? branchName)
 {
     try
     {
@@ -151,15 +159,57 @@ static void TryStartTrayIconProcess()
         if (already) return;
 
         var ppid = Environment.ProcessId;
+        var args = $"--parent-pid={ppid}";
+        if (!string.IsNullOrWhiteSpace(branchName))
+        {
+            args += $" --branch-db={branchName}";
+        }
+
         Process.Start(new ProcessStartInfo
         {
             FileName = path,
-            Arguments = $"--parent-pid={ppid}",
-            UseShellExecute = true
+            Arguments = args,
+            UseShellExecute = false,
+            CreateNoWindow = false
         });
     }
     catch
     {
         // ignore
     }
+}
+
+static string? TryGetGitBranchSafe(string startDir)
+{
+    try
+    {
+        var dir = new DirectoryInfo(startDir);
+        for (var d = dir; d != null; d = d.Parent)
+        {
+            var gitDir = Path.Combine(d.FullName, ".git");
+            if (Directory.Exists(gitDir))
+            {
+                var headFile = Path.Combine(gitDir, "HEAD");
+                if (File.Exists(headFile))
+                {
+                    var head = File.ReadAllText(headFile).Trim();
+                    // HEAD may be like: ref: refs/heads/feature/xyz
+                    var branch = head.StartsWith("ref:", StringComparison.OrdinalIgnoreCase)
+                        ? head.Split('/').Last()
+                        : "detached";
+                    return SanitizeBranchName(branch);
+                }
+            }
+        }
+    }
+    catch { }
+    return null;
+}
+
+static string SanitizeBranchName(string name)
+{
+    var invalid = Path.GetInvalidFileNameChars();
+    var sanitized = string.Join('_', name.Split(invalid, StringSplitOptions.RemoveEmptyEntries));
+    sanitized = sanitized.Replace(' ', '_');
+    return sanitized;
 }

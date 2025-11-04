@@ -19,15 +19,19 @@ sealed class TrayAppContext : ApplicationContext
     private readonly IisService _iisService;
     private readonly ISettingsService _settingsService;
 
-    public TrayAppContext()
+    private readonly string? _branch;
+
+    public TrayAppContext(string? branchName = null)
     {
+        _branch = Sanitize(branchName);
         _invoker.CreateControl();
         try
         {
             var appData  = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             var dataRoot = Path.Combine(appData, "BenjisToolbox");
             Directory.CreateDirectory(dataRoot);
-            var dbPath   = Path.Combine(dataRoot, "toolbox.db");
+            var dbFile   = string.IsNullOrWhiteSpace(_branch) ? "toolbox.db" : $"toolbox_{_branch}.db";
+            var dbPath   = Path.Combine(dataRoot, dbFile);
             var connStr  = $"Data Source={dbPath};Cache=Shared";
 
             var options = new DbContextOptionsBuilder<InternalAppDbContext>()
@@ -154,6 +158,17 @@ sealed class TrayAppContext : ApplicationContext
     {
         try { await action(); }
         catch (Exception ex) { try { _trayIcon.ShowBalloonTip(3000, "Fehler", ex.Message, ToolTipIcon.Error); } catch { } }
+    }
+    private static string? Sanitize(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return null;
+        try
+        {
+            var invalid = Path.GetInvalidFileNameChars();
+            var sanitized = string.Join('_', name.Split(invalid, StringSplitOptions.RemoveEmptyEntries));
+            return sanitized.Replace(' ', '_');
+        }
+        catch { return name; }
     }
 }
 
