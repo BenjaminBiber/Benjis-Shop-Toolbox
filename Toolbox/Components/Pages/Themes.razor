@@ -14,6 +14,28 @@
 @inject SolutionOpener SolutionOpener
 @inject IisService IisService
 
+@if (false)
+{
+    <div class="d-flex flex-column align-items-center justify-content-center my-6">
+        <MudAlert Icon="@Icons.Material.Filled.Warning"
+                  Variant="Variant.Filled"
+                  Severity="Severity.Warning">
+            Kein Shop ausgewählt
+        </MudAlert>
+        @if (Settings.ShopSettingsList.Any())
+        {
+            <div class="mt-4" style="min-width:300px;">
+                <MudSelect Variant="Variant.Outlined" Value="_selectedShopPath" ValueChanged="ChangeSelectedShop" T="string">
+                    @foreach (var shopPaths in Settings.ShopSettingsList)
+                    {
+                        <MudSelectItem Value="@shopPaths.ShopYamlPath">@GetShopDisplayName(shopPaths)</MudSelectItem>
+                    }
+                </MudSelect>
+            </div>
+        }
+    </div>
+}
+
 @if (Settings.ShopSettingsList.Any())
 {        
     <div class="row p-4">
@@ -109,8 +131,31 @@ else
     protected override async Task OnInitializedAsync()
     {
         var current = Settings.GetShopSettingForCurrentSite();
-        _selectedShopPath = current?.ShopYamlPath ?? Settings.ShopSettingsList.FirstOrDefault()?.ShopYamlPath ?? string.Empty;
+        _selectedShopPath = current?.ShopYamlPath ?? string.Empty;
+
+        await EnsureShopSelectedAsync();
+
         await LoadAsync();
+    }
+
+    private async Task EnsureShopSelectedAsync()
+    {
+        if (SelectedShopSetting != null || !Settings.ShopSettingsList.Any())
+            return;
+
+        var parameters = new DialogParameters<SelectShopDialog>
+        {
+            { x => x.Shops, Settings.ShopSettingsList },
+            { x => x.SelectedShopPath, _selectedShopPath }
+        };
+
+        var dlg = await DialogService.ShowAsync<SelectShopDialog>("Shop auswählen", parameters);
+        var result = await dlg.Result;
+
+        if (!result.Canceled && result.Data is string path && !string.IsNullOrWhiteSpace(path))
+        {
+            await ChangeSelectedShop(path);
+        }
     }
 
     private async Task SearchChanged(string? searchValue)

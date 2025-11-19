@@ -1,0 +1,115 @@
+@using System.IO
+@using Toolbox.Data.Models
+@using Toolbox.Services
+
+@inject IisService IisService
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-2">Kein Shop ausgewählt</MudText>
+        <MudAlert Icon="@Icons.Material.Filled.Warning"
+                  Variant="Variant.Filled"
+                  Severity="Severity.Warning"
+                  Class="mb-4">
+            Bitte einen Shop auswählen.
+        </MudAlert>
+
+        <MudSelect T="string"
+                   Label="Shop"
+                   Variant="Variant.Outlined"
+                   Class="w-100"
+                   @bind-Value="_selectedPath">
+            @foreach (var shop in Shops)
+            {
+                <MudSelectItem Value="@shop.ShopYamlPath">@GetShopDisplayName(shop)</MudSelectItem>
+            }
+        </MudSelect>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary"
+                   Disabled="string.IsNullOrWhiteSpace(_selectedPath)"
+                   OnClick="Confirm">
+            OK
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public List<ShopSetting> Shops { get; set; } = new();
+    [Parameter] public string? SelectedShopPath { get; set; }
+
+    private string _selectedPath = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        _selectedPath = SelectedShopPath ?? Shops.FirstOrDefault()?.ShopYamlPath ?? string.Empty;
+    }
+
+    private void Confirm()
+    {
+        MudDialog.Close(DialogResult.Ok(_selectedPath));
+    }
+
+    private string GetShopDisplayName(ShopSetting s)
+    {
+        var name = IisService.GetSiteNameById(s.SiteId);
+        if (!string.IsNullOrWhiteSpace(name)) return name;
+
+        try
+        {
+            var yamlPath = s.ShopYamlPath ?? string.Empty;
+            var dir = Path.GetDirectoryName(yamlPath) ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(dir)) return yamlPath;
+
+            var segments = dir.Split(new[]
+                {
+                    Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar
+                },
+                StringSplitOptions.RemoveEmptyEntries);
+
+            string? candidate = null;
+
+            var idxCustomerRoot = Array.FindIndex(segments,
+                p => p.Equals("KundenShops", StringComparison.OrdinalIgnoreCase));
+            if (idxCustomerRoot >= 0 && idxCustomerRoot + 1 < segments.Length)
+            {
+                candidate = segments[idxCustomerRoot + 1];
+            }
+
+            if (candidate == null)
+            {
+                var idxShopSystem = Array.FindIndex(segments,
+                    p => p.Equals("Shopsystem", StringComparison.OrdinalIgnoreCase));
+                if (idxShopSystem > 0)
+                {
+                    candidate = segments[idxShopSystem - 1];
+                }
+            }
+
+            if (candidate == null)
+            {
+                for (var i = segments.Length - 1; i >= 0; i--)
+                {
+                    var seg = segments[i];
+                    if (!seg.Equals("Shop", StringComparison.OrdinalIgnoreCase))
+                    {
+                        candidate = seg;
+                        break;
+                    }
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(candidate)) return candidate;
+
+            var baseName = Path.GetFileName(dir);
+            return string.IsNullOrWhiteSpace(baseName) ? dir : baseName;
+        }
+        catch
+        {
+            return s.ShopYamlPath ?? string.Empty;
+        }
+    }
+}
+
