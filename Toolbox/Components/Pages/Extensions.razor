@@ -388,18 +388,65 @@ else
             new RepoAction
             {
                 Label = "Nach dem Klonen Builden",
-                ExecuteAsync = dir =>
+                ExecuteWithProgressAsync = async (dir, output, error) =>
                 {
                     var name = Path.GetFileName(dir);
                     if (string.IsNullOrWhiteSpace(name))
                         name = dir;
-                    return BuildExtensionWithDialogAsync(dir, name);
+                    
+                    output?.Report($"Build für {name} gestartet...\n");
+
+                    var ok = await ExtensionsService.BuildAsync(dir, output, error);
+
+                    if (!ok)
+                    {
+                        error?.Report($"Build für {name} fehlgeschlagen.\n");
+                    }
+
+                    return ok;
                 }
             },
             new RepoAction
             {
                 Label = "Nach dem Klonen die Datenbank installieren",
-                ExecuteAsync = dir => InstallExtension(dir)
+                ExecuteWithProgressAsync = async (dir, output, error) =>
+                {
+                    var info = new ExtensionInfo
+                    {
+                        Name = Path.GetFileName(dir),
+                        Path = dir,
+                        HasSolution = Directory.GetFiles(dir, "*.sln", SearchOption.AllDirectories).Length > 0,
+                        HasProjects = Directory.GetFiles(dir, "*.csproj", SearchOption.AllDirectories).Length > 0,
+                        HasShopProject = Directory.GetDirectories(dir, "*.Shop", SearchOption.AllDirectories).Length > 0,
+                        HasDataProject = Directory.GetDirectories(dir, "*.Data", SearchOption.AllDirectories).Length > 0,
+                        HasInstallProject = Directory.GetDirectories(dir, "*.Install", SearchOption.AllDirectories).Length > 0,
+                        HasThemeV4 = Directory.GetDirectories(dir, "4SELLERS_Responsive_4", SearchOption.AllDirectories).Length > 0
+                    };
+
+                    var conn = SelectedShopSetting?.GetConnection();
+                    if (conn == null)
+                    {
+                        error?.Report("Keine Datenbankverbindung (shop.yaml) gefunden.\n");
+                        Snackbar.Add("Keine Datenbankverbindung (shop.yaml) gefunden.", Severity.Warning);
+                        return false;
+                    }
+
+                    var title = $"Installation: {info.Name}";
+                    output?.Report($"{title} gestartet...\n");
+
+                    var (ok, log) = await info.InstallWithLogAsync(conn, output, error);
+
+                    if (!ok)
+                    {
+                        var msg = string.IsNullOrWhiteSpace(log)
+                            ? "Installation fehlgeschlagen."
+                            : log;
+                        error?.Report(msg + "\n");
+                        Snackbar.Add(msg, Severity.Error);
+                    }
+
+                    return ok;
+                }
             },
             new RepoAction
             {
