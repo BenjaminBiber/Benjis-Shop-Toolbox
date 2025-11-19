@@ -67,7 +67,7 @@ public class ExtensionsService
 
     public string GetRepoName(string gitUrl) => _git.GetRepoName(gitUrl);
     
-    public async Task<bool> BuildAsync(string directory)
+    public async Task<bool> BuildAsync(string directory, IProgress<string>? outputProgress = null, IProgress<string>? errorProgress = null)
     {
         try
         {
@@ -88,11 +88,11 @@ public class ExtensionsService
 
             foreach (var sln in slns)
             {
-                if (!await RunDotnetBuildAsync(sln)) return false;
+                if (!await RunDotnetBuildAsync(sln, outputProgress, errorProgress)) return false;
             }
             foreach (var proj in projs)
             {
-                if (!await RunDotnetBuildAsync(proj)) return false;
+                if (!await RunDotnetBuildAsync(proj, outputProgress, errorProgress)) return false;
             }
 
             _notifications.Success("Build erfolgreich abgeschlossen.");
@@ -105,21 +105,72 @@ public class ExtensionsService
         }
     }
 
-    private static async Task<bool> RunDotnetBuildAsync(string path)
+    private static async Task<bool> RunDotnetBuildAsync(string path, IProgress<string>? outputProgress, IProgress<string>? errorProgress)
     {
         var workDir = System.IO.Path.GetDirectoryName(path) ?? Environment.CurrentDirectory;
         var psi = new ProcessStartInfo("cmd.exe", $"/c dotnet build \"{path}\" -c Release")
         {
-            UseShellExecute = true,
-            CreateNoWindow = false,
+            UseShellExecute = false,
+            CreateNoWindow = true,
             WorkingDirectory = workDir,
-            WindowStyle = ProcessWindowStyle.Normal
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
         };
 
-        using var proc = Process.Start(psi);
-        if (proc == null) return false;
-        await proc.WaitForExitAsync();
-        return proc.ExitCode == 0;
+        using var proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
+
+        try
+        {
+            if (!proc.Start())
+            {
+                errorProgress?.Report("dotnet build konnte nicht gestartet werden." + Environment.NewLine);
+                return false;
+            }
+
+            var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            void OnOutputDataReceived(object? _, DataReceivedEventArgs e)
+            {
+                if (e.Data is null) return;
+                outputProgress?.Report(e.Data + Environment.NewLine);
+            }
+
+            void OnErrorDataReceived(object? _, DataReceivedEventArgs e)
+            {
+                if (e.Data is null) return;
+                errorProgress?.Report(e.Data + Environment.NewLine);
+            }
+
+            void OnExited(object? _1, EventArgs _)
+            {
+                tcs.TrySetResult(true);
+            }
+
+            proc.OutputDataReceived += OnOutputDataReceived;
+            proc.ErrorDataReceived += OnErrorDataReceived;
+            proc.Exited += OnExited;
+
+            try
+            {
+                proc.BeginOutputReadLine();
+                proc.BeginErrorReadLine();
+
+                await tcs.Task.ConfigureAwait(false);
+            }
+            finally
+            {
+                proc.OutputDataReceived -= OnOutputDataReceived;
+                proc.ErrorDataReceived -= OnErrorDataReceived;
+                proc.Exited -= OnExited;
+            }
+
+            return proc.ExitCode == 0;
+        }
+        catch (Exception ex)
+        {
+            errorProgress?.Report($"Fehler beim Starten von dotnet build: {ex.Message}{Environment.NewLine}");
+            return false;
+        }
     }
 }
 
