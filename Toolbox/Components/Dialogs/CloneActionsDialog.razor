@@ -1,0 +1,207 @@
+@using Toolbox.Data.Models
+@using Toolbox.Components.Dialogs
+@inject ISnackbar Snackbar
+
+<MudDialog DefaultFocus="DefaultFocus.None">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Aktionen nach dem Klonen</MudText>
+    </TitleContent>
+
+    <DialogContent>
+        @foreach (var run in _runs)
+        {
+            <MudPaper Class="mb-2 p-2">
+                <div class="d-flex align-items-center">
+                    @switch (run.Status)
+                    {
+                        case ActionStatus.Pending:
+                            <MudIcon Icon="@Icons.Material.Filled.RadioButtonUnchecked"
+                                     Color="Color.Default"
+                                     Class="me-2" />
+                            break;
+                        case ActionStatus.Running:
+                            <MudProgressCircular Indeterminate="true"
+                                                 Color="Color.Warning"
+                                                 Size="Size.Small"
+                                                 Class="me-2" />
+                            break;
+                        case ActionStatus.Succeeded:
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle"
+                                     Color="Color.Success"
+                                     Class="me-2" />
+                            break;
+                        case ActionStatus.Failed:
+                            <MudIcon Icon="@Icons.Material.Filled.Cancel"
+                                     Color="Color.Error"
+                                     Class="me-2" />
+                            break;
+                    }
+
+                    <MudText Class="me-auto">@run.Title</MudText>
+
+                    <MudIconButton Icon="@(run.Expanded ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+                                   Color="Color.Default"
+                                   OnClick="@(() => Toggle(run))" />
+                </div>
+
+                @if (run.Expanded)
+                {
+                    <MudPaper Class="mt-2 p-2"
+                              Style="max-height:30vh; overflow-y:auto; background:#0b0b0b; color:#dcdcdc;">
+                        <pre style="white-space: pre-wrap;">@run.Log.Text</pre>
+                    </MudPaper>
+                }
+            </MudPaper>
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton Color="Color.Primary" Disabled="_isRunning" OnClick="Close">Schließen</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string RepositoryPath { get; set; } = string.Empty;
+    [Parameter] public bool CloneSucceeded { get; set; }
+    [Parameter] public string? CloneMessage { get; set; }
+    [Parameter] public List<ActionOption> Actions { get; set; } = new();
+
+    private enum ActionStatus
+    {
+        Pending,
+        Running,
+        Succeeded,
+        Failed
+    }
+
+    private sealed class ActionRun
+    {
+        public string Title { get; init; } = string.Empty;
+        public ActionStatus Status { get; set; } = ActionStatus.Pending;
+        public bool Expanded { get; set; }
+        public string ElementId { get; } = "action_" + Guid.NewGuid().ToString("N");
+        public LogBuffer Log { get; } = new();
+        public ActionOption? Option { get; init; }
+        public bool IsCloneStep { get; init; }
+    }
+
+    private readonly List<ActionRun> _runs = new();
+    private bool _started;
+    private bool _isRunning;
+
+    protected override void OnInitialized()
+    {
+        var cloneRun = new ActionRun
+        {
+            Title = "Repository klonen",
+            Status = CloneSucceeded ? ActionStatus.Succeeded : ActionStatus.Failed,
+            Expanded = false,
+            IsCloneStep = true
+        };
+
+        if (!string.IsNullOrWhiteSpace(CloneMessage))
+        {
+            cloneRun.Log.AppendLine(CloneMessage);
+        }
+
+        _runs.Add(cloneRun);
+
+        foreach (var opt in Actions ?? new())
+        {
+            _runs.Add(new ActionRun
+            {
+                Title = opt.Label,
+                Option = opt,
+                Status = ActionStatus.Pending,
+                Expanded = false
+            });
+        }
+
+        foreach (var run in _runs)
+        {
+            run.Log.Changed += () => OnLogChanged(run);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_started)
+        {
+            _started = true;
+            if (CloneSucceeded && !string.IsNullOrWhiteSpace(RepositoryPath))
+            {
+                await RunActionsAsync();
+            }
+        }
+    }
+
+    private async Task RunActionsAsync()
+    {
+        _isRunning = true;
+        StateHasChanged();
+
+        for (var i = 1; i < _runs.Count; i++)
+        {
+            var run = _runs[i];
+            var opt = run.Option;
+            if (opt == null)
+                continue;
+
+            // Aktuelle Aktion automatisch aufklappen, alle anderen zuklappen
+            foreach (var r in _runs)
+            {
+                r.Expanded = ReferenceEquals(r, run);
+            }
+
+            run.Status = ActionStatus.Running;
+            StateHasChanged();
+
+            var output = new Progress<string>(s => run.Log.Append(s));
+            var error = new Progress<string>(s => run.Log.Append(s));
+
+            bool ok;
+            try
+            {
+                if (opt.ExecuteWithProgressAsync is not null)
+                {
+                    ok = await opt.ExecuteWithProgressAsync(RepositoryPath, output, error);
+                }
+                else if (opt.ExecuteAsync is not null)
+                {
+                    run.Log.AppendLine("Aktion wird ohne detailliertes Log ausgeführt...");
+                    ok = await opt.ExecuteAsync(RepositoryPath);
+                }
+                else
+                {
+                    ok = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                ok = false;
+                run.Log.AppendLine($"Fehler: {ex.Message}");
+                Snackbar.Add($"Aktion fehlgeschlagen: {run.Title} - {ex.Message}", Severity.Error);
+            }
+
+            run.Status = ok ? ActionStatus.Succeeded : ActionStatus.Failed;
+            StateHasChanged();
+        }
+
+        _isRunning = false;
+        StateHasChanged();
+    }
+
+    private void Toggle(ActionRun run)
+    {
+        run.Expanded = !run.Expanded;
+    }
+
+    private void Close()
+    {
+        MudDialog.Close();
+    }
+
+    private void OnLogChanged(ActionRun run) => _ = InvokeAsync(StateHasChanged);
+}

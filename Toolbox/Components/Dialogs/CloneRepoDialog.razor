@@ -2,6 +2,7 @@
 @using Toolbox.Data.Models
 @inject Toolbox.Services.GitRepoService Git
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <MudDialog>
     <DialogContent>
@@ -47,7 +48,13 @@
     {
         foreach (var a in Actions ?? new())
         {
-            _options.Add(new ActionOption { Label = a.Label, Selected = false, ExecuteAsync = a.ExecuteAsync });
+            _options.Add(new ActionOption
+            {
+                Label = a.Label,
+                Selected = false,
+                ExecuteAsync = a.ExecuteAsync,
+                ExecuteWithProgressAsync = a.ExecuteWithProgressAsync
+            });
         }
     }
 
@@ -75,23 +82,26 @@
                 return;
             }
 
-            foreach (var opt in _options.Where(o => o.Selected))
+            var selected = _options.Where(o => o.Selected).ToList();
+            if (selected.Count > 0)
             {
-                try
+                var parameters = new DialogParameters<CloneActionsDialog>
                 {
-                    if (opt.ExecuteAsync != null)
-                    {
-                        var success = await opt.ExecuteAsync(dir);
-                        if (!success)
-                        {
-                            Snackbar.Add($"Aktion fehlgeschlagen: {opt.Label}", Severity.Error);
-                        }
-                    }
-                }
-                catch (Exception ex)
+                    { x => x.RepositoryPath, dir },
+                    { x => x.CloneSucceeded, true },
+                    { x => x.CloneMessage, $"Repository geklont nach: {dir}" },
+                    { x => x.Actions, selected }
+                };
+
+                var opts = new DialogOptions
                 {
-                    Snackbar.Add($"Aktion fehlgeschlagen: {opt.Label} – {ex.Message}", Severity.Error);
-                }
+                    MaxWidth = MaxWidth.Large,
+                    FullWidth = true,
+                    CloseButton = true,
+                    BackdropClick = true
+                };
+
+                await DialogService.ShowAsync<CloneActionsDialog>("Aktionen nach dem Klonen", parameters, opts);
             }
 
             MudDialog.Close(DialogResult.Ok(true));
