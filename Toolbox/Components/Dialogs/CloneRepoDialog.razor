@@ -75,34 +75,25 @@
         StateHasChanged();
         try
         {
-            var (ok, dir) = await Git.CloneRepositoryAsync(_gitUrl, DestinationRoot);
-            if (!ok || string.IsNullOrEmpty(dir))
-            {
-                MudDialog.Close(DialogResult.Ok(false));
-                return;
-            }
-
             var selected = _options.Where(o => o.Selected).ToList();
-            if (selected.Count > 0)
+
+            var parameters = new DialogParameters<CloneActionsDialog>
             {
-                var parameters = new DialogParameters<CloneActionsDialog>
-                {
-                    { x => x.RepositoryPath, dir },
-                    { x => x.CloneSucceeded, true },
-                    { x => x.CloneMessage, $"Repository geklont nach: {dir}" },
-                    { x => x.Actions, selected }
-                };
+                { x => x.GitUrl, _gitUrl },
+                { x => x.DestinationRoot, DestinationRoot },
+                { x => x.Actions, selected }
+            };
 
-                var opts = new DialogOptions
-                {
-                    MaxWidth = MaxWidth.Large,
-                    FullWidth = true,
-                    CloseButton = true,
-                    BackdropClick = true
-                };
+            var opts = new DialogOptions
+            {
+                MaxWidth = MaxWidth.Large,
+                FullWidth = true,
+                CloseButton = true,
+                BackdropClick = true
+            };
 
-                await DialogService.ShowAsync<CloneActionsDialog>("Aktionen nach dem Klonen", parameters, opts);
-            }
+            var dlg = await DialogService.ShowAsync<CloneActionsDialog>("Aktionen nach dem Klonen", parameters, opts);
+            await dlg.Result;
 
             MudDialog.Close(DialogResult.Ok(true));
         }
