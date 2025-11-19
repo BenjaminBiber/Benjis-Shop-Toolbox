@@ -1,6 +1,7 @@
 @using Toolbox.Data.Models
 @using Toolbox.Components.Dialogs
 @inject ISnackbar Snackbar
+@inject Microsoft.JSInterop.IJSRuntime JS
 
 <MudDialog DefaultFocus="DefaultFocus.None">
     <TitleContent>
@@ -46,7 +47,7 @@
 
                 @if (run.Expanded)
                 {
-                    <MudPaper Class="mt-2 p-2"
+                    <MudPaper Class="@($"mt-2 p-2 {run.ElementId}")"
                               Style="max-height:30vh; overflow-y:auto; background:#0b0b0b; color:#dcdcdc;">
                         <pre style="white-space: pre-wrap;">@run.Log.Text</pre>
                     </MudPaper>
@@ -90,6 +91,7 @@
     private readonly List<ActionRun> _runs = new();
     private bool _started;
     private bool _isRunning;
+    private string? _pendingScrollClass;
 
     protected override void OnInitialized()
     {
@@ -133,6 +135,19 @@
             if (CloneSucceeded && !string.IsNullOrWhiteSpace(RepositoryPath))
             {
                 await RunActionsAsync();
+            }
+        }
+
+        if (!firstRender && !string.IsNullOrWhiteSpace(_pendingScrollClass))
+        {
+            var cls = _pendingScrollClass;
+            _pendingScrollClass = null;
+            try
+            {
+                await JS.InvokeVoidAsync("toolboxScrollToBottom", cls);
+            }
+            catch
+            {
             }
         }
     }
@@ -203,5 +218,9 @@
         MudDialog.Close();
     }
 
-    private void OnLogChanged(ActionRun run) => _ = InvokeAsync(StateHasChanged);
+    private void OnLogChanged(ActionRun run)
+    {
+        _pendingScrollClass = run.ElementId;
+        _ = InvokeAsync(StateHasChanged);
+    }
 }
