@@ -1,13 +1,14 @@
 @using Toolbox.Components.Dialogs
 @implements IDisposable
 @inject ISnackbar Snackbar
+@inject Microsoft.JSInterop.IJSRuntime JS
 
 <MudDialog MaxWidth="MaxWidth.Large">
     <TitleContent>
         <MudText Typo="Typo.h6">@Title</MudText>
     </TitleContent>
     <DialogContent>
-        <MudPaper Class="p-2" Style="max-height:60vh; overflow:auto; background:#0b0b0b; color:#dcdcdc;">
+        <MudPaper Class="p-2 log-dialog-content" Style="max-height:60vh; overflow:auto; background:#0b0b0b; color:#dcdcdc;">
             <pre style="white-space: pre-wrap;">@(_logBuffer is not null ? _logBuffer.Text : LogText)</pre>
         </MudPaper>
     </DialogContent>
@@ -23,6 +24,7 @@
     [Parameter] public LogBuffer? LogBuffer { get; set; }
 
     private LogBuffer? _logBuffer;
+    private string? _pendingScrollClass;
 
     protected override void OnInitialized()
     {
@@ -35,8 +37,25 @@
         }
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!string.IsNullOrWhiteSpace(_pendingScrollClass))
+        {
+            var cls = _pendingScrollClass;
+            _pendingScrollClass = null;
+            try
+            {
+                await JS.InvokeVoidAsync("toolboxScrollToBottom", cls);
+            }
+            catch
+            {
+            }
+        }
+    }
+
     private void OnLogBufferChanged()
     {
+        _pendingScrollClass = "log-dialog-content";
         _ = InvokeAsync(StateHasChanged);
     }
 
