@@ -2,13 +2,21 @@
 @using MudBlazor
 @using System.Text
 @using System.Text.Json
+@using Microsoft.AspNetCore.Components.Web
+@inject Microsoft.JSInterop.IJSRuntime JS
 
 <MudDialog MaxWidth="MaxWidth.Large">
     <DialogContent>
         <div class="egg-root">
             <div class="wheel-wrapper" style="@GetWrapperStyle()">
                 <div class="pointer"></div>
-                <div class="wheel" style="@GetWheelStyle()">
+                <div class="wheel"
+                     id="egg-wheel"
+                     style="@GetWheelStyle()"
+                     @onmousedown="OnWheelMouseDown"
+                     @onmouseup="OnWheelMouseUp"
+                     @onmouseleave="OnWheelMouseUp"
+                     @onmousemove="OnWheelMouseMove">
                     @if (_segments.Count == 0)
                     {
                         <div class="empty">Keine Bilder gefunden</div>
@@ -60,9 +68,21 @@
     private int _wheelPaddingPx = 24; // Innenabstand vom Rand
     private int _iconEdgeMarginPx = 12; // Abstand des Icon-Randes zum Rad-Rand
     private const int IconSize = 64;
+    private double _iconSideOffsetPx = 2.5; // Seitlicher Offset (rechts/links) im Sektor
+
+    private bool _isDragging;
+    private double _dragStartAngle;
+    private double _rotationStartDeg;
+    private double _centerX;
+    private double _centerY;
+    private bool _funFactsUnlocked;
 
     protected override void OnInitialized()
     {
+        _wheelSizePx = 620;
+        _wheelPaddingPx = 32;
+        _iconEdgeMarginPx = 0;
+
         try
         {
             var baseDir = AppContext.BaseDirectory;
@@ -120,6 +140,7 @@
     {
         if (_segments.Count == 0 || _spinning) return;
         _spinning = true;
+        _isDragging = false;
         _resultText = null;
 
         var rnd = new Random();
@@ -137,20 +158,8 @@
         StateHasChanged();
         try { await Task.Delay(TimeSpan.FromSeconds(_transitionSeconds)); } catch { }
 
-        try
-        {
-            _resultText = Path.GetFileNameWithoutExtension(_segments[winIndex]);
-            _funFactText = null;
-            if (!string.IsNullOrWhiteSpace(_resultText))
-            {
-                var key = _resultText;
-                if (_funFacts.TryGetValue(key, out var fact) && !string.IsNullOrWhiteSpace(fact))
-                    _funFactText = fact;
-                else
-                    _funFactText = "Kein Fun-Fact hinterlegt.";
-            }
-        }
-        catch { _resultText = $"Index {winIndex}"; _funFactText = null; }
+        UpdateSelectionFromRotation(false);
+
         _spinning = false;
         StateHasChanged();
     }
@@ -184,7 +193,7 @@
 
         // Build conic gradient for colored segments
         var sb = new StringBuilder();
-        var fromDeg = (-90.0 + (_segmentAngle / 2.0)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var fromDeg = (-90.0).ToString(System.Globalization.CultureInfo.InvariantCulture);
         var conic = new StringBuilder($"conic-gradient(from {fromDeg}deg, ");
         for (int i = 0; i < _segments.Count; i++)
         {
@@ -205,26 +214,134 @@
 
     private string GetSegmentStyle(double angle)
     {
-        // Center image inside its sector using sector centroid and keep it upright
+        // Positioniere das Bild im Sektor und lasse es radial zur Mitte zeigen
         var radius = (_wheelSizePx / 2.0) - _wheelPaddingPx;
         var offset = GetIconOffset(radius);
-        return $"transform: translate(-50%, -50%) rotate({angle.ToString(System.Globalization.CultureInfo.InvariantCulture)}deg) translateY(-{offset.ToString(System.Globalization.CultureInfo.InvariantCulture)}px) rotate(-{angle.ToString(System.Globalization.CultureInfo.InvariantCulture)}deg);";
+        var totalAngle = angle + 180.0; // obere Bildkante zeigt zur Radmitte
+        var sideOffset = _iconSideOffsetPx; // seitlicher Offset (rechts/links) im Sektor
+
+        return
+            $"transform: translate(-50%, -50%) " +
+            $"rotate({totalAngle.ToString(System.Globalization.CultureInfo.InvariantCulture)}deg) " +
+            $"translate({sideOffset.ToString(System.Globalization.CultureInfo.InvariantCulture)}px, -{offset.ToString(System.Globalization.CultureInfo.InvariantCulture)}px);";
     }
 
     private double GetIconOffset(double radius)
     {
         // Positioniere die Bildmitte nahe am Außenrand, mit kleinem Sicherheitsabstand
-        var offset = radius - (IconSize / 2.0) - _iconEdgeMarginPx;
+        var offset = radius * 0.9;
         return Math.Max(0, offset);
+    }
+
+    private async Task OnWheelMouseDown(MouseEventArgs e)
+    {
+        if (_segments.Count == 0 || _spinning) return;
+        _isDragging = true;
+        _transitionSeconds = 0;
+        _rotationStartDeg = _rotationDeg;
+
+        if (_centerX == 0 && _centerY == 0)
+        {
+            try
+            {
+                var center = await JS.InvokeAsync<ElementCenter>("toolboxGetElementCenter", "egg-wheel");
+                if (center is not null)
+                {
+                    _centerX = center.X;
+                    _centerY = center.Y;
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        _dragStartAngle = GetAngle(e.ClientX, e.ClientY);
+    }
+
+    private void OnWheelMouseMove(MouseEventArgs e)
+    {
+        if (!_isDragging) return;
+        var angle = GetAngle(e.ClientX, e.ClientY);
+        var delta = angle - _dragStartAngle;
+        _rotationDeg = _rotationStartDeg + delta;
+        StateHasChanged();
+    }
+
+    private void OnWheelMouseUp(MouseEventArgs e)
+    {
+        if (!_isDragging) return;
+        _isDragging = false;
+        UpdateSelectionFromRotation(true);
+        StateHasChanged();
+    }
+
+    private double GetAngle(double clientX, double clientY)
+    {
+        if (_centerX == 0 && _centerY == 0)
+            return 0;
+        var dx = clientX - _centerX;
+        var dy = clientY - _centerY;
+        var rad = Math.Atan2(dy, dx);
+        var deg = rad * 180.0 / Math.PI;
+        return deg;
+    }
+
+    private void UpdateSelectionFromRotation(bool manual)
+    {
+        try
+        {
+            if (_segments.Count == 0) return;
+
+            var currentMod = ((_rotationDeg % 360.0) + 360.0) % 360.0;
+            var centerAngle = (360.0 - currentMod + 360.0) % 360.0;
+            var index = (int)Math.Floor(centerAngle / _segmentAngle);
+            if (index < 0 || index >= _segments.Count)
+            {
+                index = ((index % _segments.Count) + _segments.Count) % _segments.Count;
+            }
+
+            var name = Path.GetFileNameWithoutExtension(_segments[index]);
+            _resultText = name;
+
+            if (manual && string.Equals(name, "Paul", StringComparison.OrdinalIgnoreCase))
+            {
+                _funFactsUnlocked = true;
+            }
+
+            _funFactText = null;
+
+            if (_funFactsUnlocked && !string.IsNullOrWhiteSpace(name))
+            {
+                if (_funFacts.TryGetValue(name, out var fact) && !string.IsNullOrWhiteSpace(fact))
+                {
+                    _funFactText = fact;
+                }
+                else
+                {
+                    _funFactText = "Kein Fun-Fact hinterlegt.";
+                }
+            }
+        }
+        catch
+        {
+            // ignore selection errors
+        }
+    }
+
+    private sealed class ElementCenter
+    {
+        public double X { get; set; }
+        public double Y { get; set; }
     }
 }
 
 <style>
     .egg-root { display: flex; flex-direction: column; align-items: center; gap: 16px; }
-    .wheel-wrapper { position: relative; width: 320px; height: 320px; }
+    .wheel-wrapper { position: relative; width: 420px; height: 420px; }
     .wheel { position: absolute; inset: 0; border-radius: 50%; overflow: visible; box-shadow: inset 0 0 0 2px rgba(0,0,0,0.06); }
     .pointer { position: absolute; top: -6px; left: 50%; transform: translateX(-50%) rotate(180deg) translateY(-50%); width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 14px solid var(--mud-palette-primary); z-index: 5; }
-    .segment-img { position: absolute; top: 50%; left: 50%; transform-origin: 50% 50%; width: 64px; height: 64px; object-fit: contain; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.3)); }
+    .segment-img { position: absolute; top: 50%; left: 50%; transform-origin: 50% 50%; width: 80px; height: 80px; object-fit: contain; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.3)); }
     .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--mud-palette-text-primary); font-style: italic; }
     .controls { display: flex; align-items: center; justify-content: center; }
     .funfact { margin-top: 8px; max-width: 520px; padding: 10px 12px; border-radius: 10px; background: rgba(13,110,253,0.08); color: var(--mud-palette-text-primary); border: 1px solid rgba(13,110,253,0.2); }

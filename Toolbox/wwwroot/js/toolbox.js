@@ -11,3 +11,14 @@ window.toolboxScrollToBottom = function (elementClass) {
     }
 };
 
+window.toolboxGetElementCenter = function (elementId) {
+    try {
+        var el = document.getElementById(elementId);
+        if (!el) return null;
+        var r = el.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    } catch (e) {
+        return null;
+    }
+};
+
