@@ -2,6 +2,7 @@
 @using Toolbox.Components.Dialogs
 @inject ISnackbar Snackbar
 @inject Microsoft.JSInterop.IJSRuntime JS
+@inject Toolbox.Services.GitRepoService Git
 
 <MudDialog DefaultFocus="DefaultFocus.None">
     <TitleContent>
@@ -64,9 +65,8 @@
 @code {
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
 
-    [Parameter] public string RepositoryPath { get; set; } = string.Empty;
-    [Parameter] public bool CloneSucceeded { get; set; }
-    [Parameter] public string? CloneMessage { get; set; }
+    [Parameter] public string GitUrl { get; set; } = string.Empty;
+    [Parameter] public string DestinationRoot { get; set; } = string.Empty;
     [Parameter] public List<ActionOption> Actions { get; set; } = new();
 
     private enum ActionStatus
@@ -92,21 +92,17 @@
     private bool _started;
     private bool _isRunning;
     private string? _pendingScrollClass;
+    private string _repositoryPath = string.Empty;
 
     protected override void OnInitialized()
     {
         var cloneRun = new ActionRun
         {
             Title = "Repository klonen",
-            Status = CloneSucceeded ? ActionStatus.Succeeded : ActionStatus.Failed,
-            Expanded = false,
+            Status = ActionStatus.Pending,
+            Expanded = true,
             IsCloneStep = true
         };
-
-        if (!string.IsNullOrWhiteSpace(CloneMessage))
-        {
-            cloneRun.Log.AppendLine(CloneMessage);
-        }
 
         _runs.Add(cloneRun);
 
@@ -132,7 +128,7 @@
         if (firstRender && !_started)
         {
             _started = true;
-            if (CloneSucceeded && !string.IsNullOrWhiteSpace(RepositoryPath))
+            if (!string.IsNullOrWhiteSpace(GitUrl) && !string.IsNullOrWhiteSpace(DestinationRoot))
             {
                 await RunActionsAsync();
             }
@@ -157,6 +153,54 @@
         _isRunning = true;
         StateHasChanged();
 
+        var cloneRun = _runs.FirstOrDefault(r => r.IsCloneStep);
+        var cloneOk = true;
+
+        if (cloneRun is not null)
+        {
+            cloneRun.Status = ActionStatus.Running;
+            cloneRun.Expanded = true;
+            StateHasChanged();
+
+            var cloneOutput = new Progress<string>(s => cloneRun.Log.Append(s));
+            var cloneError = new Progress<string>(s => cloneRun.Log.Append(s));
+
+            try
+            {
+                var (ok, dir) = await Git.CloneRepositoryAsync(GitUrl, DestinationRoot, cloneOutput, cloneError);
+                cloneOk = ok && !string.IsNullOrWhiteSpace(dir);
+                if (cloneOk)
+                {
+                    _repositoryPath = dir!;
+                    cloneRun.Status = ActionStatus.Succeeded;
+                }
+                else
+                {
+                    cloneRun.Status = ActionStatus.Failed;
+                    if (string.IsNullOrWhiteSpace(_repositoryPath))
+                    {
+                        cloneRun.Log.AppendLine("Repository konnte nicht geklont werden.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                cloneOk = false;
+                cloneRun.Status = ActionStatus.Failed;
+                cloneRun.Log.AppendLine($"Fehler beim Klonen: {ex.Message}");
+                Snackbar.Add($"Fehler beim Klonen: {ex.Message}", Severity.Error);
+            }
+
+            StateHasChanged();
+        }
+
+        if (!cloneOk || string.IsNullOrWhiteSpace(_repositoryPath))
+        {
+            _isRunning = false;
+            StateHasChanged();
+            return;
+        }
+
         for (var i = 1; i < _runs.Count; i++)
         {
             var run = _runs[i];
@@ -164,7 +208,6 @@
             if (opt == null)
                 continue;
 
-            // Aktuelle Aktion automatisch aufklappen, alle anderen zuklappen
             foreach (var r in _runs)
             {
                 r.Expanded = ReferenceEquals(r, run);
@@ -181,12 +224,12 @@
             {
                 if (opt.ExecuteWithProgressAsync is not null)
                 {
-                    ok = await opt.ExecuteWithProgressAsync(RepositoryPath, output, error);
+                    ok = await opt.ExecuteWithProgressAsync(_repositoryPath, output, error);
                 }
                 else if (opt.ExecuteAsync is not null)
                 {
                     run.Log.AppendLine("Aktion wird ohne detailliertes Log ausgeführt...");
-                    ok = await opt.ExecuteAsync(RepositoryPath);
+                    ok = await opt.ExecuteAsync(_repositoryPath);
                 }
                 else
                 {
@@ -224,3 +267,4 @@
         _ = InvokeAsync(StateHasChanged);
     }
 }
+

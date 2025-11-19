@@ -46,6 +46,15 @@ public class GitRepoService
 
     public async Task<(bool ok, string? targetDir)> CloneRepositoryAsync(string gitUrl, string destinationRoot)
     {
+        return await CloneRepositoryAsync(gitUrl, destinationRoot, null, null);
+    }
+
+    public async Task<(bool ok, string? targetDir)> CloneRepositoryAsync(
+        string gitUrl,
+        string destinationRoot,
+        IProgress<string>? outputProgress,
+        IProgress<string>? errorProgress)
+    {
         if (string.IsNullOrWhiteSpace(gitUrl))
         {
             _notifications.Error("Git URL ist leer.");
@@ -61,10 +70,13 @@ public class GitRepoService
                 _notifications.Error("Repositoryname aus URL konnte nicht ermittelt werden.");
                 return (false, null);
             }
+
             var targetDir = Path.Combine(destinationRoot, namePart);
             if (Directory.Exists(targetDir))
             {
-                _notifications.Warning($"Repository {namePart} existiert bereits.");
+                var msgExists = $"Repository {namePart} existiert bereits.";
+                _notifications.Warning(msgExists);
+                outputProgress?.Report(msgExists + Environment.NewLine);
                 return (false, targetDir);
             }
 
@@ -72,30 +84,75 @@ public class GitRepoService
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                UseShellExecute = false
+                UseShellExecute = false,
+                CreateNoWindow = true
             };
 
-            using var proc = Process.Start(psi);
-            if (proc == null)
+            using var proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
+
+            if (!proc.Start())
             {
-                _notifications.Error("Klonvorgang konnte nicht gestartet werden.");
+                const string msg = "Klonvorgang konnte nicht gestartet werden.";
+                _notifications.Error(msg);
+                errorProgress?.Report(msg + Environment.NewLine);
                 return (false, null);
             }
 
-            await proc.WaitForExitAsync();
+            var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            void OnOutputDataReceived(object? _, DataReceivedEventArgs e)
+            {
+                if (e.Data is null) return;
+                outputProgress?.Report(e.Data + Environment.NewLine);
+            }
+
+            void OnErrorDataReceived(object? _, DataReceivedEventArgs e)
+            {
+                if (e.Data is null) return;
+                errorProgress?.Report(e.Data + Environment.NewLine);
+            }
+
+            void OnExited(object? _1, EventArgs _)
+            {
+                tcs.TrySetResult(true);
+            }
+
+            proc.OutputDataReceived += OnOutputDataReceived;
+            proc.ErrorDataReceived += OnErrorDataReceived;
+            proc.Exited += OnExited;
+
+            try
+            {
+                proc.BeginOutputReadLine();
+                proc.BeginErrorReadLine();
+
+                await tcs.Task.ConfigureAwait(false);
+            }
+            finally
+            {
+                proc.OutputDataReceived -= OnOutputDataReceived;
+                proc.ErrorDataReceived -= OnErrorDataReceived;
+                proc.Exited -= OnExited;
+            }
+
             if (proc.ExitCode == 0)
             {
-                _notifications.Success($"Repository {namePart} geklont.");
+                var msg = $"Repository {namePart} geklont.";
+                _notifications.Success(msg);
+                outputProgress?.Report(msg + Environment.NewLine);
                 return (true, targetDir);
             }
-            var error = await proc.StandardError.ReadToEndAsync();
-            _notifications.Error(string.IsNullOrWhiteSpace(error) ?
-                "Fehler beim Klonen." : $"Fehler beim Klonen: {error}");
+
+            const string errorMsg = "Fehler beim Klonen.";
+            _notifications.Error(errorMsg);
+            errorProgress?.Report(errorMsg + Environment.NewLine);
             return (false, null);
         }
         catch (Exception ex)
         {
-            _notifications.Error($"Fehler beim Klonen: {ex.Message}");
+            var msg = $"Fehler beim Klonen: {ex.Message}";
+            _notifications.Error(msg);
+            errorProgress?.Report(msg + Environment.NewLine);
             return (false, null);
         }
     }
