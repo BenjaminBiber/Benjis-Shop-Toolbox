@@ -7,7 +7,11 @@ namespace Toolbox.Data.Services;
 
 public static class SqlCmdService
 {
-     public static async Task<(int ExitCode, string StdOut, string StdError)> RunAsync(SqlCmdRequest req, CancellationToken ct = default)
+    public static async Task<(int ExitCode, string StdOut, string StdError)> RunAsync(
+        SqlCmdRequest req,
+        IProgress<string>? outputProgress = null,
+        IProgress<string>? errorProgress = null,
+        CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(req.ScriptPath))
         {
@@ -30,7 +34,7 @@ public static class SqlCmdService
             CreateNoWindow = true
         };
 
-        using var p = new Process { StartInfo = psi, EnableRaisingEvents = false };
+        using var p = new Process { StartInfo = psi };
 
         try
         {
@@ -39,11 +43,61 @@ public static class SqlCmdService
                 return new ValueTuple<int, string, string>(-1, null, "sqlcmd-Prozess konnte nicht gestartet werden.");
             }
 
-            Task<string> stdoutT = p.StandardOutput.ReadToEndAsync();
-            Task<string> stderrT = p.StandardError.ReadToEndAsync();
+            var stdoutBuilder = new StringBuilder();
+            var stderrBuilder = new StringBuilder();
 
-            string stdout = await stdoutT;
-            string stderr = await stderrT;
+            void OnOutputDataReceived(object? _, DataReceivedEventArgs e)
+            {
+                if (e.Data is null) return;
+                lock (stdoutBuilder)
+                {
+                    stdoutBuilder.AppendLine(e.Data);
+                }
+                outputProgress?.Report(e.Data + Environment.NewLine);
+            }
+
+            void OnErrorDataReceived(object? _, DataReceivedEventArgs e)
+            {
+                if (e.Data is null) return;
+                lock (stderrBuilder)
+                {
+                    stderrBuilder.AppendLine(e.Data);
+                }
+                errorProgress?.Report(e.Data + Environment.NewLine);
+            }
+
+            p.OutputDataReceived += OnOutputDataReceived;
+            p.ErrorDataReceived += OnErrorDataReceived;
+
+            try
+            {
+                p.BeginOutputReadLine();
+                p.BeginErrorReadLine();
+
+                using (ct.Register(() =>
+                       {
+                           try
+                           {
+                               if (!p.HasExited)
+                                   p.Kill();
+                           }
+                           catch
+                           {
+                               // ignore
+                           }
+                       }))
+                {
+                    await p.WaitForExitAsync().ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                p.OutputDataReceived -= OnOutputDataReceived;
+                p.ErrorDataReceived -= OnErrorDataReceived;
+            }
+
+            var stdout = stdoutBuilder.ToString();
+            var stderr = stderrBuilder.ToString();
 
             return (p.ExitCode, stdout, stderr);
         }

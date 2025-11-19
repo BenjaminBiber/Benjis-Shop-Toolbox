@@ -78,7 +78,10 @@ public class ExtensionInfo
         }
     }
 
-    public async Task<(bool Ok, string Log)> InstallWithLogAsync(DatabaseConnection connection)
+    public async Task<(bool Ok, string Log)> InstallWithLogAsync(
+        DatabaseConnection connection,
+        IProgress<string>? outputProgress = null,
+        IProgress<string>? errorProgress = null)
     {
         string? mainSqlFile = Directory
             .EnumerateFiles(Path, "InstallExtension.sql", SearchOption.AllDirectories)
@@ -113,7 +116,7 @@ public class ExtensionInfo
             SqlCmdPath = SqlCmdService.ResolveSqlCmdPath()
         };
 
-        var result = await SqlCmdService.RunAsync(req);
+        var result = await SqlCmdService.RunAsync(req, outputProgress, errorProgress);
         var combined = string.Join(Environment.NewLine, new[] { result.StdOut, result.StdError }.Where(s => !string.IsNullOrEmpty(s)));
         return (result.ExitCode == 0, combined ?? string.Empty);
     }

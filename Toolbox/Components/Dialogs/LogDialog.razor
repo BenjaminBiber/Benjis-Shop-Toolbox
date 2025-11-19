@@ -1,3 +1,5 @@
+@using Toolbox.Components.Dialogs
+@implements IDisposable
 @inject ISnackbar Snackbar
 
 <MudDialog MaxWidth="MaxWidth.Large">
@@ -6,7 +8,7 @@
     </TitleContent>
     <DialogContent>
         <MudPaper Class="p-2" Style="max-height:60vh; overflow:auto; background:#0b0b0b; color:#dcdcdc;">
-            <pre style="white-space: pre-wrap;">@LogText</pre>
+            <pre style="white-space: pre-wrap;">@(_logBuffer is not null ? _logBuffer.Text : LogText)</pre>
         </MudPaper>
     </DialogContent>
     <DialogActions>
@@ -18,6 +20,33 @@
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
     [Parameter] public string Title { get; set; } = "Protokoll";
     [Parameter] public string LogText { get; set; } = string.Empty;
+    [Parameter] public LogBuffer? LogBuffer { get; set; }
+
+    private LogBuffer? _logBuffer;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        if (LogBuffer is not null)
+        {
+            _logBuffer = LogBuffer;
+            _logBuffer.Changed += OnLogBufferChanged;
+        }
+    }
+
+    private void OnLogBufferChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
 
     private void Close() => MudDialog.Close();
+
+    public void Dispose()
+    {
+        if (_logBuffer is not null)
+        {
+            _logBuffer.Changed -= OnLogBufferChanged;
+        }
+    }
 }

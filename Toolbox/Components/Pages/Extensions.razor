@@ -1,4 +1,4 @@
-﻿@page "/extensions"
+@page "/extensions"
 @using System.Diagnostics
 @using System.IO
 @using Toolbox.Components.Dialogs
@@ -27,11 +27,19 @@
             </MudSelect>
         </div>
         <div class="col-7">
-            <MudTextField Variant="Variant.Outlined" Value="_searchText" ValueChanged="(string s) => SearchChanged(s)" Immediate="true" Placeholder="Suche..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+            <MudTextField Variant="Variant.Outlined"
+                          Value="_searchText"
+                          ValueChanged="(string s) => SearchChanged(s)"
+                          Immediate="true"
+                          Placeholder="Suche..."
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          IconSize="Size.Medium"
+                          Class="mt-0" />
         </div>
         <div class="col-1 d-flex align-items-center justify-content-center">
             <MudTooltip Text="Extension klonen">
-                <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="OpenCloneDialog"/>
+                <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="OpenCloneDialog" />
             </MudTooltip>
         </div>
     </div>
@@ -40,70 +48,88 @@
 @if (_groupedExtensions != null)
 {
     <div class="row g-0 px-3 g- d-flex align-items-start justify-content-center gap-3">
-      <MudPaper Class="col-12 mx-3 p-4">
-            <MudTable Loading="_isLoading" @ref="_table" Filter="new Func<ExtensionInfo,bool>(FilterThemes)" Elevation="0" GroupHeaderStyle="background-color:var(--mud-palette-background-gray)" GroupBy="_groupDefinition" Items="_groupedExtensions" Hover="true" Dense="true">
+        <MudPaper Class="col-12 mx-3 p-4">
+            <MudTable Loading="_isLoading"
+                      @ref="_table"
+                      Filter="new Func<ExtensionInfo,bool>(FilterThemes)"
+                      Elevation="0"
+                      GroupHeaderStyle="background-color:var(--mud-palette-background-gray)"
+                      GroupBy="_groupDefinition"
+                      Items="_groupedExtensions"
+                      Hover="true"
+                      Dense="true">
                 <HeaderContent>
-                <MudTh>Name</MudTh>
-                <MudTh>Install Projekt</MudTh>
-                <MudTh>Data Projekt</MudTh>
-                <MudTh>Shop Projekt</MudTh>
-                <MudTh>ThemeV4</MudTh>
-                <MudTh>Aktionen</MudTh>
-                <MudTh>Öffnen</MudTh>
-            </HeaderContent>
-            <GroupHeaderTemplate>
-                <MudTh Class="mud-table-cell-custom-group" colspan="7"><MudText Class="fw-bold" Typo="Typo.h6">@($"{context.Key}")</MudText></MudTh>
-            </GroupHeaderTemplate>
-            <RowTemplate>
-                <MudTd DataLabel="Name">@context.Name</MudTd>
-                <MudTd DataLabel="Install Projekt">
-                    @if (context.HasInstallProject)
-                    {
-                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success"></MudIcon>
-                    }
-                </MudTd>
-                <MudTd DataLabel="Data Projekt">
-                    @if (context.HasDataProject)
-                    {
-                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Warning"></MudIcon>
-                    }
-                </MudTd>
-                <MudTd DataLabel="Shop Projekt">
-                    @if (context.HasShopProject)
-                    {
-                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Info"></MudIcon>
-                    }
-                </MudTd>
-                <MudTd DataLabel="ThemeV4">
-                    @if (context.HasThemeV4)
-                    {
-                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Primary"></MudIcon>
-                    }
-                </MudTd>
-                <MudTd DataLabel="Aktionen">
-                    <MudMenu Icon="@Icons.Material.Filled.Build" Color="Color.Error">
-                        <MudMenuItem Label="Extension Builden" OnClick="() => ExtensionsService.BuildAsync(context.Path)"></MudMenuItem>
-                        <MudMenuItem Label="Extension Datenbank Installieren" OnClick="() => InstallExtension(context)"></MudMenuItem>
-                    </MudMenu>
-                </MudTd>
-                <MudTd DataLabel="Öffnen">
-                    <MudTooltip Text="Öffnen in">
-                        <MudMenu Icon="@Icons.Material.Filled.OpenInNew">
-                            <MudMenuItem OnClick="@(() => OpenDirectoryInExplorer(context.Path))" Label="Explorer"/>
-                            <MudMenuItem OnClick="@(() => OpenSolution(context))" Label="Rider"/>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Install Projekt</MudTh>
+                    <MudTh>Data Projekt</MudTh>
+                    <MudTh>Shop Projekt</MudTh>
+                    <MudTh>ThemeV4</MudTh>
+                    <MudTh>Aktionen</MudTh>
+                    <MudTh>Öffnen</MudTh>
+                </HeaderContent>
+                <GroupHeaderTemplate>
+                    <MudTh Class="mud-table-cell-custom-group" colspan="7">
+                        <MudText Class="fw-bold" Typo="Typo.h6">@($"{context.Key}")</MudText>
+                    </MudTh>
+                </GroupHeaderTemplate>
+                <RowTemplate>
+                    <MudTd DataLabel="Name">@context.Name</MudTd>
+                    <MudTd DataLabel="Install Projekt">
+                        @if (context.HasInstallProject)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" />
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Data Projekt">
+                        @if (context.HasDataProject)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Warning" />
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Shop Projekt">
+                        @if (context.HasShopProject)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Info" />
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="ThemeV4">
+                        @if (context.HasThemeV4)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Primary" />
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Aktionen">
+                        <MudMenu Icon="@Icons.Material.Filled.Build" Color="Color.Error">
+                            <MudMenuItem Label="Extension Builden"
+                                         OnClick="@(() => BuildExtensionFromMenuAsync(context))" />
+                            <MudMenuItem Label="Extension Datenbank Installieren"
+                                         OnClick="@(() => InstallExtension(context))" />
                         </MudMenu>
-                    </MudTooltip>
-                </MudTd>
-            </RowTemplate>
-        </MudTable>
+                    </MudTd>
+                    <MudTd DataLabel="Öffnen">
+                        <MudTooltip Text="Öffnen in">
+                            <MudMenu Icon="@Icons.Material.Filled.OpenInNew">
+                                <MudMenuItem OnClick="@(() => OpenDirectoryInExplorer(context.Path))"
+                                             Label="Explorer" />
+                                <MudMenuItem OnClick="@(() => OpenSolution(context))"
+                                             Label="Rider" />
+                            </MudMenu>
+                        </MudTooltip>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
         </MudPaper>
     </div>
 }
 else
 {
     <div class="d-flex justify-content-center my-3">
-        <MudAlert Icon="@Icons.Material.Filled.Info" Variant="Variant.Filled" Severity="Severity.Info">Keine Themes für die aktuell ausgewählte Seite vorhanden</MudAlert>
-    </div>    
+        <MudAlert Icon="@Icons.Material.Filled.Info"
+                  Variant="Variant.Filled"
+                  Severity="Severity.Info">
+            Keine Extensions für die aktuell ausgewählte Seite vorhanden
+        </MudAlert>
+    </div>
 }
 
 @code {
@@ -112,24 +138,27 @@ else
     private ToolboxSettings Settings => SettingsService.Settings;
     private string _selectedShopPath = string.Empty;
     private ShopSetting? SelectedShopSetting =>
-        Settings.ShopSettingsList.FirstOrDefault(s => string.Equals(s.ShopYamlPath, _selectedShopPath, StringComparison.OrdinalIgnoreCase))
+        Settings.ShopSettingsList.FirstOrDefault(s =>
+            string.Equals(s.ShopYamlPath, _selectedShopPath, StringComparison.OrdinalIgnoreCase))
         ?? Settings.GetShopSettingForCurrentSite();
     private MudTable<ExtensionInfo> _table = null!;
     private string _searchText = string.Empty;
-    
+
     private TableGroupDefinition<ExtensionInfo> _groupDefinition = new()
     {
         GroupName = "Group",
         Indentation = true,
         Expandable = true,
-        Selector = (e) => e.GetCustomerName(),
+        Selector = e => e.GetCustomerName(),
         IsInitiallyExpanded = false
     };
-    
+
     protected override async Task OnInitializedAsync()
     {
         var current = Settings.GetShopSettingForCurrentSite();
-        _selectedShopPath = current?.ShopYamlPath ?? Settings.ShopSettingsList.FirstOrDefault()?.ShopYamlPath ?? string.Empty;
+        _selectedShopPath = current?.ShopYamlPath
+                            ?? Settings.ShopSettingsList.FirstOrDefault()?.ShopYamlPath
+                            ?? string.Empty;
         await LoadAsync();
     }
 
@@ -155,7 +184,7 @@ else
             _table.ExpandAllGroups();
 
             var firstMatch = visibleGroups[0]
-                                 .FirstOrDefault(i => MatchesSearch(i)) 
+                                 .FirstOrDefault(MatchesSearch)
                              ?? visibleGroups[0].FirstOrDefault();
 
             if (firstMatch is not null)
@@ -166,12 +195,12 @@ else
             _table.CollapseAllGroups();
         }
     }
-    
+
     private bool FilterThemes(ExtensionInfo info)
     {
         return info.Name.Contains(_searchText.Trim(), StringComparison.OrdinalIgnoreCase);
     }
-    
+
     public static void OpenDirectoryInExplorer(string path)
     {
         if (Directory.Exists(path))
@@ -193,13 +222,15 @@ else
     private async Task ChangeSelectedShop(string shopPath)
     {
         _selectedShopPath = shopPath ?? string.Empty;
-        var selected = Settings.ShopSettingsList.FirstOrDefault(s => string.Equals(s.ShopYamlPath, _selectedShopPath, StringComparison.OrdinalIgnoreCase));
-        var siteName = (selected != null) ? IisService.GetSiteNameById(selected.SiteId) : null;
+        var selected = Settings.ShopSettingsList.FirstOrDefault(s =>
+            string.Equals(s.ShopYamlPath, _selectedShopPath, StringComparison.OrdinalIgnoreCase));
+        var siteName = selected != null ? IisService.GetSiteNameById(selected.SiteId) : null;
         if (!string.IsNullOrEmpty(siteName))
         {
             Settings.IisAppName = siteName;
             SettingsService.SaveSettings();
         }
+
         try
         {
             var shopRoot = selected != null ? Path.GetDirectoryName(selected.ShopYamlPath) : null;
@@ -217,23 +248,32 @@ else
         {
             Snackbar.Add($"Fehler beim Aktualisieren der shopsystem.json: {ex.Message}", Severity.Warning);
         }
+
         await LoadAsync();
     }
-    
+
     private string GetShopDisplayName(ShopSetting s)
     {
         var name = IisService.GetSiteNameById(s.SiteId);
         if (!string.IsNullOrWhiteSpace(name)) return name;
+
         try
         {
             var yamlPath = s.ShopYamlPath ?? string.Empty;
-            var dir = System.IO.Path.GetDirectoryName(yamlPath) ?? string.Empty;
+            var dir = Path.GetDirectoryName(yamlPath) ?? string.Empty;
             if (string.IsNullOrWhiteSpace(dir)) return yamlPath;
 
-            var segments = dir.Split(new[] { System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
+            var segments = dir.Split(new[]
+                {
+                    Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar
+                },
+                StringSplitOptions.RemoveEmptyEntries);
+
             string? candidate = null;
 
-            var idxCustomerRoot = Array.FindIndex(segments, p => p.Equals("KundenShops", StringComparison.OrdinalIgnoreCase));
+            var idxCustomerRoot = Array.FindIndex(segments,
+                p => p.Equals("KundenShops", StringComparison.OrdinalIgnoreCase));
             if (idxCustomerRoot >= 0 && idxCustomerRoot + 1 < segments.Length)
             {
                 candidate = segments[idxCustomerRoot + 1];
@@ -241,7 +281,8 @@ else
 
             if (candidate == null)
             {
-                var idxShopSystem = Array.FindIndex(segments, p => p.Equals("Shopsystem", StringComparison.OrdinalIgnoreCase));
+                var idxShopSystem = Array.FindIndex(segments,
+                    p => p.Equals("Shopsystem", StringComparison.OrdinalIgnoreCase));
                 if (idxShopSystem > 0)
                 {
                     candidate = segments[idxShopSystem - 1];
@@ -250,7 +291,7 @@ else
 
             if (candidate == null)
             {
-                for (int i = segments.Length - 1; i >= 0; i--)
+                for (var i = segments.Length - 1; i >= 0; i--)
                 {
                     var seg = segments[i];
                     if (!seg.Equals("Shop", StringComparison.OrdinalIgnoreCase))
@@ -263,7 +304,7 @@ else
 
             if (!string.IsNullOrWhiteSpace(candidate)) return candidate;
 
-            var baseName = System.IO.Path.GetFileName(dir);
+            var baseName = Path.GetFileName(dir);
             return string.IsNullOrWhiteSpace(baseName) ? dir : baseName;
         }
         catch
@@ -271,11 +312,12 @@ else
             return s.ShopYamlPath;
         }
     }
-    
+
     private async Task LoadAsync()
     {
         _isLoading = true;
         StateHasChanged();
+
         var setting = SelectedShopSetting;
         if (setting == null)
         {
@@ -297,13 +339,19 @@ else
         {
             return;
         }
-        
+
         var actions = new List<RepoAction>
         {
             new RepoAction
             {
                 Label = "Nach dem Klonen Builden",
-                ExecuteAsync = dir => ExtensionsService.BuildAsync(dir)
+                ExecuteAsync = dir =>
+                {
+                    var name = Path.GetFileName(dir);
+                    if (string.IsNullOrWhiteSpace(name))
+                        name = dir;
+                    return BuildExtensionWithDialogAsync(dir, name);
+                }
             },
             new RepoAction
             {
@@ -313,12 +361,20 @@ else
             new RepoAction
             {
                 Label = "Nach dem Klonen in Rider öffnen",
-                ExecuteAsync = dir => { OpenDirectoryInExplorer(dir); SolutionOpener.OpenSolutionInRider(dir); return Task.FromResult(true); }
+                ExecuteAsync = dir =>
+                {
+                    OpenDirectoryInExplorer(dir);
+                    SolutionOpener.OpenSolutionInRider(dir);
+                    return Task.FromResult(true);
+                }
             }
         };
 
-        var result = await DialogService.ShowCloneDialog("Extension-Repository klonen", Settings.ExtensionsRepositoryPath, actions);
-        
+        var result = await DialogService.ShowCloneDialog(
+            "Extension-Repository klonen",
+            Settings.ExtensionsRepositoryPath,
+            actions);
+
         if (!result)
         {
             await LoadAsync();
@@ -326,6 +382,26 @@ else
     }
 
     private async Task<bool> InstallExtension(string dir)
+    {
+        var info = new ExtensionInfo
+        {
+            Name = Path.GetFileName(dir),
+            Path = dir,
+            HasSolution = Directory.GetFiles(dir, "*.sln", SearchOption.AllDirectories).Length > 0,
+            HasProjects = Directory.GetFiles(dir, "*.csproj", SearchOption.AllDirectories).Length > 0,
+            HasShopProject = Directory.GetDirectories(dir, "*.Shop", SearchOption.AllDirectories).Length > 0,
+            HasDataProject = Directory.GetDirectories(dir, "*.Data", SearchOption.AllDirectories).Length > 0,
+            HasInstallProject = Directory.GetDirectories(dir, "*.Install", SearchOption.AllDirectories).Length > 0,
+            HasThemeV4 = Directory.GetDirectories(dir, "4SELLERS_Responsive_4", SearchOption.AllDirectories).Length > 0
+        };
+
+        return await InstallExtensionCoreAsync(info);
+    }
+
+    private async Task InstallExtension(ExtensionInfo info) =>
+        await InstallExtensionCoreAsync(info);
+
+    private async Task<bool> InstallExtensionCoreAsync(ExtensionInfo info)
     {
         try
         {
@@ -336,30 +412,33 @@ else
                 return false;
             }
 
-            var info = new ExtensionInfo
-            {
-                Name = Path.GetFileName(dir),
-                Path = dir,
-                HasSolution = Directory.GetFiles(dir, "*.sln", SearchOption.AllDirectories).Length > 0,
-                HasProjects = Directory.GetFiles(dir, "*.csproj", SearchOption.AllDirectories).Length > 0,
-                HasShopProject = Directory.GetDirectories(dir, "*.Shop", SearchOption.AllDirectories).Length > 0,
-                HasDataProject = Directory.GetDirectories(dir, "*.Data", SearchOption.AllDirectories).Length > 0,
-                HasInstallProject = Directory.GetDirectories(dir, "*.Install", SearchOption.AllDirectories).Length > 0,
-                HasThemeV4 = Directory.GetDirectories(dir, "4SELLERS_Responsive_4", SearchOption.AllDirectories).Length > 0
-            };
+            var title = $"Installation: {info.Name}";
+            var logBuffer = new LogBuffer();
+            logBuffer.AppendLine($"{title} gestartet...");
 
-            var (ok, log) = await info.InstallWithLogAsync(conn);
-            var title = ok ? $"Installation: {info.Name} (Erfolg)" : $"Installation: {info.Name} (Fehlgeschlagen)";
             var parameters = new DialogParameters<LogDialog>
             {
                 { x => x.Title, title },
-                { x => x.LogText, string.IsNullOrEmpty(log) ? "(Kein Logausgabe erhalten)" : log }
+                { x => x.LogBuffer, logBuffer }
             };
-            await DialogService.ShowAsync<LogDialog>("Installationsprotokoll", parameters, new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+
+            await DialogService.ShowAsync<LogDialog>(
+                "Installationsprotokoll",
+                parameters,
+                new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+
+            var outputProgress = new Progress<string>(s => logBuffer.Append(s));
+            var errorProgress = new Progress<string>(s => logBuffer.Append(s));
+
+            var (ok, log) = await info.InstallWithLogAsync(conn, outputProgress, errorProgress);
+
             if (!ok)
             {
-                Snackbar.Add(string.IsNullOrWhiteSpace(log) ? "Installation fehlgeschlagen." : log, Severity.Error);
+                Snackbar.Add(string.IsNullOrWhiteSpace(log)
+                    ? "Installation fehlgeschlagen."
+                    : log, Severity.Error);
             }
+
             return ok;
         }
         catch (Exception ex)
@@ -369,34 +448,43 @@ else
         }
     }
 
-    private async Task InstallExtension(ExtensionInfo info)
+    private async Task BuildExtensionFromMenuAsync(ExtensionInfo info) =>
+        await BuildExtensionWithDialogAsync(info.Path, info.Name);
+
+    private async Task<bool> BuildExtensionWithDialogAsync(string directory, string extensionName)
     {
         try
         {
-            var conn = SelectedShopSetting?.GetConnection();
-            if (conn == null)
-            {
-                Snackbar.Add("Keine Datenbankverbindung (shop.yaml) gefunden.", Severity.Warning);
-                return;
-            }
-            var (ok, log) = await info.InstallWithLogAsync(conn);
-            var title = ok ? $"Installation: {info.Name} (Erfolg)" : $"Installation: {info.Name} (Fehlgeschlagen)";
+            var logBuffer = new LogBuffer();
+            logBuffer.AppendLine($"Build für {extensionName} gestartet...");
+
             var parameters = new DialogParameters<LogDialog>
             {
-                { x => x.Title, title },
-                { x => x.LogText, string.IsNullOrEmpty(log) ? "(Kein Logausgabe erhalten)" : log }
+                { x => x.Title, $"Build: {extensionName}" },
+                { x => x.LogBuffer, logBuffer }
             };
-            await DialogService.ShowAsync<LogDialog>("Installationsprotokoll", parameters, new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+
+            await DialogService.ShowAsync<LogDialog>(
+                "Build-Protokoll",
+                parameters,
+                new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+
+            var outputProgress = new Progress<string>(s => logBuffer.Append(s));
+            var errorProgress = new Progress<string>(s => logBuffer.Append(s));
+
+            var ok = await ExtensionsService.BuildAsync(directory, outputProgress, errorProgress);
+
             if (!ok)
             {
-                Snackbar.Add(string.IsNullOrWhiteSpace(log) ? "Installation fehlgeschlagen." : log, Severity.Error);
+                Snackbar.Add($"Build für {extensionName} fehlgeschlagen.", Severity.Error);
             }
+
+            return ok;
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Installationsfehler: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Build-Fehler: {ex.Message}", Severity.Error);
+            return false;
         }
-    }}
-
-
-
+    }
+}
