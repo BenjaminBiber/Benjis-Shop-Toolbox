@@ -152,10 +152,21 @@ public class IisService
         try
         {
             using var manager = new ServerManager();
-            var pool = manager.ApplicationPools.FirstOrDefault(p => p.Name != site.Name);
+
+            // Standardmäßig die Root-Application als Referenz nehmen
+            var rootApp = site.Applications["/"];
+            var appPoolName = rootApp?.ApplicationPoolName;
+
+            if (string.IsNullOrWhiteSpace(appPoolName))
+            {
+                _notificationService.Error($"Kein Application Pool für Site '{site.Name}' gefunden.");
+                return;
+            }
+
+            var pool = manager.ApplicationPools[appPoolName];
             if (pool == null)
             {
-                _notificationService.Error($"AppPool '{site.Name}' nicht gefunden.");
+                _notificationService.Error($"AppPool '{appPoolName}' nicht gefunden.");
                 return;
             }
 
@@ -168,7 +179,10 @@ public class IisService
                 pool.Recycle();
             }
 
-            _notificationService.Success($"AppPool '{site.Name}' recycelt.");
+            if (showNotification)
+            {
+                _notificationService.Success($"AppPool '{appPoolName}' recycelt.");
+            }
         }
         catch (Exception ex)
         {
