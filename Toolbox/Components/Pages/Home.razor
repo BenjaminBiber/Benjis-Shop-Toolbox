@@ -11,6 +11,7 @@
 @using Microsoft.Web.Administration
 @using Toolbox.Services
 @using Toolbox.Data.Models.Extensions
+@inject EasterEggService EasterEggService
 @inject IisService IisService
 @using MudBlazor
 @implements IDisposable
@@ -54,12 +55,6 @@
                 <MudButton Color="Color.Success" Class="w-100" StartIcon="@Icons.Material.Filled.Start" Variant="Variant.Filled" OnClick="@IisService.StartIisApp">Start</MudButton>
                 <MudButton Color="Color.Warning" Class="w-100" StartIcon="@Icons.Material.Filled.RestartAlt" Variant="Variant.Filled" OnClick="@(() => IisService.RestartIisApp())">Neustart</MudButton>
                 <MudButton Color="Color.Error" Class="w-100" StartIcon="@Icons.Material.Filled.Stop" Variant="Variant.Filled" OnClick="@IisService.StopCurrentIisApp">Stop</MudButton>
-            
-                @if (showEasterEgg)
-                {
-                    <MudButton Color="Color.Error" Class="w-100" Style="opacity: 0 !important;" StartIcon="@Icons.Material.Filled.Stop" Variant="Variant.Filled" OnClick="ShowDialogEasterEgg">Stop</MudButton>
-                }
-                
             </div>
         </div>
 
@@ -227,7 +222,6 @@
     private bool _isPopOverOpen = false;
     private HashSet<LogLevel> _selectedLevels = new(Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All));
     private HashSet<MessageType> _selectedMessageTypes = new(Enum.GetValues<MessageType>());
-    private bool showEasterEgg = false;
     
     private IEnumerable<LogEntry> DisplayLogs => FilterAndBundle(_displayLogs);
 
@@ -245,9 +239,9 @@
 
     private IEnumerable<LogEntry> FilterAndBundle(IEnumerable<LogEntry> source)
     {
-        if (_searchText.ToLower() == "andy ist der beste")
+        if (!EasterEggService.IsSecretUnlocked && string.Equals(_searchText, "andy ist der beste", StringComparison.OrdinalIgnoreCase))
         {
-            showEasterEgg = true;
+            EasterEggService.UnlockSecret();
             _searchText = string.Empty;
             StateHasChanged();
         }
@@ -309,8 +303,8 @@
             FullWidth = true,
             MaxWidth = MaxWidth.Medium
         };
-        await DialogService.ShowAsync<EasterEggDialog>("Glücksrad", options);
-        showEasterEgg = false;
+        await DialogService.ShowAsync<EasterEggDialog>("Gluecksrad", options);
+        EasterEggService.MarkEasterEggCompleted();
     }
     
     private MarkupString Highlight(string message)

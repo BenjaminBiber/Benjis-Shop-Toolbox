@@ -72,6 +72,7 @@ builder.Services.AddScoped<IAppInfoService, AppInfoService>();
 builder.Services.AddScoped<IisService>();
 builder.Services.AddScoped<DatabaseConnectionService>();
 builder.Services.AddScoped<SqlBuilder>();
+builder.Services.AddScoped<EasterEggService>();
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
