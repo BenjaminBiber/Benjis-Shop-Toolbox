@@ -62,6 +62,54 @@
                 
             </div>
         </div>
+
+        @if (_onlySinceRestart && (_loadedExtensions.Any() || _excludedExtensions.Any()))
+        {
+            <div class="row mt-5">
+                <div class="col-12">
+                    <div class="p-2 d-flex flex-column align-items-start justify-content-center">
+                        @if (_loadedExtensions.Any())
+                        {
+                            <MudText Typo="Typo.body2" Class="mb-1 fw-bold">
+                                @(_extensionsSinceRestart
+                                    ? "Geladene Extensions seit letztem Neustart"
+                                    : _loadedExtensionsTimestamp.HasValue
+                                        ? $"Zuletzt geladene Extensions ({_loadedExtensionsTimestamp:dd.MM.yyyy HH:mm})"
+                                        : "Zuletzt geladene Extensions")
+                            </MudText>
+                            @foreach (var ext in _loadedExtensions)
+                            {
+                                <MudChip T="string" Class="me-1 w-100 mb-1"
+                                         Color="Color.Primary"
+                                         Variant="Variant.Outlined"
+                                         OnClick="@(() => ShowExtensionLog(ext, false))">
+                                    @ext
+                                </MudChip>
+                            }
+                        }
+                        @if (_excludedExtensions.Any())
+                        {
+                            <MudText Typo="Typo.body2" Class="mt-3 mb-1 fw-bold">
+                                @(_excludedSinceRestart
+                                    ? "Nicht geladene Extensions seit letztem Neustart"
+                                    : _excludedExtensionsTimestamp.HasValue
+                                        ? $"Zuletzt nicht geladene Extensions ({_excludedExtensionsTimestamp:dd.MM.yyyy HH:mm})"
+                                        : "Nicht geladene Extensions")
+                            </MudText>
+                            @foreach (var ext in _excludedExtensions)
+                            {
+                                <MudChip T="string" Class="me-1 w-100 mb-1"
+                                         Color="Color.Error"
+                                         Variant="Variant.Outlined"
+                                         OnClick="@(() => ShowExtensionLog(ext, true))">
+                                    @ext
+                                </MudChip>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+        }
     </div>
 
     @*FILTER AND SEARCH*@
@@ -166,6 +214,14 @@
     private bool _isLoading;
     private List<LogEntry> _logs = new();
     private List<LogEntry> _displayLogs = new();
+    private readonly List<string> _loadedExtensions = new();
+    private readonly List<string> _excludedExtensions = new();
+    private readonly Dictionary<string, LogEntry> _loadedExtensionLogs = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, LogEntry> _excludedExtensionLogs = new(StringComparer.OrdinalIgnoreCase);
+    private DateTime? _loadedExtensionsTimestamp;
+    private DateTime? _excludedExtensionsTimestamp;
+    private bool _extensionsSinceRestart;
+    private bool _excludedSinceRestart;
     private string _searchText = string.Empty;
     private LogService? _logService;
     private bool _isPopOverOpen = false;
@@ -323,6 +379,7 @@
         var since = reload == ReloadOption.AlleLogs ? DateTime.MinValue  : _onlySinceRestart ? _lastShopRestart : _appStartTime;
         var logs = await Task.Run(() => _logService?.GetLogs(since, LogLevel.All) ?? Enumerable.Empty<LogEntry>());
         _logs = logs.ToList();
+        await UpdateLoadedExtensions();
         _displayLogs = _logs
             .Where(l => _selectedLevels.Contains(l.Level))
             .ToList();
@@ -334,6 +391,158 @@
     {
         reload = option;
         await LoadLogs();
+    }
+
+    private async Task UpdateLoadedExtensions()
+    {
+        _loadedExtensions.Clear();
+        _excludedExtensions.Clear();
+        _loadedExtensionLogs.Clear();
+        _excludedExtensionLogs.Clear();
+        _loadedExtensionsTimestamp = null;
+        _excludedExtensionsTimestamp = null;
+        _extensionsSinceRestart = false;
+        _excludedSinceRestart = false;
+
+        if (_logService == null)
+        {
+            return;
+        }
+
+        var loadedFound = false;
+        var excludedFound = false;
+
+        if (_logs.Any())
+        {
+            loadedFound = TryExtractExtensions(
+                _logs,
+                @"Completely loaded and initialized extensions:\s*(?<exts>.+)",
+                _loadedExtensions,
+                _loadedExtensionLogs,
+                out var loadedTs);
+
+            if (loadedFound)
+            {
+                _loadedExtensionsTimestamp = loadedTs;
+                _extensionsSinceRestart = _onlySinceRestart;
+            }
+
+            excludedFound = TryExtractExtensions(
+                _logs,
+                @"Excluded extensions:\s*(?<exts>.+)",
+                _excludedExtensions,
+                _excludedExtensionLogs,
+                out var excludedTs);
+
+            if (excludedFound)
+            {
+                _excludedExtensionsTimestamp = excludedTs;
+                _excludedSinceRestart = _onlySinceRestart;
+            }
+        }
+
+        // Fallback nur relevant, wenn wir "seit letztem Neustart" anzeigen
+        if (!_onlySinceRestart)
+        {
+            return;
+        }
+
+        if (loadedFound && excludedFound)
+        {
+            return;
+        }
+
+        var allLogs = await Task.Run(() => _logService.GetLogs(DateTime.MinValue, LogLevel.All).ToList());
+
+        if (!allLogs.Any())
+        {
+            return;
+        }
+
+        if (!loadedFound)
+        {
+            loadedFound = TryExtractExtensions(
+                allLogs,
+                @"Completely loaded and initialized extensions:\s*(?<exts>.+)",
+                _loadedExtensions,
+                _loadedExtensionLogs,
+                out var loadedTs);
+
+            if (loadedFound)
+            {
+                _loadedExtensionsTimestamp = loadedTs;
+                _extensionsSinceRestart = false;
+            }
+        }
+
+        if (!excludedFound)
+        {
+            excludedFound = TryExtractExtensions(
+                allLogs,
+                @"Excluded extensions:\s*(?<exts>.+)",
+                _excludedExtensions,
+                _excludedExtensionLogs,
+                out var excludedTs);
+
+            if (excludedFound)
+            {
+                _excludedExtensionsTimestamp = excludedTs;
+                _excludedSinceRestart = false;
+            }
+        }
+
+          bool TryExtractExtensions(
+              IEnumerable<LogEntry> source,
+              string pattern,
+              List<string> target,
+              Dictionary<string, LogEntry> map,
+              out DateTime? timestamp)
+        {
+            timestamp = null;
+
+            var regex = new System.Text.RegularExpressions.Regex(pattern);
+
+            foreach (var entry in source)
+            {
+                var text = entry.ParsedMessage?.GetFormattedMessage(_selectedMessageTypes);
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    text = entry.Message;
+                }
+
+                if (string.IsNullOrWhiteSpace(text))
+                    continue;
+
+                var match = regex.Match(text);
+                if (!match.Success)
+                    continue;
+
+                var list = match.Groups["exts"].Value;
+                if (string.IsNullOrWhiteSpace(list))
+                    continue;
+
+                var extensions = list
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(e => e.Trim())
+                    .Where(e => !string.IsNullOrWhiteSpace(e));
+
+                foreach (var ext in extensions)
+                {
+                    if (!target.Contains(ext, StringComparer.OrdinalIgnoreCase))
+                    {
+                        target.Add(ext);
+                    }
+
+                    // immer den aktuellsten Logeintrag merken
+                    map[ext] = entry;
+                }
+
+                timestamp = entry.Time;
+                return target.Any();
+            }
+
+            return false;
+        }
     }
 
     private void StartTimer()
@@ -373,7 +582,12 @@
 
     private async Task ShowLogDetails(TableRowClickEventArgs<LogEntry> args)
     {
-        var parameters = new DialogParameters<LogEntryDialog> { {x => x.Entry, args.Item} };
+        await ShowLogDetails(args.Item);
+    }
+
+    private async Task ShowLogDetails(LogEntry entry)
+    {
+        var parameters = new DialogParameters<LogEntryDialog> { {x => x.Entry, entry} };
         var options = new DialogOptions
         {
             CloseButton = true,
@@ -382,6 +596,21 @@
             BackdropClick = true,
         };
         await DialogService.ShowAsync<LogEntryDialog>("", parameters, options);
+    }
+
+    private async Task ShowExtensionLog(string extensionName, bool excluded)
+    {
+        if (string.IsNullOrWhiteSpace(extensionName))
+            return;
+
+        var map = excluded ? _excludedExtensionLogs : _loadedExtensionLogs;
+        if (!map.TryGetValue(extensionName, out var entry))
+        {
+            Snackbar.Add("Kein Logeintrag für diese Extension gefunden.", Severity.Info);
+            return;
+        }
+
+        await ShowLogDetails(entry);
     }
 
     private Color GetColor(LogLevel level) => level switch
