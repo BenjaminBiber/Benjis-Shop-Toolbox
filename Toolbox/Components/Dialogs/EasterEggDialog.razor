@@ -294,7 +294,8 @@
             if (_segments.Count == 0) return;
 
             var currentMod = ((_rotationDeg % 360.0) + 360.0) % 360.0;
-            var centerAngle = (360.0 - currentMod + 360.0) % 360.0;
+            var pointerAngle = 180.0;
+            var centerAngle = (pointerAngle - currentMod + 360.0) % 360.0;
             var index = (int)Math.Floor(centerAngle / _segmentAngle);
             if (index < 0 || index >= _segments.Count)
             {
