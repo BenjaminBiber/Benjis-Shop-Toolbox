@@ -22,6 +22,8 @@ public class ToolboxSettings
     public bool DeleteBundlerOnShopRestart { get; set; }
     public bool DeleteAssetsOnShopRestart { get; set; }
     public long TrayIconIisSite { get; set; }
+    public string? PinnedExtensionGroups { get; set; }
+    public string? PinnedThemeGroups { get; set; }
     public List<ShopSetting> ShopSettingsList { get; set; }
 
 
@@ -42,6 +44,8 @@ public class ToolboxSettings
         ShopSettingsList = new List<ShopSetting>();
         DeleteBundlerOnShopRestart = false;
         TrayIconIisSite = long.MinValue;
+        PinnedExtensionGroups = null;
+        PinnedThemeGroups = null;
     }
 
     public ShopSetting? GetShopSettingForCurrentSite()

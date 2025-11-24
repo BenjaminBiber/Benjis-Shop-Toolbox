@@ -91,7 +91,17 @@
                 </HeaderContent>
                 <GroupHeaderTemplate>
                     <MudTh Class="mud-table-cell-custom-group" colspan="7">
-                        <MudText Class="fw-bold" Typo="Typo.h6">@($"{context.Key}")</MudText>
+                        <div class="d-flex align-items-center">
+                            <MudText Class="fw-bold me-auto" Typo="Typo.h6">@($"{context.Key}")</MudText>
+                            @{
+                                var groupKey = context.Key?.ToString() ?? string.Empty;
+                                var isPinned = _pinnedExtensionGroups.Contains(groupKey);
+                            }
+                            <MudIconButton Icon="@(isPinned ? Icons.Material.Filled.PushPin : Icons.Material.Outlined.PushPin)"
+                                           Color="@(isPinned ? Color.Primary : Color.Default)"
+                                           Size="Size.Small"
+                                           OnClick="@(() => TogglePinnedExtensionGroup(groupKey))" />
+                        </div>
                     </MudTh>
                 </GroupHeaderTemplate>
                 <RowTemplate>
@@ -165,7 +175,8 @@ else
         ?? Settings.GetShopSettingForCurrentSite();
     private MudTable<ExtensionInfo> _table = null!;
     private string _searchText = string.Empty;
-
+    private readonly HashSet<string> _pinnedExtensionGroups = new(StringComparer.OrdinalIgnoreCase);
+  
     private TableGroupDefinition<ExtensionInfo> _groupDefinition = new()
     {
         GroupName = "Group",
@@ -174,14 +185,16 @@ else
         Selector = e => e.GetCustomerName(),
         IsInitiallyExpanded = false
     };
-
+  
     protected override async Task OnInitializedAsync()
     {
         var current = Settings.GetShopSettingForCurrentSite();
         _selectedShopPath = current?.ShopYamlPath ?? string.Empty;
 
+        LoadPinnedExtensionGroups();
+  
         await EnsureShopSelectedAsync();
-
+  
         await LoadAsync();
     }
 
@@ -208,28 +221,28 @@ else
     private async Task SearchChanged(string? searchValue)
     {
         _searchText = searchValue ?? string.Empty;
-
+  
         var groups = _groupedExtensions
             .GroupBy(t => t.GetCustomerName() ?? string.Empty)
             .ToList();
-
+  
         bool MatchesSearch(ExtensionInfo i) =>
             string.IsNullOrWhiteSpace(_searchText)
             || (i.Name?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ?? false)
             || (i.GetCustomerName()?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ?? false);
-
+  
         var visibleGroups = groups
             .Where(g => g.Any(MatchesSearch))
             .ToList();
-
+  
         if (visibleGroups.Count == 1)
         {
             _table.ExpandAllGroups();
-
+  
             var firstMatch = visibleGroups[0]
                                  .FirstOrDefault(MatchesSearch)
                              ?? visibleGroups[0].FirstOrDefault();
-
+  
             if (firstMatch is not null)
                 await _table.ScrollToItemAsync(firstMatch);
         }
@@ -237,6 +250,56 @@ else
         {
             _table.CollapseAllGroups();
         }
+    }
+
+    private void LoadPinnedExtensionGroups()
+    {
+        _pinnedExtensionGroups.Clear();
+        var raw = Settings.PinnedExtensionGroups;
+        if (string.IsNullOrWhiteSpace(raw))
+            return;
+
+        foreach (var part in raw.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var key = part.Trim();
+            if (!string.IsNullOrWhiteSpace(key))
+            {
+                _pinnedExtensionGroups.Add(key);
+            }
+        }
+    }
+
+    private void ApplyPinnedExtensionsOrder()
+    {
+        if (_groupedExtensions == null)
+            return;
+
+        _groupedExtensions = _groupedExtensions
+            .OrderByDescending(e => _pinnedExtensionGroups.Contains(e.GetCustomerName()))
+            .ThenBy(e => e.GetCustomerName(), StringComparer.OrdinalIgnoreCase)
+            .ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private void TogglePinnedExtensionGroup(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+            return;
+
+        if (_pinnedExtensionGroups.Contains(key))
+        {
+            _pinnedExtensionGroups.Remove(key);
+        }
+        else
+        {
+            _pinnedExtensionGroups.Add(key);
+        }
+
+        Settings.PinnedExtensionGroups = string.Join(";", _pinnedExtensionGroups);
+        SettingsService.SaveSettings();
+
+        ApplyPinnedExtensionsOrder();
+        StateHasChanged();
     }
 
     private bool FilterThemes(ExtensionInfo info)
@@ -360,7 +423,7 @@ else
     {
         _isLoading = true;
         StateHasChanged();
-
+  
         var setting = SelectedShopSetting;
         if (setting == null)
         {
@@ -369,8 +432,9 @@ else
             StateHasChanged();
             return;
         }
-
+  
         _groupedExtensions = ExtensionsService.GetExtensions().ToList();
+        ApplyPinnedExtensionsOrder();
         _isLoading = false;
         StateHasChanged();
     }
