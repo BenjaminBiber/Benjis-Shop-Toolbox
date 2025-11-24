@@ -71,7 +71,19 @@
                 <MudTh>öffnen</MudTh>
             </HeaderContent>
             <GroupHeaderTemplate>
-                <MudTh Class="mud-table-cell-custom-group" colspan="5"><MudText Class="fw-bold" Typo="Typo.h6">@($"{context.Key}")</MudText></MudTh>
+                <MudTh Class="mud-table-cell-custom-group" colspan="5">
+                    <div class="d-flex align-items-center">
+                        <MudText Class="fw-bold me-auto" Typo="Typo.h6">@($"{context.Key}")</MudText>
+                        @{
+                            var groupKey = context.Key?.ToString() ?? string.Empty;
+                            var isPinned = _pinnedThemeGroups.Contains(groupKey);
+                        }
+                        <MudIconButton Icon="@(isPinned ? Icons.Material.Filled.PushPin : Icons.Material.Outlined.PushPin)"
+                                       Color="@(isPinned ? Color.Primary : Color.Default)"
+                                       Size="Size.Small"
+                                       OnClick="@(() => TogglePinnedThemeGroup(groupKey))" />
+                    </div>
+                </MudTh>
             </GroupHeaderTemplate>
             <RowTemplate>
                 <MudTd DataLabel="Name">@context.Name</MudTd>
@@ -118,6 +130,7 @@ else
         ?? Settings.GetShopSettingForCurrentSite();
     private MudTable<ThemeInfo> _table = null!;
     private string _searchText = string.Empty;
+    private readonly HashSet<string> _pinnedThemeGroups = new(StringComparer.OrdinalIgnoreCase);
     
     private TableGroupDefinition<ThemeInfo> _groupDefinition = new()
     {
@@ -132,6 +145,8 @@ else
     {
         var current = Settings.GetShopSettingForCurrentSite();
         _selectedShopPath = current?.ShopYamlPath ?? string.Empty;
+
+        LoadPinnedThemeGroups();
 
         await EnsureShopSelectedAsync();
 
@@ -242,6 +257,7 @@ else
         }
 
         _groupedThemes = ThemeService.GetThemes(setting.ThemeFolderPath ?? string.Empty, setting.ShopYamlPath ?? string.Empty).ToList();
+        ApplyPinnedThemeOrder();
         _isLoading = false;
         StateHasChanged();
     }
@@ -325,6 +341,56 @@ else
         {
             await LoadAsync();
         }
+    }
+
+    private void LoadPinnedThemeGroups()
+    {
+        _pinnedThemeGroups.Clear();
+        var raw = Settings.PinnedThemeGroups;
+        if (string.IsNullOrWhiteSpace(raw))
+            return;
+
+        foreach (var part in raw.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var key = part.Trim();
+            if (!string.IsNullOrWhiteSpace(key))
+            {
+                _pinnedThemeGroups.Add(key);
+            }
+        }
+    }
+
+    private void ApplyPinnedThemeOrder()
+    {
+        if (_groupedThemes == null)
+            return;
+
+        _groupedThemes = _groupedThemes
+            .OrderByDescending(t => _pinnedThemeGroups.Contains(t.Repo))
+            .ThenBy(t => t.Repo, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private void TogglePinnedThemeGroup(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+            return;
+
+        if (_pinnedThemeGroups.Contains(key))
+        {
+            _pinnedThemeGroups.Remove(key);
+        }
+        else
+        {
+            _pinnedThemeGroups.Add(key);
+        }
+
+        Settings.PinnedThemeGroups = string.Join(";", _pinnedThemeGroups);
+        SettingsService.SaveSettings();
+
+        ApplyPinnedThemeOrder();
+        StateHasChanged();
     }
     
     private string GetShopDisplayName(ShopSetting s)
