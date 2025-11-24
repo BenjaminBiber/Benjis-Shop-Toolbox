@@ -6,7 +6,7 @@
 
 <MudDialog DefaultFocus="DefaultFocus.None">
     <TitleContent>
-        <MudText Typo="Typo.h6">Aktionen nach dem Klonen</MudText>
+        <MudText Typo="Typo.h6">@(!string.IsNullOrWhiteSpace(ItemName) ? ItemName : "Aktionen nach dem Klonen")</MudText>
     </TitleContent>
 
     <DialogContent>
@@ -58,7 +58,11 @@
     </DialogContent>
 
     <DialogActions>
-        <MudButton Color="Color.Primary" Disabled="_isRunning" OnClick="Close">Schließen</MudButton>
+        <MudButton Color="Color.Primary"
+                   Disabled="_isRunning"
+                   OnClick="Close">
+            @(AutoCloseOnSuccess ? "Fortfahren" : "Schließen")
+        </MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -68,6 +72,8 @@
     [Parameter] public string GitUrl { get; set; } = string.Empty;
     [Parameter] public string DestinationRoot { get; set; } = string.Empty;
     [Parameter] public List<ActionOption> Actions { get; set; } = new();
+    [Parameter] public bool AutoCloseOnSuccess { get; set; }
+    [Parameter] public string ItemName { get; set; } = string.Empty;
 
     private enum ActionStatus
     {
@@ -144,6 +150,7 @@
             }
             catch
             {
+                // ignore JS errors
             }
         }
     }
@@ -249,6 +256,15 @@
 
         _isRunning = false;
         StateHasChanged();
+
+        if (AutoCloseOnSuccess)
+        {
+            var hasFailure = _runs.Any(r => r.Status == ActionStatus.Failed);
+            if (!hasFailure)
+            {
+                MudDialog.Close();
+            }
+        }
     }
 
     private void Toggle(ActionRun run)

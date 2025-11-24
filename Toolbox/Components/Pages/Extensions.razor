@@ -463,7 +463,7 @@ else
         var result = await DialogService.ShowCloneDialog(
             "Extension-Repository klonen",
             Settings.ExtensionsRepositoryPath,
-            actions);
+            actions, true);
 
         if (!result)
         {
