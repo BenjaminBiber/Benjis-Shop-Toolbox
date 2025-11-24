@@ -7,7 +7,33 @@
 <MudDialog>
     <DialogContent>
         <MudText Typo="Typo.h6" Class="mb-4">@Title</MudText>
-        <MudTextField @bind-Value="_gitUrl" Label="Git URL" Variant="Variant.Filled" Class="mb-2" />
+        @if (AllowMultiple)
+        {
+            @for (var i = 0; i < _gitUrls.Count; i++)
+            {
+                var index = i;
+                <div class="d-flex align-items-center mb-2">
+                    <MudTextField @bind-Value="_gitUrls[index]"
+                                  Label="@($"Git URL {index + 1}")"
+                                  Variant="Variant.Filled"
+                                  Class="flex-grow-1 me-2" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Color="Color.Default"
+                                   Disabled="_gitUrls.Count == 1"
+                                   OnClick="@(() => RemoveGitUrl(index))" />
+                </div>
+            }
+            <MudButton Variant="Variant.Text"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="AddGitUrl">
+                Weitere URL
+            </MudButton>
+        }
+        else
+        {
+            <MudTextField @bind-Value="_gitUrl" Label="Git URL" Variant="Variant.Filled" Class="mb-2" />
+        }
 
         <MudText Class="mt-2 mb-1" Typo="Typo.subtitle2">Aktionen nach dem Klonen</MudText>
         <div class="row d-flex align-items-center justify-content-center">
@@ -39,9 +65,11 @@
     [Parameter] public string DestinationRoot { get; set; } = string.Empty;
     [Parameter] public List<RepoAction> Actions { get; set; } = new();
     [Parameter] public string Title { get; set; } = "Repository klonen";
+    [Parameter] public bool AllowMultiple { get; set; }
 
     private readonly List<ActionOption> _options = new();
     private string _gitUrl = string.Empty;
+    private readonly List<string> _gitUrls = new() { string.Empty };
     private bool _busy;
 
     protected override void OnInitialized()
@@ -58,13 +86,56 @@
         }
     }
 
-    private async Task Clone()
+    private void AddGitUrl()
     {
-        if (string.IsNullOrWhiteSpace(_gitUrl))
+        _gitUrls.Add(string.Empty);
+    }
+
+    private void RemoveGitUrl(int index)
+    {
+        if (index < 0 || index >= _gitUrls.Count)
         {
-            Snackbar.Add("Bitte eine Git URL angeben.", Severity.Warning);
             return;
         }
+
+        if (_gitUrls.Count == 1)
+        {
+            _gitUrls[0] = string.Empty;
+            return;
+        }
+
+        _gitUrls.RemoveAt(index);
+    }
+
+    private async Task Clone()
+    {
+        List<string> urls;
+
+        if (AllowMultiple)
+        {
+            urls = _gitUrls
+                .Select(u => u?.Trim())
+                .Where(u => !string.IsNullOrWhiteSpace(u))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (urls.Count == 0)
+            {
+                Snackbar.Add("Bitte mindestens eine Git URL angeben.", Severity.Warning);
+                return;
+            }
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(_gitUrl))
+            {
+                Snackbar.Add("Bitte eine Git URL angeben.", Severity.Warning);
+                return;
+            }
+
+            urls = new List<string> { _gitUrl.Trim() };
+        }
+
         if (string.IsNullOrWhiteSpace(DestinationRoot))
         {
             Snackbar.Add("Kein Zielordner angegeben.", Severity.Error);
@@ -77,23 +148,36 @@
         {
             var selected = _options.Where(o => o.Selected).ToList();
 
-            var parameters = new DialogParameters<CloneActionsDialog>
-            {
-                { x => x.GitUrl, _gitUrl },
-                { x => x.DestinationRoot, DestinationRoot },
-                { x => x.Actions, selected }
-            };
+            var autoClose = AllowMultiple && urls.Count > 1;
 
-            var opts = new DialogOptions
+            foreach (var url in urls)
             {
-                MaxWidth = MaxWidth.Large,
-                FullWidth = true,
-                CloseButton = true,
-                BackdropClick = true
-            };
+                var itemName = autoClose ? Git.GetRepoName(url) : string.Empty;
+                if (string.IsNullOrWhiteSpace(itemName))
+                {
+                    itemName = url;
+                }
 
-            var dlg = await DialogService.ShowAsync<CloneActionsDialog>("Aktionen nach dem Klonen", parameters, opts);
-            await dlg.Result;
+                var parameters = new DialogParameters<CloneActionsDialog>
+                {
+                    { x => x.GitUrl, url },
+                    { x => x.DestinationRoot, DestinationRoot },
+                    { x => x.Actions, selected },
+                    { x => x.AutoCloseOnSuccess, autoClose },
+                    { x => x.ItemName, itemName }
+                };
+
+                var opts = new DialogOptions
+                {
+                    MaxWidth = MaxWidth.Large,
+                    FullWidth = true,
+                    CloseButton = true,
+                    BackdropClick = true
+                };
+
+                var dlg = await DialogService.ShowAsync<CloneActionsDialog>("Aktionen nach dem Klonen", parameters, opts);
+                await dlg.Result;
+            }
 
             MudDialog.Close(DialogResult.Ok(true));
         }
@@ -106,4 +190,3 @@
 
     private void Cancel() => MudDialog.Cancel();
 }
-

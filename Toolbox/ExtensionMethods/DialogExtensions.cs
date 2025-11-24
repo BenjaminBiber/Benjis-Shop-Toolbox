@@ -6,13 +6,19 @@ namespace Toolbox.ExtensionMethods;
 
 public static class DialogExtensions
 {
-    public static async Task<bool> ShowCloneDialog(this IDialogService dialogService, string title, string destination, List<RepoAction> actions)
+    public static async Task<bool> ShowCloneDialog(
+        this IDialogService dialogService,
+        string title,
+        string destination,
+        List<RepoAction> actions,
+        bool allowMultiple = false)
     {
         var parameters = new DialogParameters<CloneRepoDialog>()
         {
             {x => x.DestinationRoot, destination},
             {x => x.Title, title},
-            {x => x.Actions, actions}
+            {x => x.Actions, actions},
+            {x => x.AllowMultiple, allowMultiple}
         };
         var options = new DialogOptions()
         {
