@@ -134,8 +134,11 @@
                         <MudMenu Icon="@Icons.Material.Filled.Build" Color="Color.Error">
                             <MudMenuItem Label="Extension Builden"
                                          OnClick="@(() => BuildExtensionFromMenuAsync(context))" />
-                            <MudMenuItem Label="Extension Datenbank Installieren"
-                                         OnClick="@(() => InstallExtension(context))" />
+                            @if (context.HasDataProject)
+                            {
+                                <MudMenuItem Label="Extension Datenbank Installieren"
+                                             OnClick="@(() => InstallExtension(context))" />   
+                            }b n
                         </MudMenu>
                     </MudTd>
                     <MudTd DataLabel="Öffnen">
