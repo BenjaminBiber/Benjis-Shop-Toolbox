@@ -5,6 +5,9 @@
 @using Microsoft.Web.Administration
 @using System.IO
 @using Toolbox.Components.Settings
+@using Toolbox.Components.MiniGames
+@inject EasterEggService EasterEggService
+@implements IDisposable
 
 <div class="settings-root">
   <aside class="settings-nav">
@@ -13,6 +16,10 @@
       <MudListItem Class="m-0" T="object" Selected="@(_section==SettingsSection.General)" Icon="@Icons.Material.Filled.Tune" OnClick="@(()=>Select(SettingsSection.General))">Allgemein</MudListItem>
       <MudListItem Class="m-0" T="object" Selected="@(_section==SettingsSection.Logs)" Icon="@Icons.Material.Filled.Message" OnClick="@(()=>Select(SettingsSection.Logs))">Logs</MudListItem>
       <MudListItem Class="m-0" T="object" Selected="@(_section==SettingsSection.IIS)" Icon="@Icons.Material.Filled.Computer" OnClick="@(()=>Select(SettingsSection.IIS))">IIS</MudListItem>
+      @if (EasterEggService.IsSecretUnlocked)
+      {
+          <MudListItem Class="m-0" T="object" Selected="@(_section==SettingsSection.Pong)" Icon="@Icons.Material.Filled.SportsEsports" OnClick="@(()=>Select(SettingsSection.Pong))">Pong</MudListItem>
+      }
     </MudList>
   </aside>
   <section class="settings-content">
@@ -28,20 +35,49 @@
         case SettingsSection.IIS:
             <IisSettings />
             break;
+        case SettingsSection.Pong:
+            <Pong />
+            break;
     }
   </section>
 </div>
 
 @code {
-    private enum SettingsSection {General, Logs, IIS }
+    private enum SettingsSection {General, Logs, IIS, Pong }
     private SettingsSection _section = SettingsSection.General;
-    private void Select(SettingsSection s) => _section = s;
+    protected override void OnInitialized()
+    {
+        EasterEggService.StateChanged += HandleSecretStateChanged;
+    }
+
+    private void Select(SettingsSection s)
+    {
+        if (s == SettingsSection.Pong && !EasterEggService.IsSecretUnlocked)
+        {
+            return;
+        }
+        _section = s;
+    }
     private string GetSectionTitle() => _section switch
     {
         SettingsSection.General => "Allgemein",
         SettingsSection.IIS => "IIS",
         SettingsSection.Logs => "Logs",
+        SettingsSection.Pong => "Pong",
         _ => "Einstellungen"
     };
-}
 
+    private void HandleSecretStateChanged()
+    {
+        if (_section == SettingsSection.Pong && !EasterEggService.IsSecretUnlocked)
+        {
+            _section = SettingsSection.General;
+        }
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        EasterEggService.StateChanged -= HandleSecretStateChanged;
+    }
+}
