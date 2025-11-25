@@ -17,17 +17,14 @@ public class ExtensionInfo
 
     public string GetCustomerName()
     {
-        var parts = Name.Split(".");
-        if (parts.Length > 2)
-        {
-            return parts[parts.Length - 2];
-        }
+        if (string.IsNullOrWhiteSpace(Name))
+            return string.Empty;
 
-        if (parts.Length > 1 && parts.Length < 3)
-        {
-            return parts[parts.Length - 1];
-        }
-        return parts.First();
+        var lastDotIndex = Name.LastIndexOf('.');
+        if (lastDotIndex <= 0)
+            return Name;
+
+        return Name.Substring(0, lastDotIndex);
     }
 
     public async Task<bool> InstallAsync(DatabaseConnection connection, INotificationService notificationService)
