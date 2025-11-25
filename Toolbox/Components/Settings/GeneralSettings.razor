@@ -6,6 +6,7 @@
 @inject NotificationService NotificationService
 @inject ISnackbar Snackbar
 @inject UpdaterService UpdaterSvc
+@using System.Linq
 
 <div class="row g-0 pl-4 flex-column">
     <div class="col-12 mt-3 d-flex gap-1 align-items-center justify-content-center">
@@ -21,8 +22,32 @@
         <MudDivider Class="w-auto"></MudDivider>
     </div>
     <div class="col-12 d-flex flex-column gap-2">
-        <MudTextField ValueChanged="(string i) => SettingsService.SaveSettingChanges(x => x.ThemeRepositoryPath = i, NotificationService)" Value="Setting.ThemeRepositoryPath" Label="Repo Pfad" Variant="Variant.Text" Class="pl-4"
-                      Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseRepo"/>
+        <div class="pl-4 d-flex flex-column gap-2">
+            <MudText Typo="Typo.caption" Class="fw-bold">Repo Pfade</MudText>
+            <MudChipSet T="string" Class="d-flex flex-wrap gap-1">
+                @if (_themePaths.Any())
+                {
+                    @foreach (var path in _themePaths)
+                    {
+                        <MudChip T="string"
+                                 Variant="Variant.Outlined"
+                                 Color="Color.Primary"
+                                 OnClose="@(() => RemoveThemePath(path))"
+                                 Closeable="true">@path</MudChip>
+                    }
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption" Class="text-secondary">Keine Pfade hinterlegt</MudText>
+                }
+            </MudChipSet>
+            <div class="d-flex gap-2">
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="AddThemePath">Pfad hinzufügen</MudButton>
+            </div>
+        </div>
         <MudCheckBox Class="p-0" ValueChanged="(bool i) => SettingsService.SaveSettingChanges(x => x.RestartShopOnThemeChange = i, NotificationService)" Value="Setting.RestartShopOnThemeChange" T="bool" Color="Color.Primary">Shop bei Theme-Wechsel neustarten</MudCheckBox>
     </div>
 
@@ -31,8 +56,32 @@
         <MudDivider Class="w-auto"></MudDivider>
     </div>
     <div class="col-12 d-flex flex-column gap-2">
-        <MudTextField ValueChanged="(string i) => SettingsService.SaveSettingChanges(x => x.ExtensionsRepositoryPath = i, NotificationService)" Value="Setting.ExtensionsRepositoryPath" Label="Extensions Repo Pfad" Variant="Variant.Text" Class="pl-4"
-                      Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseExtensionsRepo"/>
+        <div class="pl-4 d-flex flex-column gap-2">
+            <MudText Typo="Typo.caption" Class="fw-bold">Repo Pfade</MudText>
+            <MudChipSet T="string" Class="d-flex flex-wrap gap-1">
+                @if (_extensionPaths.Any())
+                {
+                    @foreach (var path in _extensionPaths)
+                    {
+                        <MudChip T="string"
+                                 Variant="Variant.Outlined"
+                                 Color="Color.Primary"
+                                 OnClose="@(() => RemoveExtensionPath(path))"
+                                 Closeable="true">@path</MudChip>
+                    }
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption" Class="text-secondary">Keine Pfade hinterlegt</MudText>
+                }
+            </MudChipSet>
+            <div class="d-flex gap-2">
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="AddExtensionPath">Pfad hinzufügen</MudButton>
+            </div>
+        </div>
     </div>
     
     <div class="col-12 mt-3 d-flex gap-1 align-items-center justify-content-center">
@@ -65,28 +114,74 @@
     private ToolboxSettings Setting => SettingsService.Settings;
     private string? _currentVersion;
     private bool _startingUpdater;
+    private readonly List<string> _themePaths = new();
+    private readonly List<string> _extensionPaths = new();
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync()
     {
         _currentVersion = GetInformationalVersion();
-    }
-    
-    private void ChooseRepo()
-    {
-        var path = FileDialog.OpenFolder("Repo Ordner auswählen", Setting.ThemeRepositoryPath);
-        if (!string.IsNullOrEmpty(path))
-        {
-            Setting.ThemeRepositoryPath = path;
-        }
+        LoadPathLists();
+        return Task.CompletedTask;
     }
 
-    private void ChooseExtensionsRepo()
+    private void LoadPathLists()
     {
-        var path = FileDialog.OpenFolder("Extensions Repo Ordner auswählen", Setting.ExtensionsRepositoryPath);
-        if (!string.IsNullOrEmpty(path))
+        _themePaths.Clear();
+        _themePaths.AddRange(Setting.GetThemeRoots());
+
+        _extensionPaths.Clear();
+        _extensionPaths.AddRange(Setting.GetExtensionRoots());
+    }
+
+    private void AddThemePath()
+    {
+        var initial = _themePaths.LastOrDefault() ?? Setting.GeneralFolderPath;
+        var path = FileDialog.OpenFolder("Theme Repo Ordner auswählen", initial);
+        AddPath(path, _themePaths, paths => SettingsService.SaveSettingChanges(x => x.SetThemeRoots(paths), NotificationService));
+    }
+
+    private void AddExtensionPath()
+    {
+        var initial = _extensionPaths.LastOrDefault() ?? Setting.GeneralFolderPath;
+        var path = FileDialog.OpenFolder("Extensions Repo Ordner auswählen", initial);
+        AddPath(path, _extensionPaths, paths => SettingsService.SaveSettingChanges(x => x.SetExtensionRoots(paths), NotificationService));
+    }
+
+    private void AddPath(string path, List<string> target, Action<IEnumerable<string>> saveAction)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
+        var normalized = path.Trim();
+        if (target.Any(p => string.Equals(p, normalized, StringComparison.OrdinalIgnoreCase)))
         {
-            Setting.ExtensionsRepositoryPath = path;
+            Snackbar.Add("Pfad ist bereits hinterlegt.", Severity.Info);
+            return;
         }
+
+        target.Add(normalized);
+        saveAction(target);
+        LoadPathLists();
+    }
+
+    private void RemoveThemePath(string path)
+    {
+        RemovePath(path, _themePaths, paths => SettingsService.SaveSettingChanges(x => x.SetThemeRoots(paths), NotificationService));
+    }
+
+    private void RemoveExtensionPath(string path)
+    {
+        RemovePath(path, _extensionPaths, paths => SettingsService.SaveSettingChanges(x => x.SetExtensionRoots(paths), NotificationService));
+    }
+
+    private void RemovePath(string path, List<string> target, Action<IEnumerable<string>> saveAction)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
+        target.RemoveAll(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase));
+        saveAction(target);
+        LoadPathLists();
     }
 
     private void ChooseGeneralFolder()

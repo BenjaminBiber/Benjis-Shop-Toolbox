@@ -1,5 +1,6 @@
 @using Toolbox.Components.Dialogs
 @using Toolbox.Data.Models
+@using System.Linq
 @inject Toolbox.Services.GitRepoService Git
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
@@ -35,6 +36,25 @@
             <MudTextField @bind-Value="_gitUrl" Label="Git URL" Variant="Variant.Filled" Class="mb-2" />
         }
 
+        <MudSelect T="string"
+                   Label="Zielpfad"
+                   Variant="Variant.Filled"
+                   @bind-Value="_selectedDestination"
+                   Dense="true"
+                   Class="mb-3">
+            @if (DestinationOptions?.Any() == true)
+            {
+                @foreach (var opt in DestinationOptions)
+                {
+                    <MudSelectItem Value="@opt">@opt</MudSelectItem>
+                }
+            }
+            else
+            {
+                <MudSelectItem Value="@DestinationRoot">@DestinationRoot</MudSelectItem>
+            }
+        </MudSelect>
+
         <MudText Class="mt-2 mb-1" Typo="Typo.subtitle2">Aktionen nach dem Klonen</MudText>
         <div class="row d-flex align-items-center justify-content-center">
             @if (_options.Count == 0)
@@ -63,6 +83,7 @@
 @code {
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
     [Parameter] public string DestinationRoot { get; set; } = string.Empty;
+    [Parameter] public List<string> DestinationOptions { get; set; } = new();
     [Parameter] public List<RepoAction> Actions { get; set; } = new();
     [Parameter] public string Title { get; set; } = "Repository klonen";
     [Parameter] public bool AllowMultiple { get; set; }
@@ -70,10 +91,23 @@
     private readonly List<ActionOption> _options = new();
     private string _gitUrl = string.Empty;
     private readonly List<string> _gitUrls = new() { string.Empty };
+    private string _selectedDestination = string.Empty;
     private bool _busy;
 
     protected override void OnInitialized()
     {
+        var roots = (DestinationOptions ?? new()).Where(d => !string.IsNullOrWhiteSpace(d)).Select(d => d.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (!string.IsNullOrWhiteSpace(DestinationRoot) && !roots.Contains(DestinationRoot))
+        {
+            roots.Insert(0, DestinationRoot);
+        }
+        DestinationOptions = roots;
+        _selectedDestination = DestinationRoot ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(_selectedDestination))
+        {
+            _selectedDestination = DestinationOptions.FirstOrDefault() ?? string.Empty;
+        }
+
         foreach (var a in Actions ?? new())
         {
             _options.Add(new ActionOption
@@ -136,7 +170,7 @@
             urls = new List<string> { _gitUrl.Trim() };
         }
 
-        if (string.IsNullOrWhiteSpace(DestinationRoot))
+        if (string.IsNullOrWhiteSpace(_selectedDestination))
         {
             Snackbar.Add("Kein Zielordner angegeben.", Severity.Error);
             return;
@@ -161,7 +195,7 @@
                 var parameters = new DialogParameters<CloneActionsDialog>
                 {
                     { x => x.GitUrl, url },
-                    { x => x.DestinationRoot, DestinationRoot },
+                    { x => x.DestinationRoot, _selectedDestination },
                     { x => x.Actions, selected },
                     { x => x.AutoCloseOnSuccess, autoClose },
                     { x => x.ItemName, itemName }

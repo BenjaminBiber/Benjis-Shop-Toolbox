@@ -23,31 +23,37 @@ public class ExtensionsService
     {
         try
         {
-            var root = _settings.Settings.ExtensionsRepositoryPath;
-            if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+            var roots = _settings.Settings.GetExtensionRoots().ToList();
+            if (!roots.Any())
                 return Enumerable.Empty<ExtensionInfo>();
 
             var list = new List<ExtensionInfo>();
-            foreach (var dir in Directory.EnumerateDirectories(root))
+            foreach (var root in roots)
             {
-                var name = Path.GetFileName(dir);
-                var hasSln = Directory.GetFiles(dir, "*.sln", SearchOption.AllDirectories).Length > 0;
-                var hasProj = Directory.GetFiles(dir, "*.csproj", SearchOption.AllDirectories).Length > 0;
-                var hasShopProject = Directory.GetDirectories(dir, "*.Shop", SearchOption.AllDirectories).Length > 0;
-                var hasDataProject = Directory.GetDirectories(dir, "*.Data", SearchOption.AllDirectories).Length > 0;
-                var hasInstallProject = Directory.GetDirectories(dir, "*.Install", SearchOption.AllDirectories).Length > 0;
-                var isThemeV4 = Directory.GetDirectories(dir, "4SELLERS_Responsive_4", SearchOption.AllDirectories).Length > 0;
-                list.Add(new ExtensionInfo
+                if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+                    continue;
+
+                foreach (var dir in Directory.EnumerateDirectories(root))
                 {
-                    Name = name,
-                    Path = dir,
-                    HasSolution = hasSln,
-                    HasProjects = hasProj,
-                    HasShopProject = hasShopProject,
-                    HasDataProject = hasDataProject,
-                    HasInstallProject = hasInstallProject,
-                    HasThemeV4 = isThemeV4
-                });
+                    var name = Path.GetFileName(dir);
+                    var hasSln = Directory.GetFiles(dir, "*.sln", SearchOption.AllDirectories).Length > 0;
+                    var hasProj = Directory.GetFiles(dir, "*.csproj", SearchOption.AllDirectories).Length > 0;
+                    var hasShopProject = Directory.GetDirectories(dir, "*.Shop", SearchOption.AllDirectories).Length > 0;
+                    var hasDataProject = Directory.GetDirectories(dir, "*.Data", SearchOption.AllDirectories).Length > 0;
+                    var hasInstallProject = Directory.GetDirectories(dir, "*.Install", SearchOption.AllDirectories).Length > 0;
+                    var isThemeV4 = Directory.GetDirectories(dir, "4SELLERS_Responsive_4", SearchOption.AllDirectories).Length > 0;
+                    list.Add(new ExtensionInfo
+                    {
+                        Name = name,
+                        Path = dir,
+                        HasSolution = hasSln,
+                        HasProjects = hasProj,
+                        HasShopProject = hasShopProject,
+                        HasDataProject = hasDataProject,
+                        HasInstallProject = hasInstallProject,
+                        HasThemeV4 = isThemeV4
+                    });
+                }
             }
 
             return list.OrderBy(x => x.Name).ToList();
@@ -61,7 +67,13 @@ public class ExtensionsService
 
     public async Task<(bool ok, string? targetDir)> CloneRepositoryAsync(string gitUrl)
     {
-        var repoFolder = _settings.Settings.ExtensionsRepositoryPath;
+        var repoFolder = _settings.Settings.GetExtensionRoots().FirstOrDefault(Directory.Exists)
+                         ?? _settings.Settings.ExtensionsRepositoryPath;
+        if (string.IsNullOrWhiteSpace(repoFolder))
+        {
+            _notifications.Error("Kein Extensions-Repo Pfad konfiguriert.");
+            return (false, null);
+        }
         return await _git.CloneRepositoryAsync(gitUrl, repoFolder);
     }
 

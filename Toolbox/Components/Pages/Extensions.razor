@@ -560,8 +560,10 @@ else
 
         var result = await DialogService.ShowCloneDialog(
             "Extension-Repository klonen",
-            Settings.ExtensionsRepositoryPath,
-            actions, true);
+            Settings.GetPrimaryExtensionRoot() ?? Settings.ExtensionsRepositoryPath,
+            actions,
+            allowMultiple: true,
+            destinationOptions: Settings.GetExtensionRoots());
 
         if (!result)
         {

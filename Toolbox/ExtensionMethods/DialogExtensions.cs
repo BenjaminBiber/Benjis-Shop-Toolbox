@@ -11,11 +11,13 @@ public static class DialogExtensions
         string title,
         string destination,
         List<RepoAction> actions,
-        bool allowMultiple = false)
+        bool allowMultiple = false,
+        IEnumerable<string>? destinationOptions = null)
     {
         var parameters = new DialogParameters<CloneRepoDialog>()
         {
             {x => x.DestinationRoot, destination},
+            {x => x.DestinationOptions, destinationOptions?.ToList() ?? new List<string>()},
             {x => x.Title, title},
             {x => x.Actions, actions},
             {x => x.AllowMultiple, allowMultiple}

@@ -27,12 +27,15 @@ public class ThemeLinkService
                 return new List<ThemeInfo>();
 
             var config = ShopYamlService.LoadConfiguration(shopYamlPath);
-            var repo = _settings.Settings.ThemeRepositoryPath;
+            var repos = _settings.Settings.GetThemeRoots().ToList();
             var shop = shopThemesPath;
             var themes = new List<ThemeInfo>();
 
-            if (Directory.Exists(repo))
+            foreach (var repo in repos)
             {
+                if (!Directory.Exists(repo))
+                    continue;
+
                 foreach (var dir in Directory.EnumerateDirectories(repo, "Themes", SearchOption.AllDirectories))
                 {
                     foreach (var themeDir in Directory.EnumerateDirectories(dir))
@@ -152,7 +155,13 @@ public class ThemeLinkService
 
     public async Task<bool> CloneRepositoryAsync(string gitUrl)
     {
-        var repoFolder = _settings.Settings.ThemeRepositoryPath;
+        var repoFolder = _settings.Settings.GetThemeRoots().FirstOrDefault(Directory.Exists)
+                         ?? _settings.Settings.ThemeRepositoryPath;
+        if (string.IsNullOrWhiteSpace(repoFolder))
+        {
+            _notifications.Error("Kein Theme-Repo Pfad konfiguriert.");
+            return false;
+        }
         var (ok, _) = await _git.CloneRepositoryAsync(gitUrl, repoFolder);
         return ok;
     }

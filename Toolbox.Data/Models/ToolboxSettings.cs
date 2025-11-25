@@ -1,4 +1,6 @@
 using Microsoft.Web.Administration;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Toolbox.Data.Models;
 
@@ -48,6 +50,15 @@ public class ToolboxSettings
         PinnedThemeGroups = null;
     }
 
+    public IEnumerable<string> GetExtensionRoots() => SplitPaths(ExtensionsRepositoryPath);
+    public IEnumerable<string> GetThemeRoots() => SplitPaths(ThemeRepositoryPath);
+
+    public string? GetPrimaryExtensionRoot() => GetExtensionRoots().FirstOrDefault();
+    public string? GetPrimaryThemeRoot() => GetThemeRoots().FirstOrDefault();
+
+    public void SetExtensionRoots(IEnumerable<string> paths) => ExtensionsRepositoryPath = JoinPaths(paths);
+    public void SetThemeRoots(IEnumerable<string> paths) => ThemeRepositoryPath = JoinPaths(paths);
+
     public ShopSetting? GetShopSettingForCurrentSite()
     {
         if (ShopSettingsList == null || !ShopSettingsList.Any() || string.IsNullOrEmpty(IisAppName))
@@ -68,5 +79,30 @@ public class ToolboxSettings
     {
         var manager = new ServerManager();
         return (manager.Sites.FirstOrDefault(x => x.Id == TrayIconIisSite)) ?? manager.Sites.FirstOrDefault(x => x.Name == IisAppName);
+    }
+
+    private static IEnumerable<string> SplitPaths(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return Enumerable.Empty<string>();
+
+        return raw
+            .Split(new[] { ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(p => p.Trim())
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+    }
+
+    public static string JoinPaths(IEnumerable<string> paths)
+    {
+        if (paths == null)
+            return string.Empty;
+
+        var normalized = paths
+            .Select(p => p?.Trim())
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+
+        return string.Join(";", normalized);
     }
 }
