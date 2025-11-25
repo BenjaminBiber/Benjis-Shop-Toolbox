@@ -40,15 +40,15 @@
 {        
     <div class="row p-4">
         <MudText Typo="Typo.h5">Extensions</MudText>   
-        <div class="col-4">
+        <div class="col-6">
             <MudSelect Variant="Variant.Outlined" Value="_selectedShopPath" ValueChanged="ChangeSelectedShop" T="string">
                 @foreach (var shopPaths in Settings.ShopSettingsList)
                 {
-                    <MudSelectItem Value="@shopPaths.ShopYamlPath">@GetShopDisplayName(shopPaths)</MudSelectItem>
+                    <MudSelectItem Value="@shopPaths.ShopYamlPath">@(GetShopDisplayName(shopPaths)) </MudSelectItem>
                 }
             </MudSelect>
         </div>
-        <div class="col-7">
+        <div class="col-5">
             <MudTextField Variant="Variant.Outlined"
                           Value="_searchText"
                           ValueChanged="(string s) => SearchChanged(s)"
@@ -363,63 +363,90 @@ else
 
     private string GetShopDisplayName(ShopSetting s)
     {
+        string displayName;
+
         var name = IisService.GetSiteNameById(s.SiteId);
-        if (!string.IsNullOrWhiteSpace(name)) return name;
-
-        try
+        if (!string.IsNullOrWhiteSpace(name))
         {
-            var yamlPath = s.ShopYamlPath ?? string.Empty;
-            var dir = Path.GetDirectoryName(yamlPath) ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(dir)) return yamlPath;
-
-            var segments = dir.Split(new[]
-                {
-                    Path.DirectorySeparatorChar,
-                    Path.AltDirectorySeparatorChar
-                },
-                StringSplitOptions.RemoveEmptyEntries);
-
-            string? candidate = null;
-
-            var idxCustomerRoot = Array.FindIndex(segments,
-                p => p.Equals("KundenShops", StringComparison.OrdinalIgnoreCase));
-            if (idxCustomerRoot >= 0 && idxCustomerRoot + 1 < segments.Length)
+            displayName = name;
+        }
+        else
+        {
+            try
             {
-                candidate = segments[idxCustomerRoot + 1];
-            }
-
-            if (candidate == null)
-            {
-                var idxShopSystem = Array.FindIndex(segments,
-                    p => p.Equals("Shopsystem", StringComparison.OrdinalIgnoreCase));
-                if (idxShopSystem > 0)
+                var yamlPath = s.ShopYamlPath ?? string.Empty;
+                var dir = Path.GetDirectoryName(yamlPath) ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(dir))
                 {
-                    candidate = segments[idxShopSystem - 1];
+                    displayName = yamlPath;
                 }
-            }
-
-            if (candidate == null)
-            {
-                for (var i = segments.Length - 1; i >= 0; i--)
+                else
                 {
-                    var seg = segments[i];
-                    if (!seg.Equals("Shop", StringComparison.OrdinalIgnoreCase))
+                    var segments = dir.Split(new[]
+                        {
+                            Path.DirectorySeparatorChar,
+                            Path.AltDirectorySeparatorChar
+                        },
+                        StringSplitOptions.RemoveEmptyEntries);
+
+                    string? candidate = null;
+
+                    var idxCustomerRoot = Array.FindIndex(segments,
+                        p => p.Equals("KundenShops", StringComparison.OrdinalIgnoreCase));
+                    if (idxCustomerRoot >= 0 && idxCustomerRoot + 1 < segments.Length)
                     {
-                        candidate = seg;
-                        break;
+                        candidate = segments[idxCustomerRoot + 1];
+                    }
+
+                    if (candidate == null)
+                    {
+                        var idxShopSystem = Array.FindIndex(segments,
+                            p => p.Equals("Shopsystem", StringComparison.OrdinalIgnoreCase));
+                        if (idxShopSystem > 0)
+                        {
+                            candidate = segments[idxShopSystem - 1];
+                        }
+                    }
+
+                    if (candidate == null)
+                    {
+                        for (var i = segments.Length - 1; i >= 0; i--)
+                        {
+                            var seg = segments[i];
+                            if (!seg.Equals("Shop", StringComparison.OrdinalIgnoreCase))
+                            {
+                                candidate = seg;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(candidate))
+                    {
+                        displayName = candidate;
+                    }
+                    else
+                    {
+                        var baseName = Path.GetFileName(dir);
+                        displayName = string.IsNullOrWhiteSpace(baseName) ? dir : baseName;
                     }
                 }
             }
-
-            if (!string.IsNullOrWhiteSpace(candidate)) return candidate;
-
-            var baseName = Path.GetFileName(dir);
-            return string.IsNullOrWhiteSpace(baseName) ? dir : baseName;
+            catch
+            {
+                displayName = s.ShopYamlPath ?? string.Empty;
+            }
         }
-        catch
+
+        var conn = s.GetConnection();
+        if (conn != null && (!string.IsNullOrWhiteSpace(conn.Server) || !string.IsNullOrWhiteSpace(conn.Database)))
         {
-            return s.ShopYamlPath;
+            var server = string.IsNullOrWhiteSpace(conn.Server) ? "?" : conn.Server;
+            var db = string.IsNullOrWhiteSpace(conn.Database) ? "?" : conn.Database;
+            displayName = $"{displayName} ({server} | {db})";
         }
+
+        return displayName;
     }
 
     private async Task LoadAsync()
