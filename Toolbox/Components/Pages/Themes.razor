@@ -146,11 +146,14 @@ else
         var current = Settings.GetShopSettingForCurrentSite();
         _selectedShopPath = current?.ShopYamlPath ?? string.Empty;
 
-        LoadPinnedThemeGroups();
+        // allow immediate render with loading state
+        _groupedThemes = new List<ThemeInfo>();
+        _isLoading = true;
 
+        LoadPinnedThemeGroups();
         await EnsureShopSelectedAsync();
 
-        await LoadAsync();
+        _ = LoadAsync();
     }
 
     private async Task EnsureShopSelectedAsync()
