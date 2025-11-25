@@ -1,4 +1,4 @@
-@page "/"
+﻿@page "/"
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject Toolbox.Services.SettingsService SettingsService
@@ -43,7 +43,7 @@
                 </MudBadge>
             </div>
             <div class="col-1 col-lg-1 d-flex align-items-center justify-content-start justify-content-lg-center">
-                <MudMenu Icon="@Icons.Material.Filled.OpenInNew" Class="mx-0 my-0" AriaLabel="Öffne IIS App im Browser">
+                <MudMenu Icon="@Icons.Material.Filled.OpenInNew" Class="mx-0 my-0" AriaLabel="Ã–ffne IIS App im Browser">
                     @if (!String.IsNullOrEmpty(Settings.IisAppName))
                     {
                         @foreach (var binding in manager.Sites[Settings.IisAppName]?.Bindings ?? Enumerable.Empty<Binding>())
@@ -601,15 +601,48 @@
     {
         if (string.IsNullOrWhiteSpace(extensionName))
             return;
+        
+        if (excluded)
+        {
+            var entry = FindLatestExtensionIssue(extensionName);
+            if (entry == null)
+            {
+                Snackbar.Add("Keine Warnung/Fehlermeldung für diese Extension gefunden.", Severity.Info);
+                return;
+            }
 
-        var map = excluded ? _excludedExtensionLogs : _loadedExtensionLogs;
-        if (!map.TryGetValue(extensionName, out var entry))
+            await ShowLogDetails(entry);
+            return;
+        }
+
+        var map = _loadedExtensionLogs;
+        if (!map.TryGetValue(extensionName, out var entry2))
         {
             Snackbar.Add("Kein Logeintrag für diese Extension gefunden.", Severity.Info);
             return;
         }
 
-        await ShowLogDetails(entry);
+        await ShowLogDetails(entry2);
+    }
+
+    private LogEntry? FindLatestExtensionIssue(string extensionName)
+    {
+        if (!_logs.Any())
+            return null;
+
+        foreach (var entry in _logs
+                     .Where(l => l.Level is LogLevel.Warning or LogLevel.Error or LogLevel.Critical)
+                     .OrderByDescending(l => l.Time))
+        {
+            var textEntry = entry.ParsedMessage?.GetFormattedMessage(_selectedMessageTypes) ?? entry.Message;
+            if (string.IsNullOrWhiteSpace(textEntry))
+                continue;
+
+            if (textEntry.Contains(extensionName, StringComparison.OrdinalIgnoreCase))
+                return entry;
+        }
+
+        return null;
     }
 
     private Color GetColor(LogLevel level) => level switch
@@ -654,7 +687,7 @@
         }
         else if (selectedValues.Count == 0)
         {
-            return "Keine LogMeldung ausgewählt";
+            return "Keine LogMeldung ausgewÃ¤hlt";
         }
         else
         {
@@ -670,7 +703,7 @@
         }
         else if (selectedValues.Count == 0)
         {
-            return "Keine Ebene ausgewählt";
+            return "Keine Ebene ausgewÃ¤hlt";
         }
         else
         {
