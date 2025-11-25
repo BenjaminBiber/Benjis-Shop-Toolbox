@@ -194,11 +194,15 @@ else
         var current = Settings.GetShopSettingForCurrentSite();
         _selectedShopPath = current?.ShopYamlPath ?? string.Empty;
 
+        // show table shell immediately with loader
+        _groupedExtensions = new List<ExtensionInfo>();
+        _isLoading = true;
+
         LoadPinnedExtensionGroups();
   
         await EnsureShopSelectedAsync();
   
-        await LoadAsync();
+        _ = LoadAsync();
     }
 
     private async Task EnsureShopSelectedAsync()
