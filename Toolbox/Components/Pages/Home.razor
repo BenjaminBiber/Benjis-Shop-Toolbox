@@ -17,7 +17,7 @@
 @implements IDisposable
 
 @{
-    var color = String.IsNullOrEmpty(Settings.IisAppName) ? Color.Default : GetColor();
+    var color = String.IsNullOrEmpty(Settings.IisAppName) ? Color.Default : GetColor(Settings.IisAppName);
 }
 
 <div class="row h-100">
@@ -31,7 +31,12 @@
                         {
                             if (site != null)
                             {
-                                <MudSelectItem Value="@site.Name">@site.Name</MudSelectItem>
+                                var single = String.IsNullOrEmpty(site.Name) ? Color.Default : GetColor(site.Name);
+                                <MudSelectItem Value="@site.Name">
+                                    <MudBadge Visible="site.Name != Settings.IisAppName" Overlap="true" Dot="true" Class="w-100" Origin="Origin.TopRight" Color="single">
+                                        @site.Name
+                                    </MudBadge>
+                                </MudSelectItem>
                             }
                         }
                     </MudSelect>
@@ -616,7 +621,7 @@
         _ => Color.Default
     };
 
-    private Color GetColor() => manager.Sites[Settings.IisAppName].State switch
+    private Color GetColor(string siteName) => manager.Sites[siteName].State switch
     {
         ObjectState.Started => Color.Success,
         ObjectState.Starting => Color.Warning,
