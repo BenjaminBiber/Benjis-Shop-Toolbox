@@ -334,7 +334,8 @@ else
 
         var parameters = new DialogParameters<CloneRepoDialog>
         {
-            { x => x.DestinationRoot, Settings.ThemeRepositoryPath },
+            { x => x.DestinationRoot, Settings.GetPrimaryThemeRoot() ?? Settings.ThemeRepositoryPath },
+            { x => x.DestinationOptions, Settings.GetThemeRoots().ToList() },
             { x => x.Actions, actions },
             { x => x.Title, "Theme-Repository klonen" }
         };
