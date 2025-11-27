@@ -1,4 +1,4 @@
-﻿@page "/"
+@page "/"
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject Toolbox.Services.SettingsService SettingsService
@@ -43,7 +43,7 @@
                 </MudBadge>
             </div>
             <div class="col-1 col-lg-1 d-flex align-items-center justify-content-start justify-content-lg-center">
-                <MudMenu Icon="@Icons.Material.Filled.OpenInNew" Class="mx-0 my-0" AriaLabel="Ã–ffne IIS App im Browser">
+                <MudMenu Icon="@Icons.Material.Filled.OpenInNew" Class="mx-0 my-0" AriaLabel="Öffne IIS App im Browser">
                     @if (!String.IsNullOrEmpty(Settings.IisAppName))
                     {
                         @foreach (var binding in manager.Sites[Settings.IisAppName]?.Bindings ?? Enumerable.Empty<Binding>())
@@ -161,7 +161,7 @@
 
         @if (DisplayLogs.Any())
         {
-            <MudTable Style="height: 90%" Height="90%" Loading="_isLoading" FixedFooter="true" FixedHeader="true" Items="DisplayLogs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
+            <MudTable Height="@TableHeight" Loading="_isLoading" FixedFooter="true" FixedHeader="true" Items="DisplayLogs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
                 <HeaderContent>
                     <MudTh><MudTableSortLabel SortBy="new Func<LogEntry, object>(x=>x.Time)">Zeit</MudTableSortLabel></MudTh>
                     <MudTh>Ebene</MudTh>
@@ -188,6 +188,27 @@
                                    HorizontalAlignment="HorizontalAlignment.Right"/>
                 </PagerContent>
             </MudTable>
+                        <MudPaper Class="mt-2 p-3">
+                @if (_selectedLog is not null)
+                {
+                    <div class="row">
+                        <div class="col-12 col-lg-4">
+                            <MudText Typo="Typo.subtitle2" Class="fw-bold mb-1">Metadaten</MudText>
+                            <MudStack Spacing="1">
+                                <MudText Typo="Typo.body2"><span class="fw-bold">Zeit:</span> @_selectedLog.Time</MudText>
+                                <MudText Typo="Typo.body2"><span class="fw-bold">Ebene:</span> @_selectedLog.Level</MudText>
+                                <MudText Typo="Typo.body2"><span class="fw-bold">Anzahl:</span> @_selectedLog.Count</MudText>
+                            </MudStack>
+                        </div>
+                        <div class="col-12 col-lg-8">
+                            <MudText Typo="Typo.subtitle2" Class="fw-bold mb-1">Nachricht</MudText>
+                            <MudPaper Class="p-2" Style="background:#0b0b0b; color:#dcdcdc; max-height:35vh; overflow:auto;">
+                                <pre style="white-space:pre-wrap; margin:0;">@HighlightDetail(_selectedLog.ParsedMessage?.GetFormattedMessage(_selectedMessageTypes) ?? _selectedLog.Message)</pre>
+                            </MudPaper>
+                        </div>
+                    </div>
+                }
+            </MudPaper>
         }
         else
         {
@@ -223,12 +244,14 @@
     private bool _extensionsSinceRestart;
     private bool _excludedSinceRestart;
     private string _searchText = string.Empty;
+    private LogEntry? _selectedLog;
     private LogService? _logService;
     private bool _isPopOverOpen = false;
     private HashSet<LogLevel> _selectedLevels = new(Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All));
     private HashSet<MessageType> _selectedMessageTypes = new(Enum.GetValues<MessageType>());
     
     private IEnumerable<LogEntry> DisplayLogs => FilterAndBundle(_displayLogs);
+    private string TableHeight => _selectedLog == null ? "80vh" : "40vh";
 
     private async Task SelectedLevelsChanged(IEnumerable<LogLevel> levels)
     {
@@ -579,22 +602,13 @@
         StartTimer();
     }
 
-    private async Task ShowLogDetails(TableRowClickEventArgs<LogEntry> args)
-    {
-        await ShowLogDetails(args.Item);
-    }
+    private Task ShowLogDetails(TableRowClickEventArgs<LogEntry> args) => ShowLogDetails(args.Item);
 
-    private async Task ShowLogDetails(LogEntry entry)
+    private Task ShowLogDetails(LogEntry entry)
     {
-        var parameters = new DialogParameters<LogEntryDialog> { {x => x.Entry, entry} };
-        var options = new DialogOptions
-        {
-            CloseButton = true,
-            MaxWidth = MaxWidth.Large,
-            FullWidth = true,
-            BackdropClick = true,
-        };
-        await DialogService.ShowAsync<LogEntryDialog>("", parameters, options);
+        _selectedLog = entry;
+        StateHasChanged();
+        return Task.CompletedTask;
     }
 
     private async Task ShowExtensionLog(string extensionName, bool excluded)
@@ -607,7 +621,7 @@
             var entry = FindLatestExtensionIssue(extensionName);
             if (entry == null)
             {
-                Snackbar.Add("Keine Warnung/Fehlermeldung für diese Extension gefunden.", Severity.Info);
+                Snackbar.Add("Keine Warnung/Fehlermeldung f�r diese Extension gefunden.", Severity.Info);
                 return;
             }
 
@@ -618,7 +632,7 @@
         var map = _loadedExtensionLogs;
         if (!map.TryGetValue(extensionName, out var entry2))
         {
-            Snackbar.Add("Kein Logeintrag für diese Extension gefunden.", Severity.Info);
+            Snackbar.Add("Kein Logeintrag f�r diese Extension gefunden.", Severity.Info);
             return;
         }
 
@@ -687,7 +701,7 @@
         }
         else if (selectedValues.Count == 0)
         {
-            return "Keine LogMeldung ausgewÃ¤hlt";
+            return "Keine LogMeldung ausgewählt";
         }
         else
         {
@@ -703,19 +717,26 @@
         }
         else if (selectedValues.Count == 0)
         {
-            return "Keine Ebene ausgewÃ¤hlt";
+            return "Keine Ebene ausgewählt";
         }
         else
         {
             return string.Join(", ", selectedValues.Select(v => Enum.Parse<LogLevel>(v).GetDescription()));
         }
     }
-    
+    private MarkupString HighlightDetail(string message) => Highlight(message);
+
     private void HandlePopOver()
     {
         _isPopOverOpen = !_isPopOverOpen;
     }
 }
+
+
+
+
+
+
 
 
 

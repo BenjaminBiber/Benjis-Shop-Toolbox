@@ -10,10 +10,12 @@ namespace Toolbox.Services;
 public class GitRepoService
 {
     private readonly INotificationService _notifications;
+    private readonly CacheService _cache;
 
-    public GitRepoService(INotificationService notifications)
+    public GitRepoService(INotificationService notifications, CacheService cache)
     {
         _notifications = notifications;
+        _cache = cache;
     }
 
     public string GetRepoName(string gitUrl)
@@ -140,6 +142,8 @@ public class GitRepoService
                 var msg = $"Repository {namePart} geklont.";
                 _notifications.Success(msg);
                 outputProgress?.Report(msg + Environment.NewLine);
+                _cache.InvalidateExtensions();
+                _cache.InvalidateThemes();
                 return (true, targetDir);
             }
 
