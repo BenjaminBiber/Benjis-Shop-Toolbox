@@ -138,7 +138,7 @@
                             {
                                 <MudMenuItem Label="Extension Datenbank Installieren"
                                              OnClick="@(() => InstallExtension(context))" />   
-                            }b n
+                            }
                         </MudMenu>
                     </MudTd>
                     <MudTd DataLabel="Öffnen">
@@ -170,6 +170,7 @@ else
 @code {
     private List<ExtensionInfo> _groupedExtensions;
     private bool _isLoading;
+    private bool _initialLoadTriggered;
     private ToolboxSettings Settings => SettingsService.Settings;
     private string _selectedShopPath = string.Empty;
     private ShopSetting? SelectedShopSetting =>
@@ -189,7 +190,7 @@ else
         IsInitiallyExpanded = false
     };
   
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
         var current = Settings.GetShopSettingForCurrentSite();
         _selectedShopPath = current?.ShopYamlPath ?? string.Empty;
@@ -199,10 +200,17 @@ else
         _isLoading = true;
 
         LoadPinnedExtensionGroups();
-  
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialLoadTriggered)
+            return;
+
+        _initialLoadTriggered = true;
+
         await EnsureShopSelectedAsync();
-  
-        _ = LoadAsync();
+        await LoadAsync();
     }
 
     private async Task EnsureShopSelectedAsync()
@@ -456,21 +464,22 @@ else
     private async Task LoadAsync()
     {
         _isLoading = true;
-        StateHasChanged();
+        await InvokeAsync(StateHasChanged);
   
         var setting = SelectedShopSetting;
         if (setting == null)
         {
             _groupedExtensions = null;
             _isLoading = false;
-            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
             return;
         }
   
-        _groupedExtensions = ExtensionsService.GetExtensions().ToList();
+        var loadedExtensions = await Task.Run(() => ExtensionsService.GetExtensions().ToList());
+        _groupedExtensions = loadedExtensions;
         ApplyPinnedExtensionsOrder();
         _isLoading = false;
-        StateHasChanged();
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task OpenCloneDialog()
