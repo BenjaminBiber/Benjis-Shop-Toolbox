@@ -126,12 +126,6 @@
                 <MudPopover Class="pa-6" Open="@_isPopOverOpen" AnchorOrigin="Origin.BottomRight">
                     <div class="d-flex gap-3 flex-column">
                         <MudText Class="fw-bold fs-3">Filter</MudText>
-                        <MudSelect T="MessageType" MultiSelection="true" MultiSelectionTextFunc="@(new Func<List<string>, string>(GetMultiSelectionTextMessage))" SelectedValues="_selectedMessageTypes" SelectedValuesChanged="@(async levels => await SelectedLevelsChanged(levels))" Label="LogMeldung">
-                            @foreach (var level in Enum.GetValues<MessageType>())
-                            {
-                                <MudSelectItem Value="@level">@level.GetDescription()</MudSelectItem>
-                            }
-                        </MudSelect>
                         <MudSelect T="LogLevel" MultiSelection="true" MultiSelectionTextFunc="@(new Func<List<string>, string>(GetMultiSelectionText))" SelectedValues="_selectedLevels" SelectedValuesChanged="@(async levels => await SelectedLevelsChanged(levels))" Label="Ebene">
                             @foreach (var level in Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All))
                             {
@@ -175,7 +169,7 @@
                                 <MudChip T="string" Color="@GetColor(context.Level)" Icon="@GetIcon(context.Level)" Variant="Variant.Filled">@context.Level</MudChip>
                             </MudTd>
                             <MudTd DataLabel="Nachricht">
-                                @Highlight(context.ParsedMessage.GetFormattedMessage(_selectedMessageTypes))
+                                @HighlightSnippet(GetSnippet(context))
                                 @if (context.Count > 1)
                                 {
                                     <span class="ms-1">(x@context.Count)</span>
@@ -255,19 +249,13 @@
     private LogService? _logService;
     private bool _isPopOverOpen = false;
     private HashSet<LogLevel> _selectedLevels = new(Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All));
-    private HashSet<MessageType> _selectedMessageTypes = new(Enum.GetValues<MessageType>());
+    private static readonly HashSet<MessageType> _allMessageTypes = new(Enum.GetValues<MessageType>());
     
     private IEnumerable<LogEntry> DisplayLogs => FilterAndBundle(_displayLogs);
 
     private async Task SelectedLevelsChanged(IEnumerable<LogLevel> levels)
     {
         _selectedLevels = levels.ToHashSet();
-        await LoadLogs();
-    }
-
-    private async Task SelectedLevelsChanged(IEnumerable<MessageType> levels)
-    {
-        _selectedMessageTypes = levels.ToHashSet();
         await LoadLogs();
     }
 
@@ -282,8 +270,7 @@
         
         var filtered = string.IsNullOrWhiteSpace(_searchText)
             ? source
-            : source.Where(e => (e.ParsedMessage?.GetFormattedMessage(_selectedMessageTypes) ?? e.Message)
-                                    .Contains(_searchText, StringComparison.OrdinalIgnoreCase));
+            : source.Where(e => GetFullMessage(e).Contains(_searchText, StringComparison.OrdinalIgnoreCase));
 
         if (!Settings.BundleLogs)
         {
@@ -307,7 +294,7 @@
                 };
             }
             else if (current.Level == log.Level &&
-                     current.ParsedMessage.GetFormattedMessage(_selectedMessageTypes) == log.ParsedMessage.GetFormattedMessage(_selectedMessageTypes))
+                     GetFullMessage(current) == GetFullMessage(log))
             {
                 current.Count += log.Count;
             }
@@ -532,7 +519,7 @@
 
             foreach (var entry in source)
             {
-                var text = entry.ParsedMessage?.GetFormattedMessage(_selectedMessageTypes);
+                var text = GetFullMessage(entry);
                 if (string.IsNullOrWhiteSpace(text))
                 {
                     text = entry.Message;
@@ -633,6 +620,28 @@
         return Task.CompletedTask;
     }
 
+    private string GetFullMessage(LogEntry entry)
+    {
+        if (entry == null) return string.Empty;
+        var text = entry.ParsedMessage?.GetFormattedMessage(new HashSet<MessageType>() { MessageType.Message }) ?? entry.Message ?? string.Empty;
+        return text;
+    }
+
+    private string GetSnippet(LogEntry entry)
+    {
+        var full = GetFullMessage(entry);
+        if (string.IsNullOrWhiteSpace(full))
+            return string.Empty;
+
+        var normalized = full.Replace("\r", string.Empty);
+        var lines = normalized.Split('\n');
+
+        if (lines.Length <= 3)
+            return normalized;
+
+        return string.Join(Environment.NewLine, lines.Take(3)) + "...";
+    }
+
     private async Task ShowExtensionLog(string extensionName, bool excluded)
     {
         if (string.IsNullOrWhiteSpace(extensionName))
@@ -670,7 +679,7 @@
                      .Where(l => l.Level is LogLevel.Warning or LogLevel.Error or LogLevel.Critical)
                      .OrderByDescending(l => l.Time))
         {
-            var textEntry = entry.ParsedMessage?.GetFormattedMessage(_selectedMessageTypes) ?? entry.Message;
+            var textEntry = GetFullMessage(entry);
             if (string.IsNullOrWhiteSpace(textEntry))
                 continue;
 
@@ -715,22 +724,6 @@
         _timer?.Dispose();
     }
 
-    private string GetMultiSelectionTextMessage(List<string> selectedValues)
-    {
-        if (Enum.GetValues<MessageType>().Count() == selectedValues.Count)
-        {
-            return "Ganze LogMeldungen";
-        }
-        else if (selectedValues.Count == 0)
-        {
-            return "Keine LogMeldung ausgewählt";
-        }
-        else
-        {
-            return string.Join(", ", selectedValues.Select(v => Enum.Parse<MessageType>(v).GetDescription()));
-        }
-    }
-
     private string GetMultiSelectionText(List<string> selectedValues)
     {
         if (Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All).Count() == selectedValues.Count)
@@ -739,27 +732,19 @@
         }
         else if (selectedValues.Count == 0)
         {
-            return "Keine Ebene ausgewählt";
+            return "Keine Ebene ausgew�hlt";
         }
         else
         {
             return string.Join(", ", selectedValues.Select(v => Enum.Parse<LogLevel>(v).GetDescription()));
         }
     }
+
     private MarkupString HighlightDetail(string message) => Highlight(message);
+    private MarkupString HighlightSnippet(string snippet) => Highlight(snippet);
 
     private void HandlePopOver()
     {
         _isPopOverOpen = !_isPopOverOpen;
     }
 }
-
-
-
-
-
-
-
-
-
-
