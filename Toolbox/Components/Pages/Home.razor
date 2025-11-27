@@ -113,7 +113,7 @@
     </div>
 
     @*FILTER AND SEARCH*@
-    <div class="col-12 col-lg-9" style="height: calc(100dvh - var(--mud-appbar-height) - 2rem);">
+    <div class="col-12 col-lg-9 d-flex flex-column" style="height: calc(100dvh - var(--mud-appbar-height)); min-height:0; overflow:hidden;">
         <div class="row mb-3">
             @*SEARCH*@
             <div class="col">
@@ -159,65 +159,72 @@
             </div>
         </div>
 
-        @if (DisplayLogs.Any())
-        {
-            <MudTable Height="@TableHeight" Loading="_isLoading" FixedFooter="true" FixedHeader="true" Items="DisplayLogs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
-                <HeaderContent>
-                    <MudTh><MudTableSortLabel SortBy="new Func<LogEntry, object>(x=>x.Time)">Zeit</MudTableSortLabel></MudTh>
-                    <MudTh>Ebene</MudTh>
-                    <MudTh>Nachricht</MudTh>
-                </HeaderContent>
-                <RowTemplate>
-                    <MudTd DataLabel="Zeit">@context.Time</MudTd>
-                    <MudTd DataLabel="Ebene">
-                        <MudChip T="string" Color="@GetColor(context.Level)" Icon="@GetIcon(context.Level)" Variant="Variant.Filled">@context.Level</MudChip>
-                    </MudTd>
-                    <MudTd DataLabel="Nachricht">
-                        @Highlight(context.ParsedMessage.GetFormattedMessage(_selectedMessageTypes))
-                        @if (context.Count > 1)
-                        {
-                            <span class="ms-1">(x@context.Count)</span>
-                        }
-                    </MudTd>
-                </RowTemplate>
-                <PagerContent>
-                    <MudTablePager PageSizeOptions="new int[] { 50, 100, int.MaxValue }"
-                                   RowsPerPageString="Logs pro Seite"
-                                   InfoFormat="{first_item}-{last_item} von {all_items}"
-                                   AllItemsText="Alle"
-                                   HorizontalAlignment="HorizontalAlignment.Right"/>
-                </PagerContent>
-            </MudTable>
-                        <MudPaper Class="mt-2 p-3">
-                @if (_selectedLog is not null)
-                {
-                    <div class="row">
-                        <div class="col-12 col-lg-4">
-                            <MudText Typo="Typo.subtitle2" Class="fw-bold mb-1">Metadaten</MudText>
-                            <MudStack Spacing="1">
-                                <MudText Typo="Typo.body2"><span class="fw-bold">Zeit:</span> @_selectedLog.Time</MudText>
-                                <MudText Typo="Typo.body2"><span class="fw-bold">Ebene:</span> @_selectedLog.Level</MudText>
-                                <MudText Typo="Typo.body2"><span class="fw-bold">Anzahl:</span> @_selectedLog.Count</MudText>
-                            </MudStack>
-                        </div>
-                        <div class="col-12 col-lg-8">
-                            <MudText Typo="Typo.subtitle2" Class="fw-bold mb-1">Nachricht</MudText>
-                            <MudPaper Class="p-2" Style="background:#0b0b0b; color:#dcdcdc; max-height:35vh; overflow:auto;">
-                                <pre style="white-space:pre-wrap; margin:0;">@HighlightDetail(_selectedLog.ParsedMessage?.GetFormattedMessage(_selectedMessageTypes) ?? _selectedLog.Message)</pre>
-                            </MudPaper>
-                        </div>
-                    </div>
-                }
-            </MudPaper>
-        }
-        else
-        {
-            <div class="row">
-                <div class="col d-flex align-items-center justify-content-center">
-                    <MudAlert Class="w-100">Keine Logs gefunden.</MudAlert>
+        <div class="flex-grow-1 d-flex flex-column" style="min-height:0;">
+            @if (DisplayLogs.Any())
+            {
+                <div class="flex-grow-1" style="@GetTableContainerStyle()">
+                    <MudTable Height="100%" Loading="_isLoading" FixedFooter="true" FixedHeader="true" Items="DisplayLogs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
+                        <HeaderContent>
+                            <MudTh><MudTableSortLabel SortBy="new Func<LogEntry, object>(x=>x.Time)">Zeit</MudTableSortLabel></MudTh>
+                            <MudTh>Ebene</MudTh>
+                            <MudTh>Nachricht</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Zeit">@context.Time</MudTd>
+                            <MudTd DataLabel="Ebene">
+                                <MudChip T="string" Color="@GetColor(context.Level)" Icon="@GetIcon(context.Level)" Variant="Variant.Filled">@context.Level</MudChip>
+                            </MudTd>
+                            <MudTd DataLabel="Nachricht">
+                                @Highlight(context.ParsedMessage.GetFormattedMessage(_selectedMessageTypes))
+                                @if (context.Count > 1)
+                                {
+                                    <span class="ms-1">(x@context.Count)</span>
+                                }
+                            </MudTd>
+                        </RowTemplate>
+                        <PagerContent>
+                            <MudTablePager PageSizeOptions="new int[] { 50, 100, int.MaxValue }"
+                                           RowsPerPageString="Logs pro Seite"
+                                           InfoFormat="{first_item}-{last_item} von {all_items}"
+                                           AllItemsText="Alle"
+                                           HorizontalAlignment="HorizontalAlignment.Right"/>
+                        </PagerContent>
+                    </MudTable>
                 </div>
-            </div>
-        }
+                    @if (_selectedLog is not null)
+                    {
+                        <MudPaper Elevation="5" Class="mt-2 p-3 mb-5 mr-3" style="@GetDetailStyle()">
+
+                        <div class="d-flex align-items-start mb-2">
+                            <MudText Typo="Typo.h6" Class="fw-bold me-auto">Logdetails</MudText>
+                            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Default" OnClick="ClearLogSelection" />
+                        </div>
+                        <div class="row mb-2 pb-1">
+                            <div class="col-12 col-lg-5">
+                                <MudText Typo="Typo.subtitle2" Class="fw-bold mb-1">Metadaten</MudText>
+                                <MudPaper Elevation="0" Class="p-2 h-100" Style=" max-height:35vh; overflow:auto;">
+                                    <pre style="white-space:pre-wrap; margin:0;">@HighlightDetail(_selectedLog.ParsedMessage?.GetFormattedMessage(new HashSet<MessageType>() { MessageType.Origin, MessageType.Metadata }) ?? _selectedLog.Message)</pre>
+                                </MudPaper>
+                            </div>
+                            <div class="col-12 col-lg-7">
+                                <MudText Typo="Typo.subtitle2" Class="fw-bold mb-1">Nachricht</MudText>
+                                <MudPaper Elevation="0" Class="p-2 h-100" Style="max-height:35vh; overflow:auto;">
+                                    <pre style="white-space:pre-wrap; margin:0;">@HighlightDetail(_selectedLog.ParsedMessage?.GetFormattedMessage(new HashSet<MessageType>() { MessageType.Message }) ?? _selectedLog.Message)</pre>
+                                </MudPaper>
+                            </div>
+                        </div>
+                        </MudPaper>
+                    }
+            }
+            else
+            {
+                <div class="row">
+                    <div class="col d-flex align-items-center justify-content-center">
+                        <MudAlert Class="w-100">Keine Logs gefunden.</MudAlert>
+                    </div>
+                </div>
+            }
+        </div>
 
     </div>
 </div>
@@ -251,7 +258,6 @@
     private HashSet<MessageType> _selectedMessageTypes = new(Enum.GetValues<MessageType>());
     
     private IEnumerable<LogEntry> DisplayLogs => FilterAndBundle(_displayLogs);
-    private string TableHeight => _selectedLog == null ? "80vh" : "40vh";
 
     private async Task SelectedLevelsChanged(IEnumerable<LogLevel> levels)
     {
@@ -602,6 +608,22 @@
         StartTimer();
     }
 
+    private void ClearLogSelection()
+    {
+        _selectedLog = null;
+        StateHasChanged();
+    }
+
+    private string GetTableContainerStyle() =>
+        _selectedLog is null
+            ? "min-height:0; max-height:80vh; overflow:auto;"
+            : "min-height:0; flex:1 1 0; overflow:auto;";
+
+    private string GetDetailStyle() =>
+        _selectedLog is null
+            ? "display:none;"
+            : "min-height:0; flex:0 0 auto;";
+
     private Task ShowLogDetails(TableRowClickEventArgs<LogEntry> args) => ShowLogDetails(args.Item);
 
     private Task ShowLogDetails(LogEntry entry)
@@ -731,6 +753,7 @@
         _isPopOverOpen = !_isPopOverOpen;
     }
 }
+
 
 
 
