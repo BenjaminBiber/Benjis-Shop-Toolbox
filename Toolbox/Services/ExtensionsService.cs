@@ -11,58 +11,63 @@ public class ExtensionsService
     private readonly INotificationService _notifications;
     private readonly SettingsService _settings;
     private readonly GitRepoService _git;
+    private readonly CacheService _cache;
 
-    public ExtensionsService(INotificationService notifications, SettingsService settings, GitRepoService git)
+    public ExtensionsService(INotificationService notifications, SettingsService settings, GitRepoService git, CacheService cache)
     {
         _notifications = notifications;
         _settings = settings;
         _git = git;
+        _cache = cache;
     }
 
     public IEnumerable<ExtensionInfo> GetExtensions()
     {
-        try
+        return _cache.GetExtensions(() =>
         {
-            var roots = _settings.Settings.GetExtensionRoots().ToList();
-            if (!roots.Any())
-                return Enumerable.Empty<ExtensionInfo>();
-
-            var list = new List<ExtensionInfo>();
-            foreach (var root in roots)
+            try
             {
-                if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
-                    continue;
+                var roots = _settings.Settings.GetExtensionRoots().ToList();
+                if (!roots.Any())
+                    return Enumerable.Empty<ExtensionInfo>();
 
-                foreach (var dir in Directory.EnumerateDirectories(root))
+                var list = new List<ExtensionInfo>();
+                foreach (var root in roots)
                 {
-                    var name = Path.GetFileName(dir);
-                    var hasSln = Directory.GetFiles(dir, "*.sln", SearchOption.AllDirectories).Length > 0;
-                    var hasProj = Directory.GetFiles(dir, "*.csproj", SearchOption.AllDirectories).Length > 0;
-                    var hasShopProject = Directory.GetDirectories(dir, "*.Shop", SearchOption.AllDirectories).Length > 0;
-                    var hasDataProject = Directory.GetDirectories(dir, "*.Data", SearchOption.AllDirectories).Length > 0;
-                    var hasInstallProject = Directory.GetDirectories(dir, "*.Install", SearchOption.AllDirectories).Length > 0;
-                    var isThemeV4 = Directory.GetDirectories(dir, "4SELLERS_Responsive_4", SearchOption.AllDirectories).Length > 0;
-                    list.Add(new ExtensionInfo
-                    {
-                        Name = name,
-                        Path = dir,
-                        HasSolution = hasSln,
-                        HasProjects = hasProj,
-                        HasShopProject = hasShopProject,
-                        HasDataProject = hasDataProject,
-                        HasInstallProject = hasInstallProject,
-                        HasThemeV4 = isThemeV4
-                    });
-                }
-            }
+                    if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+                        continue;
 
-            return list.OrderBy(x => x.Name).ToList();
-        }
-        catch (Exception ex)
-        {
-            _notifications.Error($"Fehler beim Laden der Extensions: {ex.Message}");
-            return Enumerable.Empty<ExtensionInfo>();
-        }
+                    foreach (var dir in Directory.EnumerateDirectories(root))
+                    {
+                        var name = Path.GetFileName(dir);
+                        var hasSln = Directory.GetFiles(dir, "*.sln", SearchOption.AllDirectories).Length > 0;
+                        var hasProj = Directory.GetFiles(dir, "*.csproj", SearchOption.AllDirectories).Length > 0;
+                        var hasShopProject = Directory.GetDirectories(dir, "*.Shop", SearchOption.AllDirectories).Length > 0;
+                        var hasDataProject = Directory.GetDirectories(dir, "*.Data", SearchOption.AllDirectories).Length > 0;
+                        var hasInstallProject = Directory.GetDirectories(dir, "*.Install", SearchOption.AllDirectories).Length > 0;
+                        var isThemeV4 = Directory.GetDirectories(dir, "4SELLERS_Responsive_4", SearchOption.AllDirectories).Length > 0;
+                        list.Add(new ExtensionInfo
+                        {
+                            Name = name,
+                            Path = dir,
+                            HasSolution = hasSln,
+                            HasProjects = hasProj,
+                            HasShopProject = hasShopProject,
+                            HasDataProject = hasDataProject,
+                            HasInstallProject = hasInstallProject,
+                            HasThemeV4 = isThemeV4
+                        });
+                    }
+                }
+
+                return list.OrderBy(x => x.Name).ToList();
+            }
+            catch (Exception ex)
+            {
+                _notifications.Error($"Fehler beim Laden der Extensions: {ex.Message}");
+                return Enumerable.Empty<ExtensionInfo>();
+            }
+        });
     }
 
     public async Task<(bool ok, string? targetDir)> CloneRepositoryAsync(string gitUrl)
@@ -74,7 +79,12 @@ public class ExtensionsService
             _notifications.Error("Kein Extensions-Repo Pfad konfiguriert.");
             return (false, null);
         }
-        return await _git.CloneRepositoryAsync(gitUrl, repoFolder);
+        var (ok, targetDir) = await _git.CloneRepositoryAsync(gitUrl, repoFolder);
+        if (ok)
+        {
+            _cache.InvalidateExtensions();
+        }
+        return (ok, targetDir);
     }
 
     public string GetRepoName(string gitUrl) => _git.GetRepoName(gitUrl);

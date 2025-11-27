@@ -39,6 +39,7 @@ builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<SolutionOpener>();
 builder.Services.AddScoped<FileDialogService>();
+builder.Services.AddSingleton<CacheService>();
 builder.Services.AddScoped<GitRepoService>();
 
 //Initialize Internal DB Context (use branch-specific DB in Development)
