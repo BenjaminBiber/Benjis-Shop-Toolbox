@@ -123,6 +123,7 @@ else
 @code {
     private List<ThemeInfo> _groupedThemes;
     private bool _isLoading;
+    private bool _initialLoadTriggered;
     private ToolboxSettings Settings => SettingsService.Settings;
     private string _selectedShopPath = string.Empty;
     private ShopSetting? SelectedShopSetting =>
@@ -141,7 +142,7 @@ else
         IsInitiallyExpanded = false
     };
     
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
         var current = Settings.GetShopSettingForCurrentSite();
         _selectedShopPath = current?.ShopYamlPath ?? string.Empty;
@@ -151,9 +152,17 @@ else
         _isLoading = true;
 
         LoadPinnedThemeGroups();
-        await EnsureShopSelectedAsync();
+    }
 
-        _ = LoadAsync();
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialLoadTriggered)
+            return;
+
+        _initialLoadTriggered = true;
+
+        await EnsureShopSelectedAsync();
+        await LoadAsync();
     }
 
     private async Task EnsureShopSelectedAsync()
@@ -249,20 +258,23 @@ else
     private async Task LoadAsync()
     {
         _isLoading = true;
-        StateHasChanged();
+        await InvokeAsync(StateHasChanged);
         var setting = SelectedShopSetting;
         if (setting == null)
         {
             _groupedThemes = null;
             _isLoading = false;
-            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
             return;
         }
 
-        _groupedThemes = ThemeService.GetThemes(setting.ThemeFolderPath ?? string.Empty, setting.ShopYamlPath ?? string.Empty).ToList();
+        var loadedThemes = await Task.Run(() =>
+            ThemeService.GetThemes(setting.ThemeFolderPath ?? string.Empty, setting.ShopYamlPath ?? string.Empty)
+                .ToList());
+        _groupedThemes = loadedThemes;
         ApplyPinnedThemeOrder();
         _isLoading = false;
-        StateHasChanged();
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task ThemeOverwriteChanged(ThemeInfo info)
