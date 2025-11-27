@@ -1,3 +1,4 @@
+@using Microsoft.AspNetCore.Components
 @using Toolbox.Data.Models.Logs
 
 <MudDialog MaxWidth="MaxWidth.Small">
@@ -21,11 +22,11 @@
                 </MudCollapse>
             </MudStack>
             <MudText Typo="Typo.h6" Class="mb-2">Message:</MudText>
-            <MudText Class="mt-2 text-break text-wrap" Style="white-space: pre-wrap;">@Entry.ParsedMessage.Message</MudText>
+            <MudText Class="mt-2 text-break text-wrap" Style="white-space: pre-wrap;">@FormatMessage(Entry.ParsedMessage.Message)</MudText>
         }
         else
         {
-            <MudText Class="mt-2" Style="white-space: pre-wrap;">@Entry.Message</MudText>
+            <MudText Class="mt-2" Style="white-space: pre-wrap;">@FormatMessage(Entry.Message)</MudText>
         }
        
     </DialogContent>
@@ -40,5 +41,26 @@
 
     void Close() => MudDialog.Close();
     
-    bool _expanded = false;
+    bool _expanded = true;
+
+    private static MarkupString FormatMessage(string? message)
+    {
+        if (string.IsNullOrEmpty(message))
+        {
+            return new MarkupString();
+        }
+
+        // Convert escaped newline sequences to actual line breaks and render them as <br>.
+        var normalized = message
+            .Replace("\\r\\n", "\n")
+            .Replace("\\n", "\n")
+            .Replace("\\r", "\n");
+
+        var encoded = System.Net.WebUtility.HtmlEncode(normalized);
+        var html = encoded
+            .Replace("\r\n", "<br/>")
+            .Replace("\n", "<br/>");
+
+        return (MarkupString)html;
+    }
 }
