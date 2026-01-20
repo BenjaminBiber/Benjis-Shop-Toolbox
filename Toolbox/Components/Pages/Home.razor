@@ -20,7 +20,7 @@
     var color = String.IsNullOrEmpty(Settings.IisAppName) ? Color.Default : GetColor(Settings.IisAppName);
 }
 
-<div class="row h-100">
+<div class="row g-0 h-100">
     @*ACTION ROW*@
     <div class="col-12 pl-5 pt-3 col-lg-3">
         <div class="row mb-3 mb-lg-0">
@@ -196,14 +196,14 @@
                         <div class="row mb-2 pb-1">
                             <div class="col-12 col-lg-5">
                                 <MudText Typo="Typo.subtitle2" Class="fw-bold mb-1">Metadaten</MudText>
-                                <MudPaper Elevation="0" Class="p-2 h-100" Style=" max-height:35vh; overflow:auto;">
-                                    <pre style="white-space:pre-wrap; margin:0;">@HighlightDetail(_selectedLog.ParsedMessage?.GetFormattedMessage(new HashSet<MessageType>() { MessageType.Origin, MessageType.Metadata }) ?? _selectedLog.Message)</pre>
+                                <MudPaper Elevation="0" Class="p-2 h-100" Style=" max-height:40vh; overflow:auto;">
+                                    <pre style="white-space:pre-wrap; word-wrap: break-word; word-break: break-word; hyphens: auto; font-size: 0.85rem; margin:0;">@HighlightDetail(_selectedLog.ParsedMessage?.GetFormattedMessage(new HashSet<MessageType>() { MessageType.Origin, MessageType.Metadata }) ?? _selectedLog.Message)</pre>
                                 </MudPaper>
                             </div>
                             <div class="col-12 col-lg-7">
                                 <MudText Typo="Typo.subtitle2" Class="fw-bold mb-1">Nachricht</MudText>
                                 <MudPaper Elevation="0" Class="p-2 h-100" Style="max-height:35vh; overflow:auto;">
-                                    <pre style="white-space:pre-wrap; margin:0;">@HighlightDetail(_selectedLog.ParsedMessage?.GetFormattedMessage(new HashSet<MessageType>() { MessageType.Message }) ?? _selectedLog.Message)</pre>
+                                    <pre style="white-space:pre-wrap; word-wrap: break-word; word-break: break-word; hyphens: auto; font-size: 0.85rem; margin:0;">@HighlightDetail(_selectedLog.ParsedMessage?.GetFormattedMessage(new HashSet<MessageType>() { MessageType.Message }) ?? _selectedLog.Message)</pre>
                                 </MudPaper>
                             </div>
                         </div>
