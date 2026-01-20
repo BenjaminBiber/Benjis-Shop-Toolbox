@@ -1,4 +1,13 @@
 /* Copied from ElectronApp */
+@font-face {
+    font-family: "W95FA";
+    src: url("Fonts/W95FA/w95fa.woff2") format("woff2"),
+         url("Fonts/W95FA/w95fa.woff") format("woff");
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
 h1:focus {
     outline: none;
 }
@@ -75,4 +84,286 @@ body {
 
 .settings-nav .mud-selected-item {
     background-color: rgba(0,0,0,0.04);
+}
+
+.shop-action-bar .mud-button-root,
+.shop-action-bar .mud-button-root.mud-icon-button {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+    padding: 0;
+}
+
+.win95-table-check {
+    display: none;
+    width: 14px;
+    height: 14px;
+    border: 2px solid #808080;
+    background-color: #ffffff;
+    box-shadow: inset 1px 1px 0 #404040, inset -1px -1px 0 #ffffff;
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2012%2010%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22square%22%20stroke-linejoin%3D%22miter%22%3E%3Cpath%20d%3D%22M1%205l3%203%207-7%22/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 10px 8px;
+}
+
+.win95-mode .win95-table-check {
+    display: inline-flex;
+}
+
+.win95-mode .win95-check-icon {
+    display: none;
+}
+
+.topbar-win95-switch {
+    margin-right: 12px;
+}
+
+.win95-mode {
+    min-height: 100dvh;
+    background: #c0c0c0;
+    color: #000000;
+    font-family: "W95FA", "Tahoma", "Arial", sans-serif;
+}
+
+.win95-mode .mud-appbar {
+    background: #000080;
+    color: #ffffff;
+    border-bottom: 2px solid #000000;
+    box-shadow: inset 0 1px 0 #6b6bb5, inset 0 -1px 0 #000040;
+}
+
+.win95-mode .mud-drawer,
+.win95-mode .mud-navmenu {
+    background-color: #c0c0c0;
+}
+
+.win95-mode .mud-drawer {
+    border-right: 2px solid #808080;
+    box-shadow: inset 1px 1px 0 #ffffff, inset -1px -1px 0 #404040;
+}
+
+.win95-mode .mud-nav-link.active,
+.win95-mode .mud-nav-link.mud-nav-link-active {
+    background-color: #000080;
+    color: #ffffff;
+}
+
+.win95-mode .mud-button-root {
+    border-radius: 0;
+    border: 2px solid #808080;
+    background: #c0c0c0;
+    color: #000000;
+    box-shadow: inset 1px 1px 0 #ffffff, inset -1px -1px 0 #404040;
+}
+
+.win95-mode .mud-button-root:active,
+.win95-mode .mud-button-root.mud-button-active {
+    box-shadow: inset 1px 1px 0 #404040, inset -1px -1px 0 #ffffff;
+}
+
+.win95-mode .mud-button-root.mud-button-filled-primary:hover,
+.win95-mode .mud-button-root.mud-button-filled-secondary:hover,
+.win95-mode .mud-button-root.mud-button-filled-tertiary:hover,
+.win95-mode .mud-button-root.mud-button-filled-info:hover,
+.win95-mode .mud-button-root.mud-button-filled-success:hover,
+.win95-mode .mud-button-root.mud-button-filled-warning:hover,
+.win95-mode .mud-button-root.mud-button-filled-error:hover,
+.win95-mode .mud-button-root.mud-button-filled-dark:hover,
+.win95-mode .mud-button-root.mud-button-filled-primary:focus-visible,
+.win95-mode .mud-button-root.mud-button-filled-secondary:focus-visible,
+.win95-mode .mud-button-root.mud-button-filled-tertiary:focus-visible,
+.win95-mode .mud-button-root.mud-button-filled-info:focus-visible,
+.win95-mode .mud-button-root.mud-button-filled-success:focus-visible,
+.win95-mode .mud-button-root.mud-button-filled-warning:focus-visible,
+.win95-mode .mud-button-root.mud-button-filled-error:focus-visible,
+.win95-mode .mud-button-root.mud-button-filled-dark:focus-visible,
+.win95-mode .mud-button-root.mud-button-filled-primary:active,
+.win95-mode .mud-button-root.mud-button-filled-secondary:active,
+.win95-mode .mud-button-root.mud-button-filled-tertiary:active,
+.win95-mode .mud-button-root.mud-button-filled-info:active,
+.win95-mode .mud-button-root.mud-button-filled-success:active,
+.win95-mode .mud-button-root.mud-button-filled-warning:active,
+.win95-mode .mud-button-root.mud-button-filled-error:active,
+.win95-mode .mud-button-root.mud-button-filled-dark:active,
+.win95-mode .mud-button-root.mud-button-outlined-primary:hover,
+.win95-mode .mud-button-root.mud-button-outlined-secondary:hover,
+.win95-mode .mud-button-root.mud-button-outlined-tertiary:hover,
+.win95-mode .mud-button-root.mud-button-outlined-info:hover,
+.win95-mode .mud-button-root.mud-button-outlined-success:hover,
+.win95-mode .mud-button-root.mud-button-outlined-warning:hover,
+.win95-mode .mud-button-root.mud-button-outlined-error:hover,
+.win95-mode .mud-button-root.mud-button-outlined-dark:hover,
+.win95-mode .mud-button-root.mud-button-outlined-primary:focus-visible,
+.win95-mode .mud-button-root.mud-button-outlined-secondary:focus-visible,
+.win95-mode .mud-button-root.mud-button-outlined-tertiary:focus-visible,
+.win95-mode .mud-button-root.mud-button-outlined-info:focus-visible,
+.win95-mode .mud-button-root.mud-button-outlined-success:focus-visible,
+.win95-mode .mud-button-root.mud-button-outlined-warning:focus-visible,
+.win95-mode .mud-button-root.mud-button-outlined-error:focus-visible,
+.win95-mode .mud-button-root.mud-button-outlined-dark:focus-visible,
+.win95-mode .mud-button-root.mud-button-outlined-primary:active,
+.win95-mode .mud-button-root.mud-button-outlined-secondary:active,
+.win95-mode .mud-button-root.mud-button-outlined-tertiary:active,
+.win95-mode .mud-button-root.mud-button-outlined-info:active,
+.win95-mode .mud-button-root.mud-button-outlined-success:active,
+.win95-mode .mud-button-root.mud-button-outlined-warning:active,
+.win95-mode .mud-button-root.mud-button-outlined-error:active,
+.win95-mode .mud-button-root.mud-button-outlined-dark:active {
+    color: #ffffff;
+}
+
+.win95-mode .mud-paper,
+.win95-mode .mud-table-container,
+.win95-mode .mud-card {
+    border-radius: 0;
+    border: 2px solid #808080;
+    box-shadow: inset 1px 1px 0 #ffffff, inset -1px -1px 0 #404040;
+    background: #c0c0c0;
+}
+
+.win95-mode .mud-input.mud-input-outlined .mud-input-outlined-border {
+    border: 2px solid #808080;
+    box-shadow: inset 1px 1px 0 #404040, inset -1px -1px 0 #ffffff;
+}
+
+.win95-mode .mud-input.mud-input-outlined .mud-input-outlined-border,
+.win95-mode .mud-input.mud-input-outlined .mud-input-slot,
+.win95-mode .mud-input.mud-input-outlined input,
+.win95-mode .mud-input.mud-input-outlined textarea {
+    border-radius: 0;
+    background: #ffffff;
+    color: #000000;
+}
+
+.win95-mode .mud-table thead th {
+    background: #c0c0c0;
+    border-bottom: 2px solid #808080;
+}
+
+.win95-mode .mud-table tbody tr:hover {
+    background: #dcdcdc;
+}
+
+.win95-mode .mud-select .mud-input-root,
+.win95-mode .mud-select .mud-select-input,
+.win95-mode .mud-select .mud-input-slot,
+.win95-mode .mud-select input,
+.win95-mode .mud-select textarea {
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+    opacity: 1;
+}
+
+.win95-mode .mud-select .mud-badge-root.w-100 {
+    color: #000000;
+    position: relative;
+    z-index: 9;
+}
+
+.win95-mode .mud-select .mud-input-label,
+.win95-mode .mud-select .mud-input-helper-text {
+    color: #000000;
+}
+
+.win95-mode .mud-input.mud-input-outlined .mud-input-outlined-border, .win95-mode .mud-input.mud-input-outlined .mud-input-slot, .win95-mode .mud-input.mud-input-outlined input, .win95-mode .mud-input.mud-input-outlined textarea {
+    background: unset;
+}
+
+.win95-mode .mud-chip {
+    border-radius: 0;
+    border: 2px solid #808080;
+    background: #c0c0c0;
+    color: #000000;
+    box-shadow: inset 1px 1px 0 #ffffff, inset -1px -1px 0 #404040;
+}
+
+.win95-mode .mud-chip.mud-chip-selected {
+    background: #000080;
+    border-color: #000080;
+    color: #ffffff;
+    box-shadow: inset 1px 1px 0 #404040, inset -1px -1px 0 #ffffff;
+}
+
+.win95-mode .mud-chip .mud-chip-delete-icon,
+.win95-mode .mud-chip .mud-chip-close {
+    color: inherit;
+}
+
+.win95-mode .mud-checkbox .mud-button-root {
+    width: 16px;
+    height: 16px;
+    min-width: 16px;
+    min-height: 16px;
+    padding: 0;
+    border-radius: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    position: relative;
+}
+
+.win95-mode .mud-checkbox .mud-button-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+.win95-mode .mud-checkbox-input {
+    opacity: 1;
+    appearance: none;
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #808080;
+    background-color: #ffffff;
+    box-shadow: inset 1px 1px 0 #404040, inset -1px -1px 0 #ffffff;
+    cursor: pointer;
+}
+
+.win95-mode .mud-checkbox-input:checked {
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2012%2010%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22square%22%20stroke-linejoin%3D%22miter%22%3E%3Cpath%20d%3D%22M1%205l3%203%207-7%22/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 10px 8px;
+}
+
+.win95-mode .mud-checkbox-input:indeterminate {
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2010%202%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22M1%201h8%22/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 10px 2px;
+}
+
+.win95-mode .mud-checkbox svg {
+    display: none;
+}
+
+.win95-mode .shop-action-group.mud-button-group-root {
+    gap: 6px;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+}
+
+.win95-mode .shop-action-group .mud-button-root {
+    border-radius: 0;
+    border: 2px solid #808080;
+    background: #c0c0c0;
+    box-shadow: inset 1px 1px 0 #ffffff, inset -1px -1px 0 #404040;
+    min-width: 36px;
+    min-height: 36px;
+    padding: 0;
+}
+
+.win95-mode .shop-action-group .mud-button-root:active,
+.win95-mode .shop-action-group .mud-button-root.mud-button-active {
+    box-shadow: inset 1px 1px 0 #404040, inset -1px -1px 0 #ffffff;
+}
+
+.win95-mode .shop-action-group .mud-icon-root {
+    font-size: 18px;
 }
