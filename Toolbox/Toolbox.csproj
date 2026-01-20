@@ -16,6 +16,7 @@
         <NoWarn>$(NoWarn);NU1605</NoWarn>
     </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="BenjaminBiber.DynamicInput" Version="0.1.1" />
     <PackageReference Include="Blazor.AceEditorJs" Version="1.2.1" />
     <PackageReference Include="BlazorDesktop" Version="9.0.2" />
     <PackageReference Include="H.NotifyIcon" Version="2.3.2" />
