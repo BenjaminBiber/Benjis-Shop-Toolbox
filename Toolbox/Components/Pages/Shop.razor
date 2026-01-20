@@ -38,7 +38,7 @@
         </div>
     }
     <div class="row mb-5">
-        <div class="col-9">
+        <div class="col">
             <MudSelect Variant="Variant.Outlined" Value="_selectedShopPath" ValueChanged="OnShopChanged" T="string">
                 @foreach (var shopPaths in Settings.ShopSettingsList)
                 {
@@ -46,8 +46,8 @@
                 }
             </MudSelect>
         </div>
-        <div class="col-3 justify-content-around align-items-center d-flex gap-2">
-            <MudButtonGroup Size="Size.Large" Color="Color.Dark" Variant="Variant.Outlined">
+        <div class="col-4 justify-content-around align-items-center d-flex gap-2 shop-action-bar">
+            <MudButtonGroup Size="Size.Large" Color="Color.Dark" Variant="Variant.Outlined" Class="shop-action-group">
                 <MudTooltip Text="Start">
                     <MudIconButton Color="Color.Success" Icon="@Icons.Material.Filled.Start" OnClick="IisService.StartIisApp"/>
                 </MudTooltip>

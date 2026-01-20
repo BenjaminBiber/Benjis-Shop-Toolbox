@@ -109,25 +109,29 @@
                     <MudTd DataLabel="Install Projekt">
                         @if (context.HasInstallProject)
                         {
-                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" />
+                            <span class="win95-table-check" aria-label="Ja"></span>
+                            <MudIcon Class="win95-check-icon" Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" />
                         }
                     </MudTd>
                     <MudTd DataLabel="Data Projekt">
                         @if (context.HasDataProject)
                         {
-                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Warning" />
+                            <span class="win95-table-check" aria-label="Ja"></span>
+                            <MudIcon Class="win95-check-icon" Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Warning" />
                         }
                     </MudTd>
                     <MudTd DataLabel="Shop Projekt">
                         @if (context.HasShopProject)
                         {
-                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Info" />
+                            <span class="win95-table-check" aria-label="Ja"></span>
+                            <MudIcon Class="win95-check-icon" Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Info" />
                         }
                     </MudTd>
                     <MudTd DataLabel="ThemeV4">
                         @if (context.HasThemeV4)
                         {
-                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Primary" />
+                            <span class="win95-table-check" aria-label="Ja"></span>
+                            <MudIcon Class="win95-check-icon" Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Primary" />
                         }
                     </MudTd>
                     <MudTd DataLabel="Aktionen">

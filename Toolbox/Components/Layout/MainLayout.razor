@@ -1,13 +1,16 @@
 @using Toolbox.Themes
 @using Toolbox.Components.Layout.TopBar
+@using Toolbox.Services
 @inherits LayoutComponentBase
+@implements IDisposable
+@inject UiThemeState ThemeState
 
-<MudThemeProvider Theme="@ModernTheme.Yetitheme" />
+<MudThemeProvider Theme="@CurrentTheme" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
-<MudLayout>
+<MudLayout Class="@LayoutClass">
     <TopBar />
     <MudMainContent>
         <div style="height: calc(100dvh - var(--mud-appbar-height));" class="content">
@@ -17,3 +20,23 @@
     
     
 </MudLayout>
+
+@code {
+    private MudTheme CurrentTheme => ThemeState.IsWin95Mode ? Windows95Theme.Theme : ModernTheme.Yetitheme;
+    private string LayoutClass => ThemeState.IsWin95Mode ? "win95-mode" : string.Empty;
+
+    protected override void OnInitialized()
+    {
+        ThemeState.StateChanged += OnThemeChanged;
+    }
+
+    private void OnThemeChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        ThemeState.StateChanged -= OnThemeChanged;
+    }
+}
