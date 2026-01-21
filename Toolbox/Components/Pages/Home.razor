@@ -149,7 +149,14 @@
             </div>
             @*RELOAD*@
             <div class="col-1">
-                <MudIconButton Icon="@Icons.Material.Filled.Autorenew" OnClick="LoadLogs"></MudIconButton>
+                @if (!_isLoading)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.Autorenew" OnClick="LoadLogs"></MudIconButton>
+                }
+                else
+                {
+                    <MudProgressCircular Indeterminate="true" Size="Size.Large" Color="Color.Primary"></MudProgressCircular>
+                }
             </div>
         </div>
 
@@ -157,7 +164,7 @@
             @if (DisplayLogs.Any())
             {
                 <div class="flex-grow-1" style="@GetTableContainerStyle()">
-                    <MudTable Height="100%" Loading="_isLoading" FixedFooter="true" FixedHeader="true" Items="DisplayLogs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
+                    <MudTable Height="100%" FixedFooter="true" FixedHeader="true" Items="DisplayLogs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
                         <HeaderContent>
                             <MudTh><MudTableSortLabel SortBy="new Func<LogEntry, object>(x=>x.Time)">Zeit</MudTableSortLabel></MudTh>
                             <MudTh>Ebene</MudTh>
