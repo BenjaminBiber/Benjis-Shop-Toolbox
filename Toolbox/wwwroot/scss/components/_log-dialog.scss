@@ -1,0 +1,12 @@
+@use "../vars" as *;
+
+.log-dialog-content {
+    max-height: 60vh;
+    overflow: auto;
+    background: $color-log-bg;
+    color: $color-muted-light;
+}
+
+.log-dialog-text {
+    white-space: pre-wrap;
+}

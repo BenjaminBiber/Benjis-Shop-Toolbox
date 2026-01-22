@@ -48,9 +48,8 @@
 
                 @if (run.Expanded)
                 {
-                    <MudPaper Class="@($"mt-2 p-2 {run.ElementId}")"
-                              Style="max-height:30vh; overflow-y:auto; background:#0b0b0b; color:#dcdcdc;">
-                        <pre style="white-space: pre-wrap;">@run.Log.Text</pre>
+                    <MudPaper Class="@($"mt-2 p-2 {run.ElementId} clone-actions-log-panel")">
+                        <pre class="clone-actions-log-text">@run.Log.Text</pre>
                     </MudPaper>
                 }
             </MudPaper>
@@ -283,4 +282,3 @@
         _ = InvokeAsync(StateHasChanged);
     }
 }
-

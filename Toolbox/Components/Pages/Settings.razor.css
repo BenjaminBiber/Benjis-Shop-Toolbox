@@ -1,0 +1,40 @@
+.settings-root {
+  display: flex;
+  gap: 0;
+  min-height: calc(100dvh - var(--mud-appbar-height) - 32px);
+}
+
+.settings-nav {
+  width: 280px;
+  border-right: 1px solid var(--mud-palette-lines-default);
+  padding: 12px 0;
+}
+.settings-nav ::deep .mud-list-subheader {
+  padding: 8px 16px;
+}
+.settings-nav ::deep .mud-list-item {
+  border-radius: 6px;
+  margin: 2px 8px;
+}
+.settings-nav ::deep .mud-selected-item {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.settings-content {
+  flex: 1;
+  padding: 16px 24px;
+  max-height: calc(100dvh - var(--mud-appbar-height));
+  overflow-y: scroll;
+}
+
+.settings-section-title {
+  margin: 8px 0 12px 0;
+}
+
+.settings-group {
+  padding: 16px 16px 8px 16px;
+  border: 1px solid var(--mud-palette-lines-default);
+  border-radius: 8px;
+  background: var(--mud-palette-background);
+  margin-bottom: 16px;
+}

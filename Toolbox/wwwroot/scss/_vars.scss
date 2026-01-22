@@ -1,0 +1,36 @@
+$appbar-height: var(--mud-appbar-height);
+$appbar-viewport-height: calc(100dvh - #{$appbar-height});
+$appbar-viewport-height-with-gap: calc(100dvh - #{$appbar-height} - 32px);
+
+$color-white: #ffffff;
+$color-black: #000000;
+$color-error: #e50000;
+
+$color-win95-surface: #c0c0c0;
+$color-win95-border: #808080;
+$color-win95-border-dark: #404040;
+$color-win95-primary: #000080;
+$color-win95-primary-dark: #000040;
+$color-win95-primary-light: #6b6bb5;
+$color-muted-light: #dcdcdc;
+
+$color-log-bg: #0b0b0b;
+$color-shadow-strong: rgba(0, 0, 0, 0.35);
+
+$size-action-button: 36px;
+$size-checkbox: 16px;
+
+$space-8: 8px;
+$space-12: 12px;
+$space-16: 16px;
+$space-24: 24px;
+
+$radius-8: 8px;
+
+$select-min-width: 300px;
+
+$win95-border-size: 2px;
+$win95-shadow-inset: inset 1px 1px 0 $color-white, inset -1px -1px 0 $color-win95-border-dark;
+$win95-shadow-inset-pressed: inset 1px 1px 0 $color-win95-border-dark, inset -1px -1px 0 $color-white;
+
+$pong-motion-step: 16ms;

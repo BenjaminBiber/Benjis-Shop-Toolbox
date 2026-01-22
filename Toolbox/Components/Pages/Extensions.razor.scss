@@ -1,0 +1,5 @@
+@use "../../wwwroot/scss/vars" as *;
+
+.page-shop-select {
+    min-width: $select-min-width;
+}

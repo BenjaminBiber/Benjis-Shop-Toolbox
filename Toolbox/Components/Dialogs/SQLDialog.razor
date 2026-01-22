@@ -1,7 +1,7 @@
 ﻿@page "/SQLDialog"
 @using Blazor.AceEditorJs
 
-<AceJsEditor Style="min-height: 40dvh;" @bind-Value ="@SqlText" Options="_opt"></AceJsEditor>
+<AceJsEditor Class="sql-dialog-editor" @bind-Value="@SqlText" Options="_opt"></AceJsEditor>
 
 @code {
     [Parameter] public string SqlText { get; set; } = "";

@@ -1,0 +1,75 @@
+@use "../../wwwroot/scss/vars" as *;
+
+.home-main-panel {
+    height: $appbar-viewport-height;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.home-filter-overlay {
+    position: absolute;
+    background: rgba(1, 1, 1, 0.1);
+    z-index: 3;
+    height: 100dvh;
+    width: 100vw;
+    left: 0;
+    top: 0;
+}
+
+.home-filter-overlay--hidden {
+    display: none;
+}
+
+.home-filter-overlay--visible {
+    display: block;
+}
+
+.home-log-panel {
+    min-height: 0;
+}
+
+.home-log-table {
+    min-height: 0;
+    overflow: auto;
+    flex-grow: 1;
+}
+
+.home-log-table--full {
+    max-height: 80vh;
+}
+
+.home-log-table--split {
+    flex: 1 1 0;
+}
+
+.home-log-detail {
+    min-height: 0;
+    flex: 0 0 auto;
+}
+
+.home-log-detail--hidden {
+    display: none;
+}
+
+.home-log-meta {
+    max-height: 40vh;
+    overflow: auto;
+}
+
+.home-log-message {
+    max-height: 35vh;
+    overflow: auto;
+}
+
+.home-log-pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    word-break: break-word;
+    hyphens: auto;
+    font-size: 0.85rem;
+    margin: 0;
+}
+
+.home-highlight {
+    font-size: smaller;
+}

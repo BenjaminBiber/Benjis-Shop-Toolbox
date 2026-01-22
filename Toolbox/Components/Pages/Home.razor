@@ -65,46 +65,65 @@
 
         @if (_onlySinceRestart && (_loadedExtensions.Any() || _excludedExtensions.Any()))
         {
-            <div class="row mt-5">
+            <div class="row mt-2 mt-xl-5">
                 <div class="col-12">
-                    <div class="p-2 d-flex flex-column align-items-start justify-content-center">
+                    <div class="p-2 d-flex flex-column align-items-start justify-content-center w-100">
                         @if (_loadedExtensions.Any())
                         {
-                            <MudText Typo="Typo.body2" Class="mb-1 fw-bold">
-                                @(_extensionsSinceRestart
-                                    ? "Geladene Extensions seit letztem Neustart"
-                                    : _loadedExtensionsTimestamp.HasValue
-                                        ? $"Zuletzt geladene Extensions ({_loadedExtensionsTimestamp:dd.MM.yyyy HH:mm})"
-                                        : "Zuletzt geladene Extensions")
-                            </MudText>
-                            @foreach (var ext in _loadedExtensions)
-                            {
-                                <MudChip T="string" Class="me-1 w-100 mb-1"
-                                         Color="Color.Primary"
-                                         Variant="Variant.Outlined"
-                                         OnClick="@(() => ShowExtensionLog(ext, false))">
-                                    @ext
-                                </MudChip>
-                            }
+                            <div class="d-flex flex-row gap-2 align-items-center justify-content-center w-100">
+                                <MudText Typo="Typo.body2" Class="mb-1 fw-bold" >
+                                    @(_extensionsSinceRestart
+                                        ? "Geladene Extensions seit letztem Neustart"
+                                        : _loadedExtensionsTimestamp.HasValue
+                                            ? $"Zuletzt geladene Extensions ({_loadedExtensionsTimestamp:dd.MM.yyyy HH:mm})"
+                                            : "Zuletzt geladene Extensions")
+                                </MudText>
+                                <MudToggleIconButton @bind-Toggled="expandLoadedExtensions"  ToggledIcon="@Icons.Material.Filled.KeyboardArrowUp" Icon="@Icons.Material.Filled.KeyboardArrowDown"></MudToggleIconButton>
+                            </div>
+                            <MudCollapse Class="w-100" Expanded="expandLoadedExtensions">
+                                <div class="row g-2 d-flex justify-content-center align-items-center w-100">
+                                    @foreach (var ext in _loadedExtensions)
+                                    {
+                                        <div class="col-6 col-lg-12">
+                                            <MudChip T="string" Class="me-1 w-100 mb-1"
+                                                     Color="Color.Primary"
+                                                     Variant="Variant.Outlined"
+                                                     OnClick="@(() => ShowExtensionLog(ext, false))">
+                                                @ext
+                                            </MudChip>
+                                        </div>
+                                    }
+                                </div>
+                            </MudCollapse>
                         }
                         @if (_excludedExtensions.Any())
                         {
-                            <MudText Typo="Typo.body2" Class="mt-3 mb-1 fw-bold">
-                                @(_excludedSinceRestart
-                                    ? "Nicht geladene Extensions seit letztem Neustart"
-                                    : _excludedExtensionsTimestamp.HasValue
-                                        ? $"Zuletzt nicht geladene Extensions ({_excludedExtensionsTimestamp:dd.MM.yyyy HH:mm})"
-                                        : "Nicht geladene Extensions")
-                            </MudText>
-                            @foreach (var ext in _excludedExtensions)
-                            {
-                                <MudChip T="string" Class="me-1 w-100 mb-1"
-                                         Color="Color.Error"
-                                         Variant="Variant.Outlined"
-                                         OnClick="@(() => ShowExtensionLog(ext, true))">
-                                    @ext
-                                </MudChip>
-                            }
+                            <div class="d-flex flex-row gap-2 align-items-center justify-content-center w-100">
+
+                                <MudText Typo="Typo.body2" Class="mt-3 mb-1 fw-bold">
+                                    @(_excludedSinceRestart
+                                        ? "Nicht geladene Extensions seit letztem Neustart"
+                                        : _excludedExtensionsTimestamp.HasValue
+                                            ? $"Zuletzt nicht geladene Extensions ({_excludedExtensionsTimestamp:dd.MM.yyyy HH:mm})"
+                                            : "Nicht geladene Extensions")
+                                </MudText>
+                                <MudToggleIconButton @bind-Toggled="expandFailedExtensions"  ToggledIcon="@Icons.Material.Filled.KeyboardArrowUp" Icon="@Icons.Material.Filled.KeyboardArrowDown"></MudToggleIconButton>
+                            </div>
+                            <MudCollapse Class="w-100" Expanded="expandFailedExtensions">
+                                <div class="row g-2 d-flex justify-content-center align-items-center w-100">
+                                    @foreach (var ext in _excludedExtensions)
+                                    {
+                                        <div class="col-6 col-lg-12">
+                                            <MudChip T="string" Class="me-1 w-100 mb-1"
+                                                     Color="Color.Error"
+                                                     Variant="Variant.Outlined"
+                                                     OnClick="@(() => ShowExtensionLog(ext, true))">
+                                                @ext
+                                            </MudChip>
+                                        </div>
+                                    }
+                                </div>
+                            </MudCollapse>
                         }
                     </div>
                 </div>
@@ -113,7 +132,7 @@
     </div>
 
     @*FILTER AND SEARCH*@
-    <div class="col-12 col-lg-9 d-flex flex-column p-4 " style="height: calc(100dvh - var(--mud-appbar-height)); min-height:0; overflow:hidden;">
+    <div class="col-12 col-lg-9 d-flex flex-column p-4 home-main-panel">
         <div class="row mb-3">
             @*SEARCH*@
             <div class="col">
@@ -122,7 +141,7 @@
             @*FILTER*@
             <div class="col-1">
                 <MudIconButton Icon="@Icons.Material.Filled.FilterAlt" OnClick="HandlePopOver"></MudIconButton>
-                <div @onclick="HandlePopOver" class="@(_isPopOverOpen ? "position-absolute" : "d-none")" style="background: rgba(1,1,1,0.1); z-index: 3; height: 100dvh; width: 100vw; left: 0; top: 0"></div>
+                <div @onclick="HandlePopOver" class="home-filter-overlay @(_isPopOverOpen ? "home-filter-overlay--visible" : "home-filter-overlay--hidden")"></div>
                 <MudPopover Class="pa-6" Open="@_isPopOverOpen" AnchorOrigin="Origin.BottomRight">
                     <div class="d-flex gap-3 flex-column">
                         <MudText Class="fw-bold fs-3">Filter</MudText>
@@ -150,7 +169,7 @@
             @*RELOAD*@
             <div class="col-1">
                 @if (!_isLoading)
-                {
+                { 
                     <MudIconButton Icon="@Icons.Material.Filled.Autorenew" OnClick="LoadLogs"></MudIconButton>
                 }
                 else
@@ -160,11 +179,11 @@
             </div>
         </div>
 
-        <div class="flex-grow-1 d-flex flex-column" style="min-height:0;">
+        <div class="flex-grow-1 d-flex flex-column home-log-panel">
             @if (DisplayLogs.Any())
             {
-                <div class="flex-grow-1" style="@GetTableContainerStyle()">
-                    <MudTable Height="100%" FixedFooter="true" FixedHeader="true" Items="DisplayLogs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
+                <div class="home-log-table @(_selectedLog is null ? "home-log-table--full" : "home-log-table--split")">
+                    <MudTable Height="100%"  FixedFooter="true" FixedHeader="true" Items="DisplayLogs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
                         <HeaderContent>
                             <MudTh><MudTableSortLabel SortBy="new Func<LogEntry, object>(x=>x.Time)">Zeit</MudTableSortLabel></MudTh>
                             <MudTh>Ebene</MudTh>
@@ -173,7 +192,8 @@
                         <RowTemplate>
                             <MudTd DataLabel="Zeit">@context.Time</MudTd>
                             <MudTd DataLabel="Ebene">
-                                <MudChip T="string" Color="@GetColor(context.Level)" Icon="@GetIcon(context.Level)" Variant="Variant.Filled">@context.Level</MudChip>
+                                <MudChip T="string" Class="d-none d-xl-flex" Color="@GetColor(context.Level)" Icon="@GetIcon(context.Level)" Variant="Variant.Filled">@context.Level</MudChip>
+                                <MudIcon Class="d-flex d-xl-none" Color="@GetColor(context.Level)" Icon="@GetIcon(context.Level)"/>
                             </MudTd>
                             <MudTd DataLabel="Nachricht">
                                 @HighlightSnippet(GetSnippet(context))
@@ -194,7 +214,7 @@
                 </div>
                     @if (_selectedLog is not null)
                     {
-                        <MudPaper Elevation="5" Class="mt-2 p-3 mb-5 mr-3" style="@GetDetailStyle()">
+                        <MudPaper Elevation="5" Class="@($"mt-2 p-3 mb-5 mr-3 home-log-detail {(_selectedLog is null ? "home-log-detail--hidden" : string.Empty)}")">
 
                         <div class="d-flex align-items-start mb-2">
                             <MudText Typo="Typo.h6" Class="fw-bold me-auto">Logdetails</MudText>
@@ -203,14 +223,14 @@
                         <div class="row mb-2 pb-1">
                             <div class="col-12 col-lg-5">
                                 <MudText Typo="Typo.subtitle2" Class="fw-bold mb-1">Metadaten</MudText>
-                                <MudPaper Elevation="0" Class="p-2 h-100" Style=" max-height:40vh; overflow:auto;">
-                                    <pre style="white-space:pre-wrap; word-wrap: break-word; word-break: break-word; hyphens: auto; font-size: 0.85rem; margin:0;">@HighlightDetail(_selectedLog.ParsedMessage?.GetFormattedMessage(new HashSet<MessageType>() { MessageType.Origin, MessageType.Metadata }) ?? _selectedLog.Message)</pre>
+                                <MudPaper Elevation="0" Class="p-2 h-100 home-log-meta">
+                                    <pre class="home-log-pre">@HighlightDetail(_selectedLog.ParsedMessage?.GetFormattedMessage(new HashSet<MessageType>() { MessageType.Origin, MessageType.Metadata }) ?? _selectedLog.Message)</pre>
                                 </MudPaper>
                             </div>
                             <div class="col-12 col-lg-7">
                                 <MudText Typo="Typo.subtitle2" Class="fw-bold mb-1">Nachricht</MudText>
-                                <MudPaper Elevation="0" Class="p-2 h-100" Style="max-height:35vh; overflow:auto;">
-                                    <pre style="white-space:pre-wrap; word-wrap: break-word; word-break: break-word; hyphens: auto; font-size: 0.85rem; margin:0;">@HighlightDetail(_selectedLog.ParsedMessage?.GetFormattedMessage(new HashSet<MessageType>() { MessageType.Message }) ?? _selectedLog.Message)</pre>
+                                <MudPaper Elevation="0" Class="p-2 h-100 home-log-message">
+                                    <pre class="home-log-pre">@HighlightDetail(_selectedLog.ParsedMessage?.GetFormattedMessage(new HashSet<MessageType>() { MessageType.Message }) ?? _selectedLog.Message)</pre>
                                 </MudPaper>
                             </div>
                         </div>
@@ -253,6 +273,8 @@
     private bool _excludedSinceRestart;
     private string _searchText = string.Empty;
     private LogEntry? _selectedLog;
+    private bool expandFailedExtensions = false;
+    private bool expandLoadedExtensions = false;
     private LogService? _logService;
     private bool _isPopOverOpen = false;
     private HashSet<LogLevel> _selectedLevels = new(Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All));
@@ -346,7 +368,7 @@
         var pattern = System.Text.RegularExpressions.Regex.Escape(_searchText);
         var highlighted = System.Text.RegularExpressions.Regex.Replace(encoded, pattern,
             m => $"<mark>{m.Value}</mark>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        return (MarkupString)$"<span style=\"font-size:smaller\">{highlighted}</span>";
+        return (MarkupString)$"<span class=\"home-highlight\">{highlighted}</span>";
 
     }
 
@@ -607,16 +629,6 @@
         _selectedLog = null;
         StateHasChanged();
     }
-
-    private string GetTableContainerStyle() =>
-        _selectedLog is null
-            ? "min-height:0; max-height:80vh; overflow:auto;"
-            : "min-height:0; flex:1 1 0; overflow:auto;";
-
-    private string GetDetailStyle() =>
-        _selectedLog is null
-            ? "display:none;"
-            : "min-height:0; flex:0 0 auto;";
 
     private Task ShowLogDetails(TableRowClickEventArgs<LogEntry> args) => ShowLogDetails(args.Item);
 

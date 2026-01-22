@@ -24,7 +24,7 @@
         </MudAlert>
         @if (Settings.ShopSettingsList.Any())
         {
-            <div class="mt-4" style="min-width:300px;">
+            <div class="mt-4 page-shop-select">
                 <MudSelect Variant="Variant.Outlined" Value="_selectedShopPath" ValueChanged="ChangeSelectedShop" T="string">
                     @foreach (var shopPaths in Settings.ShopSettingsList)
                     {

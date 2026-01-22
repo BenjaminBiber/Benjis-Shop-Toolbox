@@ -168,15 +168,20 @@
 
     private string GetWheelStyle()
     {
-        var transformPart = $"transform: rotate({_rotationDeg.ToString(System.Globalization.CultureInfo.InvariantCulture)}deg); transition: transform {_transitionSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)}s cubic-bezier(0.17, 0.89, 0.32, 1.28);";
-        var bgPart = GetWheelBackground();
-        return $"{transformPart} {bgPart}";
+        var rotation = _rotationDeg.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var transition = _transitionSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var background = GetWheelBackground();
+        if (string.IsNullOrWhiteSpace(background))
+        {
+            background = "none";
+        }
+        return $"--egg-rotation:{rotation}deg; --egg-transition:{transition}s; --egg-wheel-background:{background};";
     }
 
     private string GetWrapperStyle()
     {
         var size = _wheelSizePx.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        return $"width: {size}px; height: {size}px;";
+        return $"--egg-wheel-size:{size}px;";
     }
 
     private string GetWheelBackground()
@@ -192,7 +197,6 @@
         };
 
         // Build conic gradient for colored segments
-        var sb = new StringBuilder();
         var fromDeg = (-90.0).ToString(System.Globalization.CultureInfo.InvariantCulture);
         var conic = new StringBuilder($"conic-gradient(from {fromDeg}deg, ");
         for (int i = 0; i < _segments.Count; i++)
@@ -204,12 +208,11 @@
             if (i < _segments.Count - 1)
                 conic.Append(", ");
         }
-        conic.Append(");");
+        conic.Append(")");
 
         // Add a soft radial highlight overlay for depth (drawn on top)
         var radial = "radial-gradient(circle at center, rgba(255,255,255,0.06), rgba(0,0,0,0.10))";
-        sb.Append($"background: {radial}, {conic}; background-blend-mode: multiply;");
-        return sb.ToString();
+        return $"{radial}, {conic}";
     }
 
     private string GetSegmentStyle(double angle)
@@ -221,7 +224,7 @@
         var sideOffset = _iconSideOffsetPx; // seitlicher Offset (rechts/links) im Sektor
 
         return
-            $"transform: translate(-50%, -50%) " +
+            $"--egg-segment-transform: translate(-50%, -50%) " +
             $"rotate({totalAngle.ToString(System.Globalization.CultureInfo.InvariantCulture)}deg) " +
             $"translate({sideOffset.ToString(System.Globalization.CultureInfo.InvariantCulture)}px, -{offset.ToString(System.Globalization.CultureInfo.InvariantCulture)}px);";
     }
@@ -337,15 +340,3 @@
     }
 }
 
-<style>
-    .egg-root { display: flex; flex-direction: column; align-items: center; gap: 16px; }
-    .wheel-wrapper { position: relative; width: 420px; height: 420px; }
-    .wheel { position: absolute; inset: 0; border-radius: 50%; overflow: visible; box-shadow: inset 0 0 0 2px rgba(0,0,0,0.06); }
-    .pointer { position: absolute; top: -6px; left: 50%; transform: translateX(-50%) rotate(180deg) translateY(-50%); width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 14px solid var(--mud-palette-primary); z-index: 5; }
-    .segment-img { position: absolute; top: 50%; left: 50%; transform-origin: 50% 50%; width: 80px; height: 80px; object-fit: contain; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.3)); }
-    .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--mud-palette-text-primary); font-style: italic; }
-    .controls { display: flex; align-items: center; justify-content: center; }
-    .funfact { margin-top: 8px; max-width: 520px; padding: 10px 12px; border-radius: 10px; background: rgba(13,110,253,0.08); color: var(--mud-palette-text-primary); border: 1px solid rgba(13,110,253,0.2); }
-    .funfact-title { font-weight: 600; margin-bottom: 4px; color: var(--mud-palette-primary); }
-    .funfact-text { white-space: pre-wrap; }
-</style>

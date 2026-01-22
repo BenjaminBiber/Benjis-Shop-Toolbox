@@ -7,18 +7,20 @@
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>0.4.5</Version>
-    <AssemblyVersion>0.4.5.0</AssemblyVersion>
-    <FileVersion>0.4.5.0</FileVersion>
+    <Version>0.4.7</Version>
+    <AssemblyVersion>0.4.7.0</AssemblyVersion>
+    <FileVersion>0.4.7.0</FileVersion>
     <ApplicationIcon>wwwroot\favicon.ico</ApplicationIcon>
   </PropertyGroup>
-    <PropertyGroup>
-        <NoWarn>$(NoWarn);NU1605</NoWarn>
-    </PropertyGroup>
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);NU1605</NoWarn>
+    <DartSassOutputStyle>expanded</DartSassOutputStyle>
+  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="BenjaminBiber.DynamicInput" Version="0.1.1" />
     <PackageReference Include="Blazor.AceEditorJs" Version="1.2.1" />
     <PackageReference Include="BlazorDesktop" Version="9.0.2" />
+    <PackageReference Include="DartSassBuilder" Version="1.1.0" />
     <PackageReference Include="H.NotifyIcon" Version="2.3.2" />
     <PackageReference Include="H.NotifyIcon.Wpf" Version="2.3.2" />
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />

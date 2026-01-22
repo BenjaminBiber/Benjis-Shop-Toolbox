@@ -1,0 +1,12 @@
+@use "../vars" as *;
+
+.clone-actions-log-panel {
+    max-height: 30vh;
+    overflow-y: auto;
+    background: $color-log-bg;
+    color: $color-muted-light;
+}
+
+.clone-actions-log-text {
+    white-space: pre-wrap;
+}
