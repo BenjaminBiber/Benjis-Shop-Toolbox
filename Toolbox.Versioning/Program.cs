@@ -10,6 +10,7 @@ class Program
 {
     private static string isccPath = @"C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe";
     private static string scriptPath = Path.Combine(AppContext.BaseDirectory, "toolbox.iss");
+    private const int KeepInstallerCount = 5;
 
     static void Main(string[] args)
     {
@@ -74,6 +75,7 @@ class Program
         // Commit + Push erst NACH erfolgreichem Installer-Build
         if (process.ExitCode == 0)
         {
+            TryCleanupOldInstallers();
             var repoRoot = FindRepoRoot();
             if (repoRoot is null)
             {
@@ -86,6 +88,149 @@ class Program
                 TryGitCommitAndPush(repoRoot, appVersion);
             }
         }
+    }
+
+    private static void TryCleanupOldInstallers()
+    {
+        try
+        {
+            var outputDir = TryGetOutputDirFromInno(scriptPath);
+            if (string.IsNullOrWhiteSpace(outputDir))
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("Hinweis: OutputDir aus toolbox.iss nicht gefunden. Cleanup uebersprungen.");
+                Console.ResetColor();
+                return;
+            }
+
+            outputDir = Environment.ExpandEnvironmentVariables(outputDir);
+            if (!Directory.Exists(outputDir))
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"Hinweis: OutputDir nicht gefunden: {outputDir}. Cleanup uebersprungen.");
+                Console.ResetColor();
+                return;
+            }
+
+            var candidates = GetInstallerCandidates(outputDir);
+            if (candidates.Count <= KeepInstallerCount)
+            {
+                return;
+            }
+
+            var ordered = candidates
+                .OrderByDescending(c => c.Version, Comparer<string>.Create(CompareVersions))
+                .ThenByDescending(c => c.WriteTimeUtc)
+                .ToList();
+
+            var keep = new HashSet<string>(
+                ordered.Take(KeepInstallerCount).Select(c => c.FullPath),
+                StringComparer.OrdinalIgnoreCase
+            );
+
+            foreach (var c in ordered.Skip(KeepInstallerCount))
+            {
+                if (keep.Contains(c.FullPath))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    File.Delete(c.FullPath);
+                    Console.WriteLine($"Installer entfernt: {Path.GetFileName(c.FullPath)}");
+                }
+                catch (Exception ex)
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"Hinweis: Konnte Installer nicht loeschen: {c.FullPath} ({ex.Message})");
+                    Console.ResetColor();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"Hinweis: Cleanup uebersprungen: {ex.Message}");
+            Console.ResetColor();
+        }
+    }
+
+    private sealed class InstallerCandidate
+    {
+        public InstallerCandidate(string version, string fullPath, DateTime writeTimeUtc)
+        {
+            Version = version;
+            FullPath = fullPath;
+            WriteTimeUtc = writeTimeUtc;
+        }
+
+        public string Version { get; }
+        public string FullPath { get; }
+        public DateTime WriteTimeUtc { get; }
+    }
+
+    private static List<InstallerCandidate> GetInstallerCandidates(string outputDir)
+    {
+        var rx = new System.Text.RegularExpressions.Regex(
+            @"^Installer_Shop\-Toolbox_(\d+(?:[._]\d+){1,3})\.exe$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase
+        );
+
+        var list = new List<InstallerCandidate>();
+        foreach (var file in Directory.EnumerateFiles(outputDir, "*.exe", SearchOption.TopDirectoryOnly))
+        {
+            var name = Path.GetFileName(file) ?? string.Empty;
+            var m = rx.Match(name);
+            if (!m.Success)
+            {
+                continue;
+            }
+
+            var version = Normalize(m.Groups[1].Value);
+            var fi = new FileInfo(file);
+            list.Add(new InstallerCandidate(version, file, fi.LastWriteTimeUtc));
+        }
+
+        return list;
+    }
+
+    private static string? TryGetOutputDirFromInno(string issPath)
+    {
+        if (!File.Exists(issPath))
+        {
+            return null;
+        }
+
+        foreach (var raw in File.ReadLines(issPath))
+        {
+            var line = raw.Trim();
+            if (line.Length == 0 || line.StartsWith(";"))
+            {
+                continue;
+            }
+
+            if (!line.StartsWith("OutputDir", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var idx = line.IndexOf('=');
+            if (idx < 0)
+            {
+                continue;
+            }
+
+            var value = line[(idx + 1)..].Trim();
+            if (value.StartsWith("\"") && value.EndsWith("\"") && value.Length >= 2)
+            {
+                value = value[1..^1];
+            }
+
+            return value;
+        }
+
+        return null;
     }
 
     private static string? FindRepoRoot()
@@ -426,6 +571,21 @@ class Program
         if (!regex.IsMatch(value)) return false;
 
         return Version.TryParse(value, out _);
+    }
+
+    private static int CompareVersions(string a, string b)
+    {
+        if (!Version.TryParse(a, out var av))
+        {
+            av = new Version(0, 0, 0, 0);
+        }
+
+        if (!Version.TryParse(b, out var bv))
+        {
+            bv = new Version(0, 0, 0, 0);
+        }
+
+        return av.CompareTo(bv);
     }
 
     private static bool TryGetCurrentCsprojVersion(out string version)
