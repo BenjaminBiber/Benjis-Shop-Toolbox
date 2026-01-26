@@ -291,23 +291,53 @@ class Program
             }
 
             Console.WriteLine("Git commit erstellt. Pushe Änderungen…");
-            var pushCode = RunProcess("git", "push", repoRoot, out so, out se);
-            if (pushCode != 0)
-            {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"Git push fehlgeschlagen ({pushCode}).\n{se}");
-                Console.ResetColor();
-            }
-            else
-            {
-                Console.WriteLine("Git push erfolgreich.");
-            }
+            TryPushAllRemotes(repoRoot);
         }
         catch (Exception ex)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"Git Commit/Push übersprungen: {ex.Message}");
             Console.ResetColor();
+        }
+    }
+
+    private static void TryPushAllRemotes(string repoRoot)
+    {
+        var remotesCode = RunProcess("git", "remote", repoRoot, out var remotesOut, out var remotesErr);
+        if (remotesCode != 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"Git remotes fehlgeschlagen ({remotesCode}).\n{remotesErr}");
+            Console.ResetColor();
+            return;
+        }
+
+        var remotes = remotesOut
+            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(r => r.Trim())
+            .Where(r => !string.IsNullOrWhiteSpace(r))
+            .ToList();
+
+        if (remotes.Count == 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("Keine Git Remotes gefunden. Push wird uebersprungen.");
+            Console.ResetColor();
+            return;
+        }
+
+        foreach (var remote in remotes)
+        {
+            var pushCode = RunProcess("git", $"push \"{remote}\" --all", repoRoot, out var so, out var se);
+            if (pushCode != 0)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"Git push zu '{remote}' fehlgeschlagen ({pushCode}).\n{se}");
+                Console.ResetColor();
+                continue;
+            }
+
+            Console.WriteLine($"Git push zu '{remote}' erfolgreich.");
         }
     }
 
