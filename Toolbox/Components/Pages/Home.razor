@@ -163,6 +163,14 @@
                                 <MudSelectItem Value="@reloadTime.Value.TotalSeconds">@reloadTime.Key</MudSelectItem>
                             }
                         </MudSelect>
+                        <div class="d-flex gap-2">
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AccessTime" OnClick="SetLogTimeToNow">
+                                Zeit auf jetzt setzen
+                            </MudButton>
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Restore" OnClick="ResetFilters">
+                                Filter zurücksetzen
+                            </MudButton>
+                        </div>
                     </div>
                 </MudPopover>
             </div>
@@ -257,6 +265,7 @@
     private bool _autoRefresh;
     private int _refreshSeconds = 0;
     private DateTime _lastShopRestart = DateTime.Now;
+    private DateTime _logSinceTime = DateTime.Now;
     private DateTime _appStartTime = DateTime.Now;
     private ReloadOption reload = ReloadOption.SeitStartDerAnwendung;
     private bool _onlySinceRestart;
@@ -376,6 +385,7 @@
     {
         var appInfo = await AppInfoService.GetAsync();
         _appStartTime = appInfo.StartTime;
+        _lastShopRestart = appInfo.IisRestartTime;
        
         if (SettingsService.IsConfigured)
         {
@@ -398,6 +408,7 @@
         _refreshSeconds = Settings.AutoRefreshSeconds;
         _onlySinceRestart = Settings.OnlySinceRestart;
         reload = _onlySinceRestart ? ReloadOption.SeitLetztemNeuladen : ReloadOption.SeitStartDerAnwendung;
+        _logSinceTime = _onlySinceRestart ? _lastShopRestart : _appStartTime;
         await LoadLogs();
         StartTimer();
     }
@@ -420,7 +431,13 @@
     {
         _isLoading = true;
         StateHasChanged();
-        var since = reload == ReloadOption.AlleLogs ? DateTime.MinValue  : _onlySinceRestart ? _lastShopRestart : _appStartTime;
+        var since = reload switch
+        {
+            ReloadOption.AlleLogs => DateTime.MinValue,
+            ReloadOption.SeitLetztemNeuladen => _logSinceTime,
+            ReloadOption.SeitStartDerAnwendung => _appStartTime,
+            _ => _appStartTime
+        };
         var logs = await Task.Run(() => _logService?.GetLogs(since, LogLevel.All) ?? Enumerable.Empty<LogEntry>());
         _logs = logs.ToList();
         await UpdateLoadedExtensions();
@@ -434,6 +451,25 @@
     private async Task LoadLogs(ReloadOption option)
     {
         reload = option;
+        await LoadLogs();
+    }
+
+    private async Task SetLogTimeToNow()
+    {
+        _logSinceTime = DateTime.Now;
+        reload = ReloadOption.SeitLetztemNeuladen;
+        await LoadLogs();
+    }
+
+    private async Task ResetFilters()
+    {
+        _searchText = string.Empty;
+        _selectedLevels = new HashSet<LogLevel>(Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All));
+        reload = _onlySinceRestart ? ReloadOption.SeitLetztemNeuladen : ReloadOption.SeitStartDerAnwendung;
+        _logSinceTime = _onlySinceRestart ? _lastShopRestart : _appStartTime;
+        _autoRefresh = Settings.AutoRefreshEnabled;
+        _refreshSeconds = Settings.AutoRefreshSeconds;
+        StartTimer();
         await LoadLogs();
     }
 
