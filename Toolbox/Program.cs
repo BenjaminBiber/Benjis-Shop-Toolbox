@@ -99,10 +99,7 @@ using (var scope = app.Services.CreateScope())
     
     var settingService = scope.ServiceProvider.GetRequiredService<SettingsService>();
     var manager = new ServerManager();
-    if (!settingService.AreThereAllShopPathSettings(manager.Sites))
-    {
-        settingService.FillShopPathSettings(manager.Sites);
-    }
+    settingService.FillShopPathSettings(manager.Sites);
     var databaseConnectionService = scope.ServiceProvider.GetRequiredService<DatabaseConnectionService>();
     databaseConnectionService.FillDataBaseConnections();
 }
