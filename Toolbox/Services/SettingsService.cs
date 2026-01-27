@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.IO;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -100,28 +101,87 @@ public class SettingsService : ISettingsService
     
     public void FillShopPathSettings(SiteCollection siteCollection)
     {
+        var siteIdByYamlPath = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        foreach (var site in siteCollection)
+        {
+            if (site == null) continue;
+            var physicalPath = site.GetSitePath();
+            if (string.IsNullOrWhiteSpace(physicalPath)) continue;
+
+            var yamlUpper = NormalizePath(Path.Combine(physicalPath, "Shop.yaml"));
+            var yamlLower = NormalizePath(Path.Combine(physicalPath, "shop.yaml"));
+
+            if (!string.IsNullOrWhiteSpace(yamlUpper) && !siteIdByYamlPath.ContainsKey(yamlUpper))
+            {
+                siteIdByYamlPath[yamlUpper] = site.Id;
+            }
+            if (!string.IsNullOrWhiteSpace(yamlLower) && !siteIdByYamlPath.ContainsKey(yamlLower))
+            {
+                siteIdByYamlPath[yamlLower] = site.Id;
+            }
+        }
+
         // 1) Scan the entire GeneralFolderPath for shops first
         try
         {
             var root = Settings.GeneralFolderPath;
             if (!string.IsNullOrWhiteSpace(root) && Directory.Exists(root))
             {
-                foreach (var shopFolder in EnumerateShopFolders(root))
+                var shopFolders = EnumerateShopFolders(root).ToList();
+                var candidates = new ConcurrentDictionary<string, ShopCandidate>(StringComparer.OrdinalIgnoreCase);
+
+                Parallel.ForEach(shopFolders, shopFolder =>
                 {
                     var yamlLower = Path.Combine(shopFolder, "shop.yaml");
                     var yamlUpper = Path.Combine(shopFolder, "Shop.yaml");
-                    var yamlPath = File.Exists(yamlUpper) ? yamlUpper : yamlLower;
-                    if (!File.Exists(yamlPath)) continue;
+                    var yamlPath = File.Exists(yamlUpper) ? yamlUpper : (File.Exists(yamlLower) ? yamlLower : null);
+                    if (string.IsNullOrWhiteSpace(yamlPath)) return;
 
                     var themesPath = Path.Combine(shopFolder, "Themes");
-                    if (!Directory.Exists(themesPath)) continue;
+                    if (!Directory.Exists(themesPath)) return;
 
-                    if (!Settings.ShopSettingsList.Any(x =>
-                            string.Equals(x.ShopYamlPath, yamlPath, StringComparison.OrdinalIgnoreCase)))
+                    var normalizedYamlPath = NormalizePath(yamlPath);
+                    if (string.IsNullOrWhiteSpace(normalizedYamlPath)) return;
+
+                    var hasSiteId = siteIdByYamlPath.TryGetValue(normalizedYamlPath, out var siteId);
+                    var candidate = new ShopCandidate
+                    {
+                        ShopYamlPath = yamlPath,
+                        ThemeFolderPath = themesPath,
+                        HasSiteId = hasSiteId,
+                        SiteId = hasSiteId ? siteId : long.MinValue
+                    };
+
+                    candidates.TryAdd(normalizedYamlPath, candidate);
+                });
+
+                foreach (var candidate in candidates.Values)
+                {
+                    var yamlPath = candidate.ShopYamlPath;
+                    var themesPath = candidate.ThemeFolderPath;
+
+                    var existing = Settings.ShopSettingsList.FirstOrDefault(x =>
+                        string.Equals(x.ShopYamlPath, yamlPath, StringComparison.OrdinalIgnoreCase));
+                    if (existing != null)
+                    {
+                        if (candidate.HasSiteId && existing.SiteId != candidate.SiteId)
+                        {
+                            existing.SiteId = candidate.SiteId;
+                        }
+                        if (!string.Equals(existing.ThemeFolderPath, themesPath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            existing.ThemeFolderPath = themesPath;
+                        }
+                        if (!string.Equals(existing.ShopYamlPath, yamlPath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            existing.ShopYamlPath = yamlPath;
+                        }
+                    }
+                    else
                     {
                         Settings.ShopSettingsList.Add(new ShopSetting
                         {
-                            SiteId = long.MinValue, // not bound to an IIS site
+                            SiteId = candidate.HasSiteId ? candidate.SiteId : long.MinValue,
                             ShopYamlPath = yamlPath,
                             ThemeFolderPath = themesPath
                         });
@@ -144,9 +204,25 @@ public class SettingsService : ISettingsService
             {
                 var yamlPath = Path.Combine(physicalPath, "Shop.yaml");
                 var themesPath = Path.Combine(physicalPath, "Themes");
-                if (!Settings.ShopSettingsList.Any(x =>
-                        x.SiteId == site.Id ||
-                        string.Equals(x.ShopYamlPath, yamlPath, StringComparison.OrdinalIgnoreCase)))
+                var existing = Settings.ShopSettingsList.FirstOrDefault(x =>
+                    x.SiteId == site.Id ||
+                    string.Equals(x.ShopYamlPath, yamlPath, StringComparison.OrdinalIgnoreCase));
+                if (existing != null)
+                {
+                    if (existing.SiteId != site.Id)
+                    {
+                        existing.SiteId = site.Id;
+                    }
+                    if (!string.Equals(existing.ShopYamlPath, yamlPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        existing.ShopYamlPath = yamlPath;
+                    }
+                    if (!string.Equals(existing.ThemeFolderPath, themesPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        existing.ThemeFolderPath = themesPath;
+                    }
+                }
+                else
                 {
                     Settings.ShopSettingsList.Add(new ShopSetting
                     {
@@ -198,6 +274,32 @@ public class SettingsService : ISettingsService
                 }
             }
         }
+    }
+
+    private static string NormalizePath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            return Path.GetFullPath(path)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+        catch
+        {
+            return path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+    }
+
+    private sealed class ShopCandidate
+    {
+        public string ShopYamlPath { get; init; } = string.Empty;
+        public string ThemeFolderPath { get; init; } = string.Empty;
+        public bool HasSiteId { get; init; }
+        public long SiteId { get; init; }
     }
     
     public bool AreThereAllShopPathSettings(SiteCollection siteCollection)
