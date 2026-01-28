@@ -360,6 +360,7 @@ class Program
             sb.AppendLine(context.DiffStat);
         }
         sb.AppendLine();
+        sb.AppendLine("Nutze ausschliesslich die angegebenen Aenderungen zwischen Basis-Commit und HEAD.");
         sb.AppendLine("Gib ausschliesslich Markdown aus. Struktur:");
         sb.AppendLine("# <Version>");
         sb.AppendLine("## Hinzugefuegt");
@@ -376,11 +377,23 @@ class Program
     {
         if (string.IsNullOrWhiteSpace(prevVersion))
         {
-            return null;
+            return TryFindLatestBumpCommit(repoRoot);
         }
 
         var normalized = NormalizeVersionText(prevVersion);
         var code = RunProcess("git", $"log --grep \"Bump to Version {normalized}\" -n 1 --pretty=format:%H", repoRoot, out var so, out _);
+        if (code != 0)
+        {
+            return TryFindLatestBumpCommit(repoRoot);
+        }
+
+        var sha = so.Trim();
+        return string.IsNullOrWhiteSpace(sha) ? TryFindLatestBumpCommit(repoRoot) : sha;
+    }
+
+    private static string? TryFindLatestBumpCommit(string repoRoot)
+    {
+        var code = RunProcess("git", "log --grep \"Bump to Version\" -n 1 --pretty=format:%H", repoRoot, out var so, out _);
         if (code != 0)
         {
             return null;
@@ -1116,4 +1129,3 @@ class Program
         return false;
     }
 }
-

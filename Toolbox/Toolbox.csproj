@@ -58,6 +58,9 @@
   <ItemGroup>
     <_ContentIncludedByDefault Remove="Components\Settings-Test\SettingsField.razor" />
     <_ContentIncludedByDefault Remove="Components\Settings-Test\Test.razor" />
+    <_ContentIncludedByDefault Remove="wwwroot\Changelog\.gitkeep" />
+    <_ContentIncludedByDefault Remove="wwwroot\Changelog\0.5.1.md" />
+    <_ContentIncludedByDefault Remove="wwwroot\Changelog\0.5.2.md" />
   </ItemGroup>
 
   <!-- Publish Toolbox.Updater alongside Toolbox output and publish -->
