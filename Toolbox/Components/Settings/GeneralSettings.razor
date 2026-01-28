@@ -97,7 +97,12 @@
         <MudText Class="fw-bold" Typo="Typo.body1">Updater</MudText>
         <MudDivider Class="w-auto"></MudDivider>
     </div>
-    <div class="col-12 d-flex align-items-center gap-2 pl-4">
+    <div class="col-12 d-flex flex-column gap-2 pl-4">
+        <MudCheckBox Class="p-0"
+                     ValueChanged="(bool i) => SettingsService.SaveSettingChanges(x => x.AllowBetaUpdates = i, NotificationService)"
+                     Value="Setting.AllowBetaUpdates"
+                     T="bool"
+                     Color="Color.Primary">Beta-Versionen installieren</MudCheckBox>
         <MudTooltip Text="Startet den Updater (Administratorrechte erforderlich).">
             <MudButton Variant="MudBlazor.Variant.Outlined"
                        Color="Color.Primary"
@@ -199,7 +204,7 @@
         _startingUpdater = true;
         try
         {
-            var ok = await UpdaterSvc.TryLaunchUpdaterAsync();
+            var ok = await UpdaterSvc.TryLaunchUpdaterAsync(Setting.AllowBetaUpdates);
             if (ok)
                 Snackbar.Add("Updater gestartet.", Severity.Success, cfg => cfg.VisibleStateDuration = 1500);
             else
@@ -227,7 +232,7 @@
             var v = attr?.InformationalVersion ?? asm.GetName().Version?.ToString();
             if (!string.IsNullOrEmpty(v))
             {
-                var idx = v.IndexOfAny(new[] { '+', '-' });
+                var idx = v.IndexOf('+');
                 if (idx > 0) v = v.Substring(0, idx);
             }
 

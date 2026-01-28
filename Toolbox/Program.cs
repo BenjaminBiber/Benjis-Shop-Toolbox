@@ -104,7 +104,13 @@ using (var scope = app.Services.CreateScope())
     databaseConnectionService.FillDataBaseConnections();
 }
 
-try { app.Services.GetService<UpdaterService>()?.LaunchInBackgroundAsync(); } catch { }
+try
+{
+    using var scope = app.Services.CreateScope();
+    var allowBeta = scope.ServiceProvider.GetService<SettingsService>()?.Settings.AllowBetaUpdates ?? false;
+    app.Services.GetService<UpdaterService>()?.LaunchInBackgroundAsync(allowBeta);
+}
+catch { }
 
 TryStartTrayIconProcess(branchName);
 

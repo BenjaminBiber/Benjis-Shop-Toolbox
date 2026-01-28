@@ -21,6 +21,7 @@ public class ToolboxSettings
     public int RestartDelaySeconds { get; set; } 
 
     public bool BundleLogs { get; set; } = false;
+    public bool AllowBetaUpdates { get; set; }
     public bool DeleteBundlerOnShopRestart { get; set; }
     public bool DeleteAssetsOnShopRestart { get; set; }
     public long TrayIconIisSite { get; set; }
@@ -43,6 +44,7 @@ public class ToolboxSettings
         RestartShopOnThemeChange = true;
         RestartDelaySeconds = 3;
         BundleLogs = false;
+        AllowBetaUpdates = false;
         ShopSettingsList = new List<ShopSetting>();
         DeleteBundlerOnShopRestart = false;
         TrayIconIisSite = long.MinValue;

@@ -58,7 +58,7 @@
         _startingUpdater = true;
         try
         {
-            var ok = await UpdaterSvc.TryLaunchUpdaterAsync();
+            var ok = await UpdaterSvc.TryLaunchUpdaterAsync(Setting.AllowBetaUpdates);
             if (ok)
                 Snackbar.Add("Updater gestartet.", Severity.Success, cfg => cfg.VisibleStateDuration = 1500);
             else
@@ -86,7 +86,7 @@
             var v = attr?.InformationalVersion ?? asm.GetName().Version?.ToString();
             if (!string.IsNullOrEmpty(v))
             {
-                var idx = v.IndexOfAny(new[] { '+', '-' });
+                var idx = v.IndexOf('+');
                 if (idx > 0) v = v.Substring(0, idx);
             }
 

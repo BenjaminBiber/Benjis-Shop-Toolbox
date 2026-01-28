@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -173,7 +173,7 @@ class Program
     private static List<InstallerCandidate> GetInstallerCandidates(string outputDir)
     {
         var rx = new System.Text.RegularExpressions.Regex(
-            @"^Installer_Shop\-Toolbox_(\d+(?:[._]\d+){1,3})\.exe$",
+            @"^Installer_Shop\-Toolbox_(\d+(?:[._]\d+){1,3})(?:-([A-Za-z][0-9A-Za-z._-]*))?\.exe$",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase
         );
 
@@ -187,7 +187,13 @@ class Program
                 continue;
             }
 
-            var version = Normalize(m.Groups[1].Value);
+            var versionText = m.Groups[1].Value;
+            if (m.Groups[2].Success)
+            {
+                versionText = $"{versionText}-{m.Groups[2].Value}";
+            }
+            var parsed = ParseVersionOrDefault(versionText);
+            var version = parsed.FullText;
             var fi = new FileInfo(file);
             list.Add(new InstallerCandidate(version, file, fi.LastWriteTimeUtc));
         }
@@ -450,12 +456,13 @@ class Program
                 return false;
             }
 
-            if (!Version.TryParse(versionText, out var v))
+            if (!TryParseVersionInput(versionText, out var parsed, out var parseError))
             {
-                error = $"Ungültige Version: {versionText}";
+                error = $"Ungültige Version: {versionText}. {parseError}";
                 return false;
             }
 
+            var v = parsed.Numeric;
             var fourPart = $"{v.Major}.{v.Minor}.{(v.Build >= 0 ? v.Build : 0)}.{(v.Revision >= 0 ? v.Revision : 0)}";
 
             var doc = XDocument.Load(path, LoadOptions.PreserveWhitespace);
@@ -491,9 +498,10 @@ class Program
                 }
             }
 
-            SetOrAdd("Version", versionText);       // NuGet/Produktversion (3- oder 4-teilig)
+            SetOrAdd("Version", parsed.FullText);       // NuGet/Produktversion inkl. Beta-Tag
             SetOrAdd("AssemblyVersion", fourPart);   // AssemblyVersion (4-teilig)
             SetOrAdd("FileVersion", fourPart);       // Dateiversion (4-teilig)
+            SetOrAdd("InformationalVersion", parsed.FullText); // Anzeigen/Produktversion
 
             doc.Save(path);
             csprojPath = path;
@@ -529,23 +537,22 @@ class Program
 
     private static string? GetVersion(string[] args)
     {
-        // 1) Falls als Argument übergeben, zunächst das prüfen
+        // 1) Falls als Argument uebergeben, zuerst pruefen
         if (args is { Length: > 0 })
         {
-            var candidate = Normalize(args[0]);
-            if (IsValidVersion(candidate))
+            if (TryParseVersionInput(args[0], out var parsed, out var parseError))
             {
-                Console.WriteLine($"Verwende Version aus Argument: {candidate}");
-                return candidate;
+                Console.WriteLine($"Verwende Version aus Argument: {parsed.FullText}");
+                return parsed.FullText;
             }
-            Console.Error.WriteLine($"Ungültige Version im Argument: '{args[0]}'");
+            Console.Error.WriteLine($"Ungueltige Version im Argument: '{args[0]}' ({parseError})");
         }
 
         var currentFromCsproj = TryGetCurrentCsprojVersion(out var currentVer) ? currentVer : null;
-      
+
         while (true)
         {
-            Console.Write("Bitte neue Versionsnummer eingeben (z.B. 1.2.3 oder 1.2.3.4). ");
+            Console.Write("Bitte neue Versionsnummer eingeben (z.B. 1.2.3 oder 1.2.3-beta). ");
             if (!string.IsNullOrWhiteSpace(currentFromCsproj))
                 Console.Write($"Aktuell: {currentFromCsproj}. ");
             Console.Write("Eingabe 'q' zum Abbruch: ");
@@ -564,58 +571,248 @@ class Program
                 return null;
             }
 
-            var normalized = Normalize(input);
-            if (IsValidVersion(normalized))
+            if (!TryParseVersionInput(input, out var parsed, out var parseError))
             {
-                return normalized;
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.Error.WriteLine($"Ungueltiges Format. {parseError}");
+                Console.Error.WriteLine("Beispiele: 1.2.3, 1.2.3.4, 1.2.3-beta");
+                Console.Error.WriteLine("Trennzeichen: '.', '_' oder ',' (z.B. 1_2_3).");
+                Console.ResetColor();
+                continue;
             }
 
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Error.WriteLine("Ungültiges Format. Erlaubt sind 3 oder 4 numerische Segmente.");
-            Console.Error.WriteLine("Beispiele: 1.2.3, 1.2.3.4 (auch Trennzeichen ',', '_' oder '-' werden akzeptiert)");
-            Console.ResetColor();
+            if (!string.IsNullOrWhiteSpace(parsed.PreRelease))
+            {
+                if (!ConfirmUseBeta(parsed.PreRelease))
+                {
+                    continue;
+                }
+                return parsed.FullText;
+            }
+
+            if (ConfirmAddBeta())
+            {
+                parsed = new ParsedVersion(parsed.NumericText, parsed.Numeric, "beta");
+            }
+            return parsed.FullText;
         }
     }
 
-    private static string Normalize(string value)
+    private sealed record ParsedVersion(string NumericText, Version Numeric, string? PreRelease)
     {
-        // 'v' oder 'V' Präfixe erlauben (z.B. v1.2.3)
-        var s = (value ?? string.Empty).Trim();
+        public string FullText => string.IsNullOrWhiteSpace(PreRelease) ? NumericText : $"{NumericText}-{PreRelease}";
+        public bool IsBeta => PreRelease?.StartsWith("beta", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private static bool TryParseVersionInput(string value, out ParsedVersion parsed, out string error)
+    {
+        parsed = new ParsedVersion("0.0.0", new Version(0, 0, 0, 0), null);
+        error = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            error = "Leere Eingabe.";
+            return false;
+        }
+
+        var s = value.Trim();
+        var plusIndex = s.IndexOf('+');
+        if (plusIndex >= 0)
+        {
+            s = s[..plusIndex];
+        }
         if (s.StartsWith('v') || s.StartsWith('V'))
         {
             s = s[1..];
         }
-        // Erlaube ',', '_' und '-' als Trenner und normalisiere auf '.'
-        s = s.Replace(',', '.').Replace('_', '.').Replace('-', '.');
+
+        string? pre = null;
+        var hyphenIndex = s.IndexOf('-');
+        if (hyphenIndex >= 0)
+        {
+            var after = s[(hyphenIndex + 1)..];
+            if (ContainsLetters(after))
+            {
+                pre = NormalizePreRelease(after);
+                s = s[..hyphenIndex];
+            }
+            else
+            {
+                s = s.Replace('-', '.');
+            }
+        }
+
+        s = s.Replace(',', '.').Replace('_', '.');
         while (s.Contains("..")) s = s.Replace("..", ".");
         s = s.Trim('.');
-        return s;
+
+        if (!IsValidNumericVersion(s))
+        {
+            error = "Erlaubt sind 3 oder 4 numerische Segmente.";
+            return false;
+        }
+
+        if (!Version.TryParse(s, out var v))
+        {
+            error = "Version konnte nicht geparst werden.";
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(pre) && !IsSupportedPreRelease(pre))
+        {
+            error = "Nur das PreRelease 'beta' ist erlaubt.";
+            return false;
+        }
+
+        parsed = new ParsedVersion(s, v, string.IsNullOrWhiteSpace(pre) ? null : pre);
+        return true;
     }
 
-    private static bool IsValidVersion(string value)
+    private static ParsedVersion ParseVersionOrDefault(string value)
     {
-        // Nach Normalize: Nur numerische Segmente mit '.', 3 oder 4 Segmente
-        if (string.IsNullOrWhiteSpace(value)) return false;
+        return TryParseVersionInput(value, out var parsed, out _) ? parsed : new ParsedVersion("0.0.0", new Version(0, 0, 0, 0), null);
+    }
 
+    private static bool IsValidNumericVersion(string value)
+    {
         var regex = new System.Text.RegularExpressions.Regex(@"^\d+(?:\.\d+){2,3}$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
-        if (!regex.IsMatch(value)) return false;
+        return regex.IsMatch(value);
+    }
 
-        return Version.TryParse(value, out _);
+    private static bool IsSupportedPreRelease(string value)
+    {
+        var regex = new System.Text.RegularExpressions.Regex(@"^beta(?:[._-]?\d+)?$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return regex.IsMatch(value);
+    }
+
+    private static bool ContainsLetters(string value)
+        => value.Any(c => char.IsLetter(c));
+
+    private static string NormalizePreRelease(string value)
+    {
+        var p = (value ?? string.Empty).Trim();
+        p = p.Replace('_', '.').Replace('-', '.').Trim('.');
+        while (p.Contains("..")) p = p.Replace("..", ".");
+        p = p.ToLowerInvariant();
+        if (p.StartsWith("beta", StringComparison.OrdinalIgnoreCase))
+        {
+            var rest = p[4..].Trim('.');
+            if (rest.Length > 0)
+            {
+                p = "beta." + rest;
+            }
+            else
+            {
+                p = "beta";
+            }
+        }
+        return p;
     }
 
     private static int CompareVersions(string a, string b)
     {
-        if (!Version.TryParse(a, out var av))
-        {
-            av = new Version(0, 0, 0, 0);
-        }
+        return CompareVersionInfos(ParseVersionOrDefault(a), ParseVersionOrDefault(b));
+    }
 
-        if (!Version.TryParse(b, out var bv))
-        {
-            bv = new Version(0, 0, 0, 0);
-        }
+    private static int CompareVersionInfos(ParsedVersion a, ParsedVersion b)
+    {
+        var cmp = CompareNumeric(a.Numeric, b.Numeric);
+        if (cmp != 0) return cmp;
+        return ComparePreRelease(a.PreRelease, b.PreRelease);
+    }
 
-        return av.CompareTo(bv);
+    private static int CompareNumeric(Version a, Version b)
+    {
+        var aa = new[]
+        {
+            a.Major,
+            a.Minor,
+            a.Build >= 0 ? a.Build : 0,
+            a.Revision >= 0 ? a.Revision : 0
+        };
+        var bb = new[]
+        {
+            b.Major,
+            b.Minor,
+            b.Build >= 0 ? b.Build : 0,
+            b.Revision >= 0 ? b.Revision : 0
+        };
+
+        for (var i = 0; i < aa.Length; i++)
+        {
+            var c = aa[i].CompareTo(bb[i]);
+            if (c != 0) return c;
+        }
+        return 0;
+    }
+
+    private static int ComparePreRelease(string? a, string? b)
+    {
+        var hasA = !string.IsNullOrWhiteSpace(a);
+        var hasB = !string.IsNullOrWhiteSpace(b);
+        if (!hasA && !hasB) return 0;
+        if (!hasA) return 1;  // stable > prerelease
+        if (!hasB) return -1;
+
+        var ap = SplitPreRelease(a!);
+        var bp = SplitPreRelease(b!);
+        var len = Math.Max(ap.Length, bp.Length);
+        for (var i = 0; i < len; i++)
+        {
+            if (i >= ap.Length) return -1;
+            if (i >= bp.Length) return 1;
+
+            var ai = ap[i];
+            var bi = bp[i];
+            var aNum = int.TryParse(ai, out var av);
+            var bNum = int.TryParse(bi, out var bv);
+
+            if (aNum && bNum)
+            {
+                var cmp = av.CompareTo(bv);
+                if (cmp != 0) return cmp;
+            }
+            else if (aNum != bNum)
+            {
+                return aNum ? -1 : 1; // numeric < non-numeric
+            }
+            else
+            {
+                var cmp = string.Compare(ai, bi, StringComparison.OrdinalIgnoreCase);
+                if (cmp != 0) return cmp;
+            }
+        }
+        return 0;
+    }
+
+    private static string[] SplitPreRelease(string value)
+        => value.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    private static bool ConfirmAddBeta()
+    {
+        Console.Write("Beta-Tag anhaengen? (j/N): ");
+        var input = Console.ReadLine();
+        return IsAffirmative(input);
+    }
+
+    private static bool ConfirmUseBeta(string preRelease)
+    {
+        if (!IsSupportedPreRelease(preRelease))
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"Hinweis: PreRelease '{preRelease}' ist nicht erlaubt.");
+            Console.ResetColor();
+            return false;
+        }
+        Console.Write("Beta-Version erkannt. Fortfahren? (j/N): ");
+        var input = Console.ReadLine();
+        return IsAffirmative(input);
+    }
+
+    private static bool IsAffirmative(string? value)
+    {
+        var v = (value ?? string.Empty).Trim().ToLowerInvariant();
+        return v is "j" or "ja" or "y" or "yes";
     }
 
     private static bool TryGetCurrentCsprojVersion(out string version)
@@ -633,11 +830,15 @@ class Program
                 .FirstOrDefault(e => e != null);
             if (versionElem != null && !string.IsNullOrWhiteSpace(versionElem.Value))
             {
-                version = Normalize(versionElem.Value);
-                return true;
+                if (TryParseVersionInput(versionElem.Value, out var parsed, out _))
+                {
+                    version = parsed.FullText;
+                    return true;
+                }
             }
         }
         catch { }
         return false;
     }
 }
+
