@@ -23,7 +23,7 @@
 .settings-content {
   flex: 1;
   padding: 16px 24px;
-  max-height: calc(100dvh - var(--mud-appbar-height));
+  max-height: 100dvh;
   overflow-y: scroll;
 }
 

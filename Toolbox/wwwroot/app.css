@@ -347,13 +347,19 @@ body {
   font-size: 18px;
 }
 
-.layout-content {
-  height: calc(100dvh - var(--mud-appbar-height));
+.main-content {
+  padding-top: 0 !important;
 }
 
 .topbar-divider {
-  border-color: var(--mud-palette-primary);
+  border-color: var(--mud-palette-inherit);
   border-width: 2px;
+}
+
+.mud-drawer-content {
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .clone-actions-log-panel {

@@ -2,39 +2,39 @@
 @using Toolbox.Services
 @inject UiThemeState ThemeState
 
-<MudDrawer @bind-Open="IsOpen" Variant="DrawerVariant.Responsive" Breakpoint="Breakpoint.Xl" ClipMode="DrawerClipMode.Docked" Anchor="Anchor.Start" Elevation="3">
-    <MudNavMenu>
-        <MudNavLink IconColor="Color.Primary" Href="" Icon="@Icons.Material.Filled.Home" Match="NavLinkMatch.All">Home</MudNavLink>
+<MudDrawer Color="Color.Primary" @bind-Open="IsOpen" Class="d-flex align-items-center justify-content-center flex-column" Overlay="false" Variant="DrawerVariant.Mini" Breakpoint="Breakpoint.None" ClipMode="DrawerClipMode.Never" Anchor="Anchor.Start" Elevation="3">
+    <MudNavMenu Color="Color.Inherit" Class="w-100">
+        <MudNavLink Class="w-100" IconColor="Color.Inherit" Href="" Icon="@Icons.Material.Filled.Home" Match="NavLinkMatch.All">Home</MudNavLink>
         <MudDivider Class="topbar-divider"></MudDivider>
-        <MudNavLink IconColor="Color.Primary" Href="themes" Icon="@Icons.Material.Filled.Link">Themes</MudNavLink>
-        <MudNavLink IconColor="Color.Primary" Href="extensions" Icon="@Icons.Material.Filled.Extension">Extensions</MudNavLink>
+        <MudNavLink Class="w-100" IconColor="Color.Inherit" Href="themes" Icon="@Icons.Material.Filled.Link">Themes</MudNavLink>
+        <MudNavLink Class="w-100" IconColor="Color.Inherit" Href="extensions" Icon="@Icons.Material.Filled.Extension">Extensions</MudNavLink>
         <MudDivider Class="topbar-divider"></MudDivider>
-        <MudNavLink IconColor="Color.Primary" Href="shop" Icon="@Icons.Material.Filled.Store">Shop</MudNavLink>
-        <MudNavLink IconColor="Color.Primary" Href="sites" Icon="@Icons.Material.Filled.Dns">IIS-Seiten</MudNavLink>
+        <MudNavLink Class="w-100" IconColor="Color.Inherit" Href="shop" Icon="@Icons.Material.Filled.Store">Shop</MudNavLink>
+        <MudNavLink Class="w-100" IconColor="Color.Inherit" Href="sites" Icon="@Icons.Material.Filled.Dns">IIS-Seiten</MudNavLink>
         <MudDivider Class="topbar-divider"></MudDivider>
         @* <MudNavLink IconColor="Color.Primary" Href="WidgetPage" Icon="@Icons.Material.Filled.Widgets">Widgets</MudNavLink> *@
-        <MudNavLink IconColor="Color.Primary" Href="settings" Icon="@Icons.Material.Filled.Settings">Einstellungen</MudNavLink>
+        <MudNavLink IconColor="Color.Inherit" Href="settings" Icon="@Icons.Material.Filled.Settings">Einstellungen</MudNavLink>
     </MudNavMenu>
+    <div class="w-100 d-flex justify-content-between align-items-center mb-3 gap-2 @(IsOpen ? "flex-row" : "flex-column-reverse")">
+        <MudTooltip Text="@(IsOpen ? "Seitenleiste schließen" : "Seitenleiste öffnen")">
+            <MudToggleIconButton Icon="@Icons.Material.Filled.ChevronRight"
+                                 ToggledIcon="@Icons.Material.Filled.ChevronLeft"
+                                 Color="Color.Inherit"
+                                 Size="Size.Medium"
+                                 @bind-Toggled="IsOpen" />
+        </MudTooltip>
+        <MudTooltip Text="Hilfe">
+            <MudMenu ActivationEvent="@MouseEvent.RightClick">
+                <ActivatorContent>
+                    <MudIconButton Icon="@Icons.Material.Filled.Help" Color="Color.Inherit" Size="Size.Medium" Href="https://4sellers.atlassian.net/wiki/x/HADPCg"></MudIconButton>
+                </ActivatorContent>
+                <ChildContent>
+                    <MudMenuItem Icon="@(ThemeState.IsWin95Mode ? @Icons.Material.Filled.FormatPaint : win95Icon)" OnClick="() => OnWin95ModeChanged(!ThemeState.IsWin95Mode)" Label="@(ThemeState.IsWin95Mode ? "Standard" : "Win95")"/>
+                </ChildContent>
+            </MudMenu>
+        </MudTooltip>
+    </div>
 </MudDrawer>
-
-<MudAppBar Fixed="true" Elevation="3">
-    <MudIconButton Icon="@Icons.Material.Filled.Menu"
-                   Color="Color.Inherit"
-                   Size="Size.Medium"
-                   Edge="Edge.Start"
-                   OnClick="@(() => IsOpen = !IsOpen)" />
-    <MudSpacer></MudSpacer>
-    <MudTooltip Text="Hilfe">
-        <MudMenu ActivationEvent="@MouseEvent.RightClick">
-            <ActivatorContent>
-                <MudIconButton Icon="@Icons.Material.Filled.Help" Color="Color.Info" Size="Size.Small" Href="https://4sellers.atlassian.net/wiki/x/HADPCg"></MudIconButton>
-            </ActivatorContent>
-            <ChildContent>
-                <MudMenuItem Icon="@(ThemeState.IsWin95Mode ? @Icons.Material.Filled.FormatPaint : win95Icon)" OnClick="() => OnWin95ModeChanged(!ThemeState.IsWin95Mode)" Label="@(ThemeState.IsWin95Mode ? "Standard" : "Win95")" />
-            </ChildContent>
-        </MudMenu>
-    </MudTooltip>
-</MudAppBar>
 
 @code {
     public bool IsOpen { get; set; } = true;

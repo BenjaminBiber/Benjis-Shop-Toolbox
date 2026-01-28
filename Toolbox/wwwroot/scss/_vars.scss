@@ -1,5 +1,5 @@
 $appbar-height: var(--mud-appbar-height);
-$appbar-viewport-height: calc(100dvh - #{$appbar-height});
+$appbar-viewport-height: 100dvh;
 $appbar-viewport-height-with-gap: calc(100dvh - #{$appbar-height} - 32px);
 
 $color-white: #ffffff;

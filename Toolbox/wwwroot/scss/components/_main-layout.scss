@@ -1,5 +1,5 @@
 @use "../vars" as *;
 
-.layout-content {
-    height: $appbar-viewport-height;
+.main-content {
+    padding-top: 0 !important;
 }
