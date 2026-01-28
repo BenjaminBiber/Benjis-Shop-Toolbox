@@ -1,0 +1,45 @@
+@using MudBlazor
+@using Toolbox.Services
+
+<MudDialog Class="changelog-dialog" MaxWidth="MaxWidth.Large">
+    <TitleContent>
+        <div class="changelog-dialog__title">
+            <MudText Typo="Typo.h6" Class="fw-bold">Changelog</MudText>
+            <MudText Typo="Typo.body2" Class="changelog-dialog__subtitle">@Subtitle</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div class="changelog-dialog__content">
+            @if (Report is null || Report.Entries.Count == 0)
+            {
+                <MudText Typo="Typo.body1">Kein Changelog fuer diese Version gefunden.</MudText>
+            }
+            else
+            {
+                @foreach (var entry in Report.Entries)
+                {
+                    <div class="changelog-entry">
+                        <MudText Typo="Typo.h6" Class="changelog-entry__version">Version @entry.Version</MudText>
+                        <MudPaper Class="changelog-entry__body" Elevation="0">
+                            <pre class="changelog-entry__text">@entry.Content</pre>
+                        </MudPaper>
+                    </div>
+                }
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="Close">Schliessen</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public ChangelogReport? Report { get; set; }
+
+    private string Subtitle => Report == null
+        ? "Was ist neu?"
+        : $"Aenderungen seit Version {Report.PreviousVersion}";
+
+    private void Close() => MudDialog.Close();
+}

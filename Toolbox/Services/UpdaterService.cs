@@ -7,6 +7,13 @@ namespace Toolbox.Services;
 
 public class UpdaterService
 {
+    private readonly ChangelogService _changelogService;
+
+    public UpdaterService(ChangelogService changelogService)
+    {
+        _changelogService = changelogService;
+    }
+
     public Task LaunchInBackgroundAsync(bool allowBeta)
     {
         if (!OperatingSystem.IsWindows()) return Task.CompletedTask;
@@ -32,6 +39,14 @@ public class UpdaterService
 
             var current = GetInformationalVersion()
                           ?? (typeof(UpdaterService).Assembly.GetName().Version?.ToString() ?? "0.0.0");
+            try
+            {
+                _changelogService.StorePendingVersion(current);
+            }
+            catch
+            {
+                // ignore
+            }
             var allowBetaArg = allowBeta ? "true" : "false";
             var args = $"--pid {Environment.ProcessId} --process-name \"Toolbox\" --current-version {current} --allow-beta {allowBetaArg}";
 #if DEBUG

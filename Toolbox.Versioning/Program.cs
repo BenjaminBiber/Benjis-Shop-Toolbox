@@ -2,6 +2,10 @@
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
 using System.Xml.Linq;
 
 namespace Toolbox.Versioning;
@@ -40,6 +44,18 @@ class Program
             Console.ResetColor();
         }
 
+        var repoRoot = FindRepoRoot();
+        if (repoRoot is null)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("Hinweis: Kein Git-Repository gefunden (.git nicht vorhanden). Changelog-Erstellung wird uebersprungen.");
+            Console.ResetColor();
+        }
+        else
+        {
+            TryEnsureChangelogFile(repoRoot, appVersion, hadPrev ? prevVersion : null);
+        }
+
         // 2) Toolbox publishen (Release) in ein temporäres Verzeichnis und Pfad an Inno weiterreichen
         var publishDir = PublishToolbox(appVersion);
         if (publishDir is null)
@@ -76,7 +92,6 @@ class Program
         if (process.ExitCode == 0)
         {
             TryCleanupOldInstallers();
-            var repoRoot = FindRepoRoot();
             if (repoRoot is null)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
@@ -154,6 +169,266 @@ class Program
             Console.WriteLine($"Hinweis: Cleanup uebersprungen: {ex.Message}");
             Console.ResetColor();
         }
+    }
+
+    private static void TryEnsureChangelogFile(string repoRoot, string appVersion, string? prevVersion)
+    {
+        try
+        {
+            var normalizedVersion = NormalizeVersionText(appVersion);
+            var changelogDir = Path.Combine(repoRoot, "Toolbox", "wwwroot", "Changelog");
+            Directory.CreateDirectory(changelogDir);
+            var changelogPath = Path.Combine(changelogDir, $"{normalizedVersion}.md");
+
+            if (File.Exists(changelogPath))
+            {
+                Console.WriteLine($"Changelog existiert bereits: {changelogPath}");
+                return;
+            }
+
+            var context = BuildChangelogContext(repoRoot, prevVersion);
+            var content = BuildChangelogContent(appVersion, prevVersion, context);
+            File.WriteAllText(changelogPath, content);
+            Console.WriteLine($"Changelog erstellt: {changelogPath}");
+        }
+        catch (Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"Hinweis: Changelog konnte nicht erstellt werden: {ex.Message}");
+            Console.ResetColor();
+        }
+    }
+
+    private sealed record ChangelogContext(string? BaseCommit, string GitLog, string DiffStat);
+
+    private static ChangelogContext BuildChangelogContext(string repoRoot, string? prevVersion)
+    {
+        var baseCommit = TryFindVersionCommit(repoRoot, prevVersion);
+        var gitLog = string.Empty;
+        var diffStat = string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(baseCommit))
+        {
+            RunProcess("git", $"log {baseCommit}..HEAD --pretty=format:%h %s", repoRoot, out gitLog, out _);
+            RunProcess("git", $"diff --stat {baseCommit}..HEAD", repoRoot, out diffStat, out _);
+        }
+        else
+        {
+            RunProcess("git", "log -n 50 --pretty=format:%h %s", repoRoot, out gitLog, out _);
+            RunProcess("git", "diff --stat HEAD~50..HEAD", repoRoot, out diffStat, out _);
+        }
+
+        gitLog = TrimToMax(gitLog, 6000);
+        diffStat = TrimToMax(diffStat, 4000);
+
+        return new ChangelogContext(baseCommit, gitLog, diffStat);
+    }
+
+    private static string BuildChangelogContent(string appVersion, string? prevVersion, ChangelogContext context)
+    {
+        var provider = (Environment.GetEnvironmentVariable("TOOLBOX_CHANGELOG_PROVIDER") ?? "openai").Trim().ToLowerInvariant();
+        if (provider == "openai" || (provider.Length == 0 && !string.IsNullOrWhiteSpace(GetOpenAiKey())))
+        {
+            var ai = TryGenerateChangelogOpenAi(appVersion, prevVersion, context);
+            if (!string.IsNullOrWhiteSpace(ai))
+            {
+                return ai.Trim();
+            }
+        }
+
+        return BuildChangelogTemplate(appVersion, prevVersion, context, provider);
+    }
+
+    private static string BuildChangelogTemplate(string appVersion, string? prevVersion, ChangelogContext context, string provider)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"# {NormalizeVersionText(appVersion)}");
+        sb.AppendLine();
+        sb.AppendLine("## Hinzugefuegt");
+        sb.AppendLine("- TODO");
+        sb.AppendLine();
+        sb.AppendLine("## Geaendert");
+        sb.AppendLine("- TODO");
+        sb.AppendLine();
+        sb.AppendLine("## Behoben");
+        sb.AppendLine("- TODO");
+
+        if (!string.IsNullOrWhiteSpace(context.GitLog) || !string.IsNullOrWhiteSpace(context.DiffStat))
+        {
+            sb.AppendLine();
+            sb.AppendLine("<!-- Kontext:");
+            if (!string.IsNullOrWhiteSpace(prevVersion))
+            {
+                sb.AppendLine($"Vorherige Version: {NormalizeVersionText(prevVersion)}");
+            }
+            if (!string.IsNullOrWhiteSpace(context.BaseCommit))
+            {
+                sb.AppendLine($"Basis-Commit: {context.BaseCommit}");
+            }
+            if (!string.IsNullOrWhiteSpace(context.GitLog))
+            {
+                sb.AppendLine("Git-Log:");
+                sb.AppendLine(context.GitLog);
+            }
+            if (!string.IsNullOrWhiteSpace(context.DiffStat))
+            {
+                sb.AppendLine("Diff-Stat:");
+                sb.AppendLine(context.DiffStat);
+            }
+            if (provider == "codex")
+            {
+                sb.AppendLine("Hinweis: Changelog kann per Codex verfeinert werden.");
+            }
+            sb.AppendLine("-->");
+        }
+
+        return sb.ToString();
+    }
+
+    private static string? TryGenerateChangelogOpenAi(string appVersion, string? prevVersion, ChangelogContext context)
+    {
+        try
+        {
+            var apiKey = GetOpenAiKey();
+            if (string.IsNullOrWhiteSpace(apiKey))
+            {
+                return null;
+            }
+
+            var model = Environment.GetEnvironmentVariable("TOOLBOX_OPENAI_MODEL");
+            if (string.IsNullOrWhiteSpace(model))
+            {
+                model = "gpt-4o-mini";
+            }
+
+            var prompt = BuildOpenAiPrompt(appVersion, prevVersion, context);
+            var payload = new
+            {
+                model,
+                temperature = 0.2,
+                messages = new[]
+                {
+                    new { role = "system", content = "Du erstellst kurze, praezise Release-Notes fuer eine interne Toolbox. Ausgabe nur Markdown." },
+                    new { role = "user", content = prompt }
+                }
+            };
+
+            var json = JsonSerializer.Serialize(payload);
+            using var client = new HttpClient();
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            var response = client.PostAsync("https://api.openai.com/v1/chat/completions",
+                new StringContent(json, Encoding.UTF8, "application/json")).GetAwaiter().GetResult();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            var responseJson = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+            using var doc = JsonDocument.Parse(responseJson);
+            var content = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
+            return string.IsNullOrWhiteSpace(content) ? null : content.Trim();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string BuildOpenAiPrompt(string appVersion, string? prevVersion, ChangelogContext context)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"Erstelle einen Changelog fuer Version {NormalizeVersionText(appVersion)}.");
+        if (!string.IsNullOrWhiteSpace(prevVersion))
+        {
+            sb.AppendLine($"Vorherige Version: {NormalizeVersionText(prevVersion)}.");
+        }
+        if (!string.IsNullOrWhiteSpace(context.BaseCommit))
+        {
+            sb.AppendLine($"Basis-Commit: {context.BaseCommit}.");
+        }
+        sb.AppendLine();
+        sb.AppendLine("Nutze die folgenden Informationen:");
+        if (!string.IsNullOrWhiteSpace(context.GitLog))
+        {
+            sb.AppendLine("Git-Log:");
+            sb.AppendLine(context.GitLog);
+        }
+        if (!string.IsNullOrWhiteSpace(context.DiffStat))
+        {
+            sb.AppendLine("Diff-Stat:");
+            sb.AppendLine(context.DiffStat);
+        }
+        sb.AppendLine();
+        sb.AppendLine("Gib ausschliesslich Markdown aus. Struktur:");
+        sb.AppendLine("# <Version>");
+        sb.AppendLine("## Hinzugefuegt");
+        sb.AppendLine("- ...");
+        sb.AppendLine("## Geaendert");
+        sb.AppendLine("- ...");
+        sb.AppendLine("## Behoben");
+        sb.AppendLine("- ...");
+        sb.AppendLine("Wenn es nichts gibt, schreibe '- Keine Eintraege.' in der passenden Sektion.");
+        return sb.ToString();
+    }
+
+    private static string? TryFindVersionCommit(string repoRoot, string? prevVersion)
+    {
+        if (string.IsNullOrWhiteSpace(prevVersion))
+        {
+            return null;
+        }
+
+        var normalized = NormalizeVersionText(prevVersion);
+        var code = RunProcess("git", $"log --grep \"Bump to Version {normalized}\" -n 1 --pretty=format:%H", repoRoot, out var so, out _);
+        if (code != 0)
+        {
+            return null;
+        }
+
+        var sha = so.Trim();
+        return string.IsNullOrWhiteSpace(sha) ? null : sha;
+    }
+
+    private static string? GetOpenAiKey()
+    {
+        return Environment.GetEnvironmentVariable("TOOLBOX_OPENAI_API_KEY")
+               ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+    }
+
+    private static string NormalizeVersionText(string versionText)
+    {
+        if (TryParseVersionInput(versionText, out var parsed, out _))
+        {
+            return parsed.FullText;
+        }
+
+        var s = (versionText ?? string.Empty).Trim();
+        var plusIndex = s.IndexOf('+');
+        if (plusIndex >= 0)
+        {
+            s = s[..plusIndex];
+        }
+        if (s.StartsWith('v') || s.StartsWith('V'))
+        {
+            s = s[1..];
+        }
+        return s;
+    }
+
+    private static string TrimToMax(string value, int max)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        if (value.Length <= max)
+        {
+            return value.Trim();
+        }
+
+        return value.Substring(0, max).TrimEnd() + "\n... (gekuerzt)";
     }
 
     private sealed class InstallerCandidate

@@ -225,7 +225,7 @@
                 </div>
                 @if (_selectedLog is not null)
                 {
-                    <MudPaper Elevation="5" Class="@($"mt-2 p-3 mb-5 mr-3 home-log-detail {(_selectedLog is null ? "home-log-detail--hidden" : string.Empty)}")">
+                    <MudPaper Style="z-index: 999; max-height: 45dvh;" Elevation="5" Class="@($"mt-2 p-3 mb-5 mr-3 home-log-detail {(_selectedLog is null ? "home-log-detail--hidden" : string.Empty)}")">
 
                     <div class="d-flex align-items-start mb-2">
                         <MudText Typo="Typo.h6" Class="fw-bold me-auto">Logdetails</MudText>
@@ -240,7 +240,7 @@
                         </div>
                         <div class="col-12 col-lg-7">
                             <MudText Typo="Typo.subtitle2" Class="fw-bold mb-1">Nachricht</MudText>
-                            <MudPaper Elevation="0" Class="p-2 h-100 home-log-message">
+                            <MudPaper Elevation="0" Class="p-2 h-100 home-log-message" Style="max-height: 35dvh; overflow-y: scroll">
                                 <pre class="home-log-pre">@HighlightDetail(_selectedLog.ParsedMessage?.GetFormattedMessage(new HashSet<MessageType>() { MessageType.Message }) ?? _selectedLog.Message)</pre>
                             </MudPaper>
                         </div>

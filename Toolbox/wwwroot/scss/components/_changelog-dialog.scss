@@ -1,0 +1,42 @@
+@use "../vars" as *;
+
+.changelog-dialog {
+    .mud-dialog-content {
+        padding-top: $space-12;
+    }
+}
+
+.changelog-dialog__title {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.changelog-dialog__subtitle {
+    color: $color-muted-light;
+}
+
+.changelog-dialog__content {
+    max-height: 65vh;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: $space-16;
+}
+
+.changelog-entry__version {
+    margin-bottom: $space-8;
+}
+
+.changelog-entry__body {
+    background: $color-log-bg;
+    color: $color-muted-light;
+    padding: $space-12;
+    border-radius: $radius-8;
+}
+
+.changelog-entry__text {
+    white-space: pre-wrap;
+    margin: 0;
+    font-family: Consolas, "Courier New", monospace;
+}
