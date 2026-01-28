@@ -58,7 +58,7 @@
             </div>
             <div class="col-7 d-flex col-lg-12 justify-content-evenly gap-3 flex-lg-column align-items-center">
                 <MudButton Color="Color.Success" Class="w-100" StartIcon="@Icons.Material.Filled.Start" Variant="Variant.Filled" OnClick="@IisService.StartIisApp">Start</MudButton>
-                <MudButton Color="Color.Warning" Class="w-100" StartIcon="@Icons.Material.Filled.RestartAlt" Variant="Variant.Filled" OnClick="@(() => IisService.RestartIisApp())">Neustart</MudButton>
+                <MudButton Color="Color.Warning" Class="w-100" StartIcon="@Icons.Material.Filled.RestartAlt" Variant="Variant.Filled" OnClick="RestartIisAppAndRefresh">Neustart</MudButton>
                 <MudButton Color="Color.Error" Class="w-100" StartIcon="@Icons.Material.Filled.Stop" Variant="Variant.Filled" OnClick="@IisService.StopCurrentIisApp">Stop</MudButton>
             </div>
         </div>
@@ -431,6 +431,7 @@
     {
         _isLoading = true;
         StateHasChanged();
+        await RefreshRestartTimeIfChangedAsync();
         var since = reload switch
         {
             ReloadOption.AlleLogs => DateTime.MinValue,
@@ -471,6 +472,34 @@
         _refreshSeconds = Settings.AutoRefreshSeconds;
         StartTimer();
         await LoadLogs();
+    }
+
+    private async Task RestartIisAppAndRefresh()
+    {
+        await IisService.RestartIisApp();
+        await RefreshRestartTimeIfChangedAsync(forceReload: true);
+        await LoadLogs();
+    }
+
+    private async Task RefreshRestartTimeIfChangedAsync(bool forceReload = false)
+    {
+        if (!_onlySinceRestart && !forceReload)
+        {
+            return;
+        }
+
+        var appInfo = await AppInfoService.GetAsync();
+        if (appInfo.IisRestartTime <= _lastShopRestart && !forceReload)
+        {
+            return;
+        }
+
+        _lastShopRestart = appInfo.IisRestartTime;
+        if (_onlySinceRestart)
+        {
+            _logSinceTime = _lastShopRestart;
+            reload = ReloadOption.SeitLetztemNeuladen;
+        }
     }
 
     private async Task UpdateLoadedExtensions()

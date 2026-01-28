@@ -7,9 +7,9 @@
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>0.4.12</Version>
-    <AssemblyVersion>0.4.12.0</AssemblyVersion>
-    <FileVersion>0.4.12.0</FileVersion>
+    <Version>0.4.13</Version>
+    <AssemblyVersion>0.4.13.0</AssemblyVersion>
+    <FileVersion>0.4.13.0</FileVersion>
     <ApplicationIcon>wwwroot\favicon.ico</ApplicationIcon>
   </PropertyGroup>
   <PropertyGroup>
