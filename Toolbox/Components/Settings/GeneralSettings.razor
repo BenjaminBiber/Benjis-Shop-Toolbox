@@ -23,7 +23,10 @@
     </div>
     <div class="col-12 d-flex flex-column gap-2">
         <div class="pl-4 d-flex flex-column gap-2">
-            <MudText Typo="Typo.caption" Class="fw-bold">Repo Pfade</MudText>
+            <MudText Typo="Typo.caption" Class="fw-bold">
+                Repo Pfade
+                <SettingsHelp PropertyName="@nameof(ToolboxSettings.ThemeRepositoryPath)" />
+            </MudText>
             <MudChipSet T="string" Class="d-flex flex-wrap gap-1">
                 @if (_themePaths.Any())
                 {
@@ -48,7 +51,10 @@
                            OnClick="AddThemePath">Pfad hinzufügen</MudButton>
             </div>
         </div>
-        <MudCheckBox Class="p-0" ValueChanged="(bool i) => SettingsService.SaveSettingChanges(x => x.RestartShopOnThemeChange = i, NotificationService)" Value="Setting.RestartShopOnThemeChange" T="bool" Color="Color.Primary">Shop bei Theme-Wechsel neustarten</MudCheckBox>
+        <MudCheckBox Class="p-0" ValueChanged="(bool i) => SettingsService.SaveSettingChanges(x => x.RestartShopOnThemeChange = i, NotificationService)" Value="Setting.RestartShopOnThemeChange" T="bool" Color="Color.Primary">
+            Shop bei Theme-Wechsel neustarten
+            <SettingsHelp PropertyName="@nameof(ToolboxSettings.RestartShopOnThemeChange)" />
+        </MudCheckBox>
     </div>
 
     <div class="col-12 mt-3 d-flex gap-1 align-items-center justify-content-center">
@@ -57,7 +63,10 @@
     </div>
     <div class="col-12 d-flex flex-column gap-2">
         <div class="pl-4 d-flex flex-column gap-2">
-            <MudText Typo="Typo.caption" Class="fw-bold">Repo Pfade</MudText>
+            <MudText Typo="Typo.caption" Class="fw-bold">
+                Repo Pfade
+                <SettingsHelp PropertyName="@nameof(ToolboxSettings.ExtensionsRepositoryPath)" />
+            </MudText>
             <MudChipSet T="string" Class="d-flex flex-wrap gap-1">
                 @if (_extensionPaths.Any())
                 {
@@ -89,8 +98,11 @@
         <MudDivider Class="w-auto"></MudDivider>
     </div>
     <div class="col-12 d-flex flex-column gap-2">
-        <MudTextField ValueChanged="(string i) => SettingsService.SaveSettingChanges(x => x.GeneralFolderPath = i, NotificationService)" Value="Setting.GeneralFolderPath" Label="Shopsystem Ordnerpfad" Variant="Variant.Text" Class="pl-4"
-                      Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseGeneralFolder"/>
+        <div class="settings-field-with-help">
+            <MudTextField ValueChanged="(string i) => SettingsService.SaveSettingChanges(x => x.GeneralFolderPath = i, NotificationService)" Value="Setting.GeneralFolderPath" Label="Shopsystem Ordnerpfad" Variant="Variant.Text" Class="pl-4 settings-field-grow"
+                          Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseGeneralFolder" />
+            <SettingsHelp PropertyName="@nameof(ToolboxSettings.GeneralFolderPath)" />
+        </div>
     </div>
     
     <div class="col-12 mt-3 d-flex gap-1 align-items-center justify-content-center">
@@ -102,7 +114,10 @@
                      ValueChanged="(bool i) => SettingsService.SaveSettingChanges(x => x.AllowBetaUpdates = i, NotificationService)"
                      Value="Setting.AllowBetaUpdates"
                      T="bool"
-                     Color="Color.Primary">Beta-Versionen installieren</MudCheckBox>
+                     Color="Color.Primary">
+            Beta-Versionen installieren
+            <SettingsHelp PropertyName="@nameof(ToolboxSettings.AllowBetaUpdates)" />
+        </MudCheckBox>
         <MudTooltip Text="Startet den Updater (Administratorrechte erforderlich).">
             <MudButton Variant="MudBlazor.Variant.Outlined"
                        Color="Color.Primary"

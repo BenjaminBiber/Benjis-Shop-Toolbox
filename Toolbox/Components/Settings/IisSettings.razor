@@ -14,9 +14,18 @@
         <MudDivider Class="w-auto"></MudDivider>
     </div>
     <div class="col-12 d-flex flex-column gap-2">
-        <MudNumericField T="int" FullWidth="true" ValueChanged="(int i) => SettingsService.SaveSettingChanges(x => x.RestartDelaySeconds = i, NotificationService)" Value="Setting.RestartDelaySeconds" Label="Zeit zwischen Start und Stop von IIS-Seiten (Sekunden)" Variant="Variant.Text" Class="pl-4" Min="1" />
-        <MudCheckBox Class="p-0" ValueChanged="(bool i) => SettingsService.SaveSettingChanges(x => x.DeleteBundlerOnShopRestart = i, NotificationService)" Value="Setting.DeleteBundlerOnShopRestart" T="bool" Color="Color.Primary">Shop-Bundler beim Neustart löschen</MudCheckBox>
-        <MudCheckBox Class="p-0" ValueChanged="(bool i) => SettingsService.SaveSettingChanges(x => x.DeleteAssetsOnShopRestart = i, NotificationService)" Value="Setting.DeleteAssetsOnShopRestart" T="bool" Color="Color.Primary">Shop-Assets(wwwroot) beim Neustart löschen</MudCheckBox>
+        <div class="settings-field-with-help">
+            <MudNumericField T="int" FullWidth="true" ValueChanged="(int i) => SettingsService.SaveSettingChanges(x => x.RestartDelaySeconds = i, NotificationService)" Value="Setting.RestartDelaySeconds" Label="Zeit zwischen Start und Stop von IIS-Seiten (Sekunden)" Variant="Variant.Text" Class="pl-4 settings-field-grow" Min="1" />
+            <SettingsHelp PropertyName="@nameof(ToolboxSettings.RestartDelaySeconds)" />
+        </div>
+        <MudCheckBox Class="p-0" ValueChanged="(bool i) => SettingsService.SaveSettingChanges(x => x.DeleteBundlerOnShopRestart = i, NotificationService)" Value="Setting.DeleteBundlerOnShopRestart" T="bool" Color="Color.Primary">
+            Shop-Bundler beim Neustart löschen
+            <SettingsHelp PropertyName="@nameof(ToolboxSettings.DeleteBundlerOnShopRestart)" />
+        </MudCheckBox>
+        <MudCheckBox Class="p-0" ValueChanged="(bool i) => SettingsService.SaveSettingChanges(x => x.DeleteAssetsOnShopRestart = i, NotificationService)" Value="Setting.DeleteAssetsOnShopRestart" T="bool" Color="Color.Primary">
+            Shop-Assets(wwwroot) beim Neustart löschen
+            <SettingsHelp PropertyName="@nameof(ToolboxSettings.DeleteAssetsOnShopRestart)" />
+        </MudCheckBox>
     </div>
     
     <div class="col-12 mt-3 d-flex gap-1 align-items-center justify-content-center">
@@ -24,12 +33,15 @@
         <MudDivider Class="w-auto"></MudDivider>
     </div>
     <div class="col-12 d-flex flex-column gap-2 pl-4">
-        <MudSelect Placeholder="Shop zum Starten/Stoppen/Neustarten über die Taskbar" Label="Shop zum Starten/Stoppen/Neustarten über die Taskbar" Variant="Variant.Text" Value="Setting.GetTrayIconSite().Id" ValueChanged="(long i) => SettingsService.SaveSettingChanges(x => x.TrayIconIisSite = i, NotificationService)" T="long">
-            @foreach (var shopPaths in Setting.ShopSettingsList)
-            {
-                <MudSelectItem Value="shopPaths.SiteId">@GetShopDisplayName(shopPaths)</MudSelectItem>
-            }
-        </MudSelect>
+        <div class="settings-field-with-help">
+            <MudSelect Placeholder="Shop zum Starten/Stoppen/Neustarten über die Taskbar" Label="Shop zum Starten/Stoppen/Neustarten über die Taskbar" Variant="Variant.Text" Value="Setting.GetTrayIconSite().Id" ValueChanged="(long i) => SettingsService.SaveSettingChanges(x => x.TrayIconIisSite = i, NotificationService)" T="long" Class="settings-field-grow">
+                @foreach (var shopPaths in Setting.ShopSettingsList)
+                {
+                    <MudSelectItem Value="shopPaths.SiteId">@GetShopDisplayName(shopPaths)</MudSelectItem>
+                }
+            </MudSelect>
+            <SettingsHelp PropertyName="@nameof(ToolboxSettings.TrayIconIisSite)" />
+        </div>
     </div>
 </div>
 

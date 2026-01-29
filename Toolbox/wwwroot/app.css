@@ -583,3 +583,31 @@ body {
   text-align: center;
   letter-spacing: 0.3px;
 }
+
+.settings-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  border-radius: 50%;
+  border: 1px solid #808080;
+  color: #000080;
+  background: #dcdcdc;
+  cursor: help;
+}
+
+.settings-field-with-help {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-field-grow {
+  flex: 1 1 auto;
+  min-width: 0;
+}

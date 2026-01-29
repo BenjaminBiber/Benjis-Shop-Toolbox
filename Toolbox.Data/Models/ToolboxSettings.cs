@@ -1,4 +1,5 @@
 using Microsoft.Web.Administration;
+using System.ComponentModel;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -9,21 +10,33 @@ public class ToolboxSettings
     public const int SingletonId = 1;
     public int Id { get; set; }
     public string? IisAppName { get; set; }
+    [Description("Name des Windows-Ereignislogs, aus dem die Logs gelesen werden.")]
     public string? LogName { get; set; }
+    [Description("Liste der Theme-Repository-Wurzelordner (mehrere Pfade sind möglich). Wird zum Finden/Verwalten von Themes genutzt.")]
     public string ThemeRepositoryPath { get; set; }
+    [Description("Liste der Extension-Repository-Wurzelordner (mehrere Pfade sind möglich). Wird zum Finden/Verwalten von Extensions genutzt.")]
     public string ExtensionsRepositoryPath { get; set; }
+    [Description("Basis-Ordner, der nach Shops (Shop.yaml + Themes) gescannt wird. Dient u. a. zum Befüllen der Shop-Listen.")]
     public string GeneralFolderPath { get; set; }
+    [Description("Intervall in Sekunden für das automatische Neuladen der Logs. Ein Wert von 0 deaktiviert Auto-Refresh.")]
     public int AutoRefreshSeconds { get; set; } 
     public bool AutoRefreshEnabled { get; set; }
     public bool OnlySinceRestart { get; set; } 
+    [Description("Startet den Shop automatisch neu, wenn ein Theme-Wechsel erfolgt.")]
     public bool RestartShopOnThemeChange { get; set; } 
 
+    [Description("Wartezeit zwischen Stop und Start beim IIS-Neustart.")]
     public int RestartDelaySeconds { get; set; } 
 
+    [Description("Fasst identische/ähnliche Logeinträge zusammen, um die Anzeige zu reduzieren.")]
     public bool BundleLogs { get; set; } = false;
+    [Description("Erlaubt dem Updater, Beta-Versionen zu berücksichtigen/zu installieren.")]
     public bool AllowBetaUpdates { get; set; }
+    [Description("Löscht beim Neustart den Shop-Bundler, bevor der Shop wieder startet.")]
     public bool DeleteBundlerOnShopRestart { get; set; }
+    [Description("Löscht beim Neustart das wwwroot-Assets-Verzeichnis des Shops.")]
     public bool DeleteAssetsOnShopRestart { get; set; }
+    [Description("Legt fest, welche IIS-Site über die Taskbar-Aktionen (Tray-Icon) gesteuert wird.")]
     public long TrayIconIisSite { get; set; }
     public string? PinnedExtensionGroups { get; set; }
     public string? PinnedThemeGroups { get; set; }

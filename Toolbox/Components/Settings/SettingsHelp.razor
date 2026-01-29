@@ -1,0 +1,32 @@
+@using MudBlazor
+@using System.ComponentModel
+@using System.Reflection
+@using Toolbox.Data.Models
+
+@if (!string.IsNullOrWhiteSpace(TooltipText))
+{
+    <MudTooltip Text="@TooltipText" Placement="Placement.Right" Inline="true">
+        <span class="settings-help" aria-label="Hilfe" @onclick:stopPropagation="true">?</span>
+    </MudTooltip>
+}
+
+@code {
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public string? PropertyName { get; set; }
+
+    private string TooltipText => !string.IsNullOrWhiteSpace(Text)
+        ? Text!
+        : GetDescriptionFromProperty(PropertyName);
+
+    private static string GetDescriptionFromProperty(string? propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(propertyName))
+        {
+            return string.Empty;
+        }
+
+        var prop = typeof(ToolboxSettings).GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public);
+        var attribute = prop?.GetCustomAttribute<DescriptionAttribute>();
+        return attribute?.Description ?? string.Empty;
+    }
+}
