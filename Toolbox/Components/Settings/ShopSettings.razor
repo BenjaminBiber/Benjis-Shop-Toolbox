@@ -1,0 +1,165 @@
+@using System.IO
+@using Toolbox.Data.Models
+@using Toolbox.Services
+@using Toolbox.Components.Dialogs
+@inject SettingsService SettingsService
+@inject NotificationService NotificationService
+@inject FileDialogService FileDialog
+@inject IisService IisService
+@inject IDialogService DialogService
+
+<div class="row g-0 pl-4 flex-column">
+    <div class="col-12 mt-3 d-flex gap-1 align-items-center justify-content-center">
+        <MudText Class="fw-bold" Typo="Typo.body1">Shop-Settings</MudText>
+        <MudDivider Class="w-auto"></MudDivider>
+    </div>
+    <div class="col-12 d-flex flex-column gap-2">
+        @if (!ShopSettingsList.Any())
+        {
+            <MudText Typo="Typo.caption" Class="text-secondary">Keine Shop-Settings vorhanden.</MudText>
+        }
+        <MudTable Items="ShopSettingsList" Dense="true" Hover="true" Bordered="true">
+            <HeaderContent>
+                <MudTh>ID</MudTh>
+                <MudTh>Site ID</MudTh>
+                <MudTh>IIS Site</MudTh>
+                <MudTh>shop.yaml</MudTh>
+                <MudTh>Themes Ordner</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="ID">
+                    <MudText Typo="Typo.caption">@context.Id</MudText>
+                </MudTd>
+                <MudTd DataLabel="Site ID">
+                    <MudNumericField T="long" Value="context.SiteId" ValueChanged="(long v) => UpdateShopSetting(context, s => s.SiteId = v)" Variant="Variant.Text" Class="w-100" />
+                </MudTd>
+                <MudTd DataLabel="IIS Site">
+                    <MudText Typo="Typo.caption">@GetSiteName(context.SiteId)</MudText>
+                </MudTd>
+                <MudTd DataLabel="shop.yaml">
+                    <MudTextField Value="context.ShopYamlPath"
+                                  ValueChanged="(string v) => UpdateShopSetting(context, s => s.ShopYamlPath = v)"
+                                  Variant="Variant.Text"
+                                  Class="w-100"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@Icons.Material.Filled.FolderOpen"
+                                  OnAdornmentClick="@(() => ChooseYaml(context))" />
+                </MudTd>
+                <MudTd DataLabel="Themes Ordner">
+                    <MudTextField Value="context.ThemeFolderPath"
+                                  ValueChanged="(string v) => UpdateShopSetting(context, s => s.ThemeFolderPath = v)"
+                                  Variant="Variant.Text"
+                                  Class="w-100"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@Icons.Material.Filled.FolderOpen"
+                                  OnAdornmentClick="@(() => ChooseTheme(context))" />
+                </MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Color="Color.Error"
+                                   Title="Eintrag löschen"
+                                   OnClick="@(() => RemoveShopSetting(context))" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </div>
+
+    <div class="col-12 mt-4 d-flex gap-1 align-items-center justify-content-center">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddDialog">
+            Neuen Eintrag hinzufügen
+        </MudButton>
+    </div>
+</div>
+
+@code {
+    private IList<ShopSetting> ShopSettingsList
+    {
+        get
+        {
+            SettingsService.Settings.ShopSettingsList ??= new List<ShopSetting>();
+            return SettingsService.Settings.ShopSettingsList;
+        }
+    }
+
+    private void UpdateShopSetting(ShopSetting setting, Action<ShopSetting> update)
+    {
+        SettingsService.SaveSettingChanges(_ => update(setting), NotificationService);
+    }
+
+    private void RemoveShopSetting(ShopSetting setting)
+    {
+        SettingsService.SaveSettingChanges(s => s.ShopSettingsList.Remove(setting), NotificationService);
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var options = new DialogOptions
+        {
+            FullWidth = true,
+            MaxWidth = MaxWidth.Medium
+        };
+
+        var dialog = await DialogService.ShowAsync<AddShopSettingDialog>("Shop-Setting hinzufügen", options);
+        var result = await dialog.Result;
+        if (result.Canceled || result.Data is not ShopSetting setting)
+        {
+            return;
+        }
+
+        var yamlPath = setting.ShopYamlPath?.Trim() ?? string.Empty;
+        var themePath = setting.ThemeFolderPath?.Trim() ?? string.Empty;
+        var siteId = setting.SiteId;
+
+        if (string.IsNullOrWhiteSpace(yamlPath) && string.IsNullOrWhiteSpace(themePath) && siteId == long.MinValue)
+        {
+            NotificationService.Info("Bitte mindestens einen Wert angeben.");
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(yamlPath) &&
+            ShopSettingsList.Any(s => string.Equals(s.ShopYamlPath, yamlPath, StringComparison.OrdinalIgnoreCase)))
+        {
+            NotificationService.Info("Eintrag mit diesem shop.yaml existiert bereits.");
+            return;
+        }
+
+        if (siteId != long.MinValue && ShopSettingsList.Any(s => s.SiteId == siteId))
+        {
+            NotificationService.Info("Eintrag mit dieser Site ID existiert bereits.");
+            return;
+        }
+
+        setting.ShopYamlPath = yamlPath;
+        setting.ThemeFolderPath = themePath;
+
+        SettingsService.SaveSettingChanges(s => s.ShopSettingsList.Add(setting), NotificationService);
+    }
+
+    private void ChooseYaml(ShopSetting setting)
+    {
+        var filters = new FileFilter[] { new FileFilter { Name = "YAML", Extensions = new[] { "yaml", "yml" } } };
+        var initial = Path.GetDirectoryName(setting.ShopYamlPath ?? string.Empty) ?? string.Empty;
+        var path = FileDialog.OpenFile("shop.yaml auswählen", filters, initial);
+        if (!string.IsNullOrEmpty(path))
+        {
+            UpdateShopSetting(setting, s => s.ShopYamlPath = path);
+        }
+    }
+
+    private void ChooseTheme(ShopSetting setting)
+    {
+        var initial = setting.ThemeFolderPath ?? string.Empty;
+        var path = FileDialog.OpenFolder("Themes Ordner auswählen", initial);
+        if (!string.IsNullOrEmpty(path))
+        {
+            UpdateShopSetting(setting, s => s.ThemeFolderPath = path);
+        }
+    }
+
+    private string GetSiteName(long siteId)
+    {
+        var name = IisService.GetSiteNameById(siteId);
+        return string.IsNullOrWhiteSpace(name) ? "-" : name;
+    }
+}

@@ -15,6 +15,7 @@
       <MudListSubheader Class="fw-bold">Einstellungen</MudListSubheader>
       <MudListItem Class="m-0" T="object" Selected="@(_section==SettingsSection.General)" Icon="@Icons.Material.Filled.Tune" OnClick="@(()=>Select(SettingsSection.General))">Allgemein</MudListItem>
       <MudListItem Class="m-0" T="object" Selected="@(_section==SettingsSection.Logs)" Icon="@Icons.Material.Filled.Message" OnClick="@(()=>Select(SettingsSection.Logs))">Logs</MudListItem>
+      <MudListItem Class="m-0" T="object" Selected="@(_section==SettingsSection.Shops)" Icon="@Icons.Material.Filled.Store" OnClick="@(()=>Select(SettingsSection.Shops))">Shop</MudListItem>
       <MudListItem Class="m-0" T="object" Selected="@(_section==SettingsSection.IIS)" Icon="@Icons.Material.Filled.Computer" OnClick="@(()=>Select(SettingsSection.IIS))">IIS</MudListItem>
       @if (EasterEggService.IsSecretUnlocked)
       {
@@ -32,6 +33,9 @@
         case SettingsSection.Logs:
             <LogSettings />
             break;
+        case SettingsSection.Shops:
+            <ShopSettings />
+            break;
         case SettingsSection.IIS:
             <IisSettings />
             break;
@@ -43,7 +47,7 @@
 </div>
 
 @code {
-    private enum SettingsSection {General, Logs, IIS, Pong }
+    private enum SettingsSection {General, Logs, Shops, IIS, Pong }
     private SettingsSection _section = SettingsSection.General;
     protected override void OnInitialized()
     {
@@ -63,6 +67,7 @@
         SettingsSection.General => "Allgemein",
         SettingsSection.IIS => "IIS",
         SettingsSection.Logs => "Logs",
+        SettingsSection.Shops => "Shop",
         SettingsSection.Pong => "Pong",
         _ => "Einstellungen"
     };
