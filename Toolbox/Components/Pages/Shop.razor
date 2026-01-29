@@ -200,6 +200,7 @@
     private bool showPassword;
     private string adornmentIcon => showPassword ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff;
     private InputType passwordInputType => showPassword ? InputType.Text : InputType.Password;
+    private bool _noShopDialogShown;
     
     protected override async Task OnInitializedAsync()
     {
@@ -207,6 +208,7 @@
         _selectedShopPath = current?.ShopYamlPath ?? string.Empty;
 
         await EnsureShopSelectedAsync();
+        await ShowNoShopSelectedDialogIfNeededAsync();
 
         GetYamlContent();
         CheckDatabaseConnection();
@@ -230,6 +232,30 @@
         {
             await OnShopChanged(path);
         }
+    }
+
+    private async Task ShowNoShopSelectedDialogIfNeededAsync()
+    {
+        if (_noShopDialogShown)
+        {
+            return;
+        }
+
+        if (Settings.ShopSettingsList.Any())
+        {
+            return;
+        }
+
+        _noShopDialogShown = true;
+
+        var options = new DialogOptions
+        {
+            FullWidth = true,
+            MaxWidth = MaxWidth.Small,
+            CloseButton = true
+        };
+
+        await DialogService.ShowAsync<NoShopSelectedDialog>("Kein Shopsystem ausgewählt", options);
     }
 
     private bool DisableYamlSaveButton()

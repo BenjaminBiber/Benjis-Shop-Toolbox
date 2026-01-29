@@ -144,7 +144,7 @@
                             <div class="row w-100">
                                 @*SEARCH*@
                                 <div class="col">
-                                    <MudTextField Variant="Variant.Text" @bind-Value="_searchText" Immediate="true" Label="Suche" Class="w-100"/>
+                                    <MudTextField T="string" Variant="Variant.Text" Value="_searchTextInput" ValueChanged="OnSearchTextChanged" Immediate="true" Label="Suche" Class="w-100"/>
                                 </div>
                                 @*FILTER*@
                                 <div class="col-1">
@@ -278,7 +278,9 @@
     private DateTime? _excludedExtensionsTimestamp;
     private bool _extensionsSinceRestart;
     private bool _excludedSinceRestart;
+    private string _searchTextInput = string.Empty;
     private string _searchText = string.Empty;
+    private string _searchTextNormalized = string.Empty;
     private LogEntry? _selectedLog;
     private bool expandFailedExtensions = true;
     private bool expandLoadedExtensions = true;
@@ -287,7 +289,11 @@
     private HashSet<LogLevel> _selectedLevels = new(Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All));
     private readonly List<string> _availableLogNames = new();
     private HashSet<string> _selectedLogNames = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, long> _lastRecordIds = new(StringComparer.OrdinalIgnoreCase);
     private static readonly HashSet<MessageType> _allMessageTypes = new(Enum.GetValues<MessageType>());
+    private const int MaxLogEntries = 5000;
+    private const int SearchDebounceMs = 250;
+    private System.Timers.Timer? _searchDebounceTimer;
     
     private IEnumerable<LogEntry> DisplayLogs => FilterAndBundle(_displayLogs);
 
@@ -301,6 +307,7 @@
     {
         _selectedLogNames = names.ToHashSet(StringComparer.OrdinalIgnoreCase);
         UpdateLogService();
+        ResetLogCursor();
         await LoadLogs();
     }
 
@@ -309,13 +316,15 @@
         if (!EasterEggService.IsSecretUnlocked && string.Equals(_searchText, "andy ist der beste", StringComparison.OrdinalIgnoreCase))
         {
             EasterEggService.UnlockSecret();
-            _searchText = string.Empty;
+            _searchTextInput = string.Empty;
+            ApplySearchText();
             StateHasChanged();
         }
         
-        var filtered = string.IsNullOrWhiteSpace(_searchText)
+        var searchText = _searchTextNormalized;
+        var filtered = string.IsNullOrWhiteSpace(searchText)
             ? source
-            : source.Where(e => GetFullMessage(e).Contains(_searchText, StringComparison.OrdinalIgnoreCase));
+            : source.Where(e => GetSearchText(e).Contains(searchText, StringComparison.Ordinal));
 
         if (!Settings.BundleLogs)
         {
@@ -329,13 +338,17 @@
         {
             if (current == null)
             {
+                var fullMessage = GetFullMessage(log);
+                searchText = GetSearchText(log);
                 current = new LogEntry
                 {
                     Time = log.Time,
                     Level = log.Level,
                     Message = log.Message,
                     Count = log.Count,
-                    ParsedMessage = log.ParsedMessage
+                    ParsedMessage = log.ParsedMessage,
+                    FullMessage = fullMessage,
+                    SearchText = searchText
                 };
             }
             else if (current.Level == log.Level &&
@@ -352,7 +365,9 @@
                     Level = log.Level,
                     Message = log.Message,
                     Count = log.Count,
-                    ParsedMessage = log.ParsedMessage
+                    ParsedMessage = log.ParsedMessage,
+                    FullMessage = GetFullMessage(log),
+                    SearchText = GetSearchText(log)
                 };
             }
         }
@@ -414,6 +429,7 @@
         _availableLogNames.AddRange(Settings.GetLogNames());
         _selectedLogNames = new HashSet<string>(_availableLogNames, StringComparer.OrdinalIgnoreCase);
         UpdateLogService();
+        ResetLogCursor();
         _autoRefresh = Settings.AutoRefreshEnabled;
         _refreshSeconds = Settings.AutoRefreshSeconds;
         _onlySinceRestart = Settings.OnlySinceRestart;
@@ -449,8 +465,19 @@
             ReloadOption.SeitStartDerAnwendung => _appStartTime,
             _ => _appStartTime
         };
-        var logs = await Task.Run(() => _logService?.GetLogs(since, LogLevel.All) ?? Enumerable.Empty<LogEntry>());
-        _logs = logs.ToList();
+        var canUseIncremental = CanUseIncremental();
+        var batch = await Task.Run(() => _logService?.GetLogsBatch(since, LogLevel.All, canUseIncremental ? _lastRecordIds : null) ?? LogBatch.Empty);
+        UpdateLogCursor(batch.LastRecordIds);
+
+        if (canUseIncremental)
+        {
+            _logs.InsertRange(0, batch.Entries);
+        }
+        else
+        {
+            _logs = batch.Entries.ToList();
+        }
+        TrimLogCache();
         await UpdateLoadedExtensions();
         _displayLogs = _logs
             .Where(l => _selectedLevels.Contains(l.Level))
@@ -462,6 +489,7 @@
     private async Task LoadLogs(ReloadOption option)
     {
         reload = option;
+        ResetLogCursor();
         await LoadLogs();
     }
 
@@ -469,15 +497,18 @@
     {
         _logSinceTime = DateTime.Now;
         reload = ReloadOption.SeitLetztemNeuladen;
+        ResetLogCursor();
         await LoadLogs();
     }
 
     private async Task ResetFilters()
     {
-        _searchText = string.Empty;
+        _searchTextInput = string.Empty;
+        ApplySearchText();
         _selectedLevels = new HashSet<LogLevel>(Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All));
         _selectedLogNames = new HashSet<string>(_availableLogNames, StringComparer.OrdinalIgnoreCase);
         UpdateLogService();
+        ResetLogCursor();
         reload = _onlySinceRestart ? ReloadOption.SeitLetztemNeuladen : ReloadOption.SeitStartDerAnwendung;
         _logSinceTime = _onlySinceRestart ? _lastShopRestart : _appStartTime;
         _autoRefresh = Settings.AutoRefreshEnabled;
@@ -511,6 +542,7 @@
         {
             _logSinceTime = _lastShopRestart;
             reload = ReloadOption.SeitLetztemNeuladen;
+            ResetLogCursor();
         }
     }
 
@@ -719,8 +751,11 @@
     private string GetFullMessage(LogEntry entry)
     {
         if (entry == null) return string.Empty;
-        var text = entry.ParsedMessage?.GetFormattedMessage(new HashSet<MessageType>() { MessageType.Message }) ?? entry.Message ?? string.Empty;
-        return text;
+        if (!string.IsNullOrWhiteSpace(entry.FullMessage))
+        {
+            return entry.FullMessage;
+        }
+        return entry.Message ?? string.Empty;
     }
 
     private string GetSnippet(LogEntry entry)
@@ -818,6 +853,7 @@
     public void Dispose()
     {
         _timer?.Dispose();
+        _searchDebounceTimer?.Dispose();
     }
 
     private string GetMultiSelectionText(List<string> selectedValues)
@@ -856,6 +892,39 @@
         return string.Join(", ", selectedValues);
     }
 
+    private void ResetLogCursor()
+    {
+        _lastRecordIds.Clear();
+    }
+
+    private void UpdateLogCursor(IReadOnlyDictionary<string, long> latest)
+    {
+        foreach (var kvp in latest)
+        {
+            _lastRecordIds[kvp.Key] = kvp.Value;
+        }
+    }
+
+    private void TrimLogCache()
+    {
+        if (_logs.Count <= MaxLogEntries)
+        {
+            return;
+        }
+
+        _logs = _logs.Take(MaxLogEntries).ToList();
+    }
+
+    private bool CanUseIncremental()
+    {
+        if (_logService == null || _lastRecordIds.Count == 0)
+        {
+            return false;
+        }
+
+        return _selectedLogNames.All(name => _lastRecordIds.ContainsKey(name));
+    }
+
     private void UpdateLogService()
     {
         if (_selectedLogNames.Count == 0)
@@ -873,5 +942,46 @@
     private void HandlePopOver()
     {
         _isPopOverOpen = !_isPopOverOpen;
+    }
+
+    private void OnSearchTextChanged(string value)
+    {
+        _searchTextInput = value ?? string.Empty;
+
+        if (_searchDebounceTimer == null)
+        {
+            _searchDebounceTimer = new System.Timers.Timer(SearchDebounceMs)
+            {
+                AutoReset = false
+            };
+            _searchDebounceTimer.Elapsed += async (_, _) =>
+            {
+                await InvokeAsync(() =>
+                {
+                    ApplySearchText();
+                    StateHasChanged();
+                });
+            };
+        }
+
+        _searchDebounceTimer.Stop();
+        _searchDebounceTimer.Start();
+    }
+
+    private void ApplySearchText()
+    {
+        _searchText = _searchTextInput ?? string.Empty;
+        _searchTextNormalized = _searchText.Trim().ToLowerInvariant();
+    }
+
+    private string GetSearchText(LogEntry entry)
+    {
+        if (!string.IsNullOrEmpty(entry.SearchText))
+        {
+            return entry.SearchText;
+        }
+
+        var full = GetFullMessage(entry);
+        return full.ToLowerInvariant();
     }
 }
