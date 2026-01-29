@@ -159,6 +159,12 @@
                                                     <MudSelectItem Value="@level">@level.GetDescription()</MudSelectItem>
                                                 }
                                             </MudSelect>
+                                            <MudSelect T="string" MultiSelection="true" MultiSelectionTextFunc="@(new Func<List<string>, string>(GetLogSelectionText))" SelectedValues="_selectedLogNames" SelectedValuesChanged="@(async names => await SelectedLogNamesChanged(names))" Label="Logs" Disabled="@(!_availableLogNames.Any())">
+                                                @foreach (var logName in _availableLogNames)
+                                                {
+                                                    <MudSelectItem Value="@logName">@logName</MudSelectItem>
+                                                }
+                                            </MudSelect>
                                             <MudSelect T="ReloadOption" Value="reload" ValueChanged="@(async (ReloadOption l) => await LoadLogs(l))" Label="Zeitpunkt">
                                                 @foreach (var level in Enum.GetValues<ReloadOption>())
                                                 {
@@ -279,6 +285,8 @@
     private LogService? _logService;
     private bool _isPopOverOpen = false;
     private HashSet<LogLevel> _selectedLevels = new(Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All));
+    private readonly List<string> _availableLogNames = new();
+    private HashSet<string> _selectedLogNames = new(StringComparer.OrdinalIgnoreCase);
     private static readonly HashSet<MessageType> _allMessageTypes = new(Enum.GetValues<MessageType>());
     
     private IEnumerable<LogEntry> DisplayLogs => FilterAndBundle(_displayLogs);
@@ -286,6 +294,13 @@
     private async Task SelectedLevelsChanged(IEnumerable<LogLevel> levels)
     {
         _selectedLevels = levels.ToHashSet();
+        await LoadLogs();
+    }
+
+    private async Task SelectedLogNamesChanged(IEnumerable<string> names)
+    {
+        _selectedLogNames = names.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        UpdateLogService();
         await LoadLogs();
     }
 
@@ -395,7 +410,10 @@
 
     private async Task ApplySettings()
     {
-        _logService = new LogService(Settings.LogName!);
+        _availableLogNames.Clear();
+        _availableLogNames.AddRange(Settings.GetLogNames());
+        _selectedLogNames = new HashSet<string>(_availableLogNames, StringComparer.OrdinalIgnoreCase);
+        UpdateLogService();
         _autoRefresh = Settings.AutoRefreshEnabled;
         _refreshSeconds = Settings.AutoRefreshSeconds;
         _onlySinceRestart = Settings.OnlySinceRestart;
@@ -458,6 +476,8 @@
     {
         _searchText = string.Empty;
         _selectedLevels = new HashSet<LogLevel>(Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All));
+        _selectedLogNames = new HashSet<string>(_availableLogNames, StringComparer.OrdinalIgnoreCase);
+        UpdateLogService();
         reload = _onlySinceRestart ? ReloadOption.SeitLetztemNeuladen : ReloadOption.SeitStartDerAnwendung;
         _logSinceTime = _onlySinceRestart ? _lastShopRestart : _appStartTime;
         _autoRefresh = Settings.AutoRefreshEnabled;
@@ -814,6 +834,37 @@
         {
             return string.Join(", ", selectedValues.Select(v => Enum.Parse<LogLevel>(v).GetDescription()));
         }
+    }
+
+    private string GetLogSelectionText(List<string> selectedValues)
+    {
+        if (_availableLogNames.Count == 0)
+        {
+            return "Keine Logs konfiguriert";
+        }
+
+        if (selectedValues.Count == 0)
+        {
+            return "Keine Logs ausgewählt";
+        }
+
+        if (selectedValues.Count == _availableLogNames.Count)
+        {
+            return "Alle Logs";
+        }
+
+        return string.Join(", ", selectedValues);
+    }
+
+    private void UpdateLogService()
+    {
+        if (_selectedLogNames.Count == 0)
+        {
+            _logService = null;
+            return;
+        }
+
+        _logService = new LogService(_selectedLogNames);
     }
 
     private MarkupString HighlightDetail(string message) => Highlight(message);

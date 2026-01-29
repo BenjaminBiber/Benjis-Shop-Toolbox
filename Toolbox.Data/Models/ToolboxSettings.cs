@@ -10,7 +10,7 @@ public class ToolboxSettings
     public const int SingletonId = 1;
     public int Id { get; set; }
     public string? IisAppName { get; set; }
-    [Description("Name des Windows-Ereignislogs, aus dem die Logs gelesen werden.")]
+    [Description("Liste der Windows-Ereignislog-Namen. Mehrere Logs sind möglich (Trennung per Semikolon). Hinweis: Je mehr Logs ausgewählt sind, desto länger kann das Laden dauern.")]
     public string? LogName { get; set; }
     [Description("Liste der Theme-Repository-Wurzelordner (mehrere Pfade sind möglich). Wird zum Finden/Verwalten von Themes genutzt.")]
     public string ThemeRepositoryPath { get; set; }
@@ -67,12 +67,14 @@ public class ToolboxSettings
 
     public IEnumerable<string> GetExtensionRoots() => SplitPaths(ExtensionsRepositoryPath);
     public IEnumerable<string> GetThemeRoots() => SplitPaths(ThemeRepositoryPath);
+    public IEnumerable<string> GetLogNames() => SplitPaths(LogName);
 
     public string? GetPrimaryExtensionRoot() => GetExtensionRoots().FirstOrDefault();
     public string? GetPrimaryThemeRoot() => GetThemeRoots().FirstOrDefault();
 
     public void SetExtensionRoots(IEnumerable<string> paths) => ExtensionsRepositoryPath = JoinPaths(paths);
     public void SetThemeRoots(IEnumerable<string> paths) => ThemeRepositoryPath = JoinPaths(paths);
+    public void SetLogNames(IEnumerable<string> names) => LogName = JoinPaths(names);
 
     public ShopSetting? GetShopSettingForCurrentSite()
     {

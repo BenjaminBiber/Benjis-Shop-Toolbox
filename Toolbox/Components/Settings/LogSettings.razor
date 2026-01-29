@@ -2,10 +2,8 @@
 @using Toolbox.Data.Models
 @using Toolbox.Services
 @inject SettingsService SettingsService
-@inject FileDialogService FileDialog
+@inject EventLogService EventLogService
 @inject NotificationService NotificationService
-@inject ISnackbar Snackbar
-@inject UpdaterService UpdaterSvc
 
 <div class="row g-0 pl-4 flex-column">
     <div class="col-12 mt-3 d-flex gap-1 align-items-center justify-content-center">
@@ -14,9 +12,26 @@
     </div>
     <div class="col-12 d-flex flex-column gap-2">
         <div class="settings-field-with-help">
-            <MudTextField ValueChanged="(string i) => SettingsService.SaveSettingChanges(x => x.LogName = i, NotificationService)" Value="Setting.LogName" FullWidth="true" Label="Log-Name" Variant="Variant.Text" Class="pl-4 settings-field-grow" />
+            <MudSelect T="string"
+                       MultiSelection="true"
+                       MultiSelectionTextFunc="@(new Func<List<string>, string>(GetLogSelectionText))"
+                       SelectedValues="_selectedLogNames"
+                       SelectedValuesChanged="@(names => SelectedLogNamesChanged(names))"
+                       FullWidth="true"
+                       Disabled="@(!_availableLogNames.Any())"
+                       Label="Log-Namen (Ereignisanzeige)"
+                       Class="pl-4 settings-field-grow">
+                @foreach (var name in _availableLogNames)
+                {
+                    <MudSelectItem Value="@name">@name</MudSelectItem>
+                }
+            </MudSelect>
             <SettingsHelp PropertyName="@nameof(ToolboxSettings.LogName)" />
         </div>
+        @if (!_availableLogNames.Any())
+        {
+            <MudText Typo="Typo.caption" Class="text-secondary pl-4">Keine Ereignisanzeige-Logs gefunden.</MudText>
+        }
         <div class="settings-field-with-help">
             <MudSelect ValueChanged="(int i) => SettingsService.SaveSettingChanges(x => x = ChangeAutoLoadSettings(x, i) , NotificationService)" T="int" Value="Setting.AutoRefreshSeconds" FullWidth="true" Label="Zeitlicher Abstand zwischen automatischem Neuladen der Logs" Class="pl-4 settings-field-grow">
                 @foreach (var reloadTime in ReloadTime.ReloadTimes)
@@ -35,6 +50,60 @@
 
 @code {
     private ToolboxSettings Setting => SettingsService.Settings;
+    private readonly List<string> _availableLogNames = new();
+    private HashSet<string> _selectedLogNames = new(StringComparer.OrdinalIgnoreCase);
+
+    protected override void OnInitialized()
+    {
+        LoadAvailableLogNames();
+        LoadSelectedLogNames();
+    }
+
+    private void LoadAvailableLogNames()
+    {
+        _availableLogNames.Clear();
+        _availableLogNames.AddRange(EventLogService.GetLogNames());
+        _availableLogNames.Sort(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private void LoadSelectedLogNames()
+    {
+        _selectedLogNames = new HashSet<string>(Setting.GetLogNames(), StringComparer.OrdinalIgnoreCase);
+        foreach (var name in _selectedLogNames)
+        {
+            if (!_availableLogNames.Exists(n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase)))
+            {
+                _availableLogNames.Add(name);
+            }
+        }
+        _availableLogNames.Sort(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private void SelectedLogNamesChanged(IEnumerable<string> names)
+    {
+        _selectedLogNames = new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
+        SettingsService.SaveSettingChanges(x => x.SetLogNames(_selectedLogNames), NotificationService);
+    }
+
+    private string GetLogSelectionText(List<string> selectedValues)
+    {
+        if (_availableLogNames.Count == 0)
+        {
+            return "Keine Logs verfügbar";
+        }
+
+        if (selectedValues.Count == 0)
+        {
+            return "Keine Logs ausgewählt";
+        }
+
+        if (selectedValues.Count == _availableLogNames.Count)
+        {
+            return "Alle Logs";
+        }
+
+        return string.Join(", ", selectedValues);
+    }
 
     private ToolboxSettings ChangeAutoLoadSettings(ToolboxSettings setting, int newValue)
     {

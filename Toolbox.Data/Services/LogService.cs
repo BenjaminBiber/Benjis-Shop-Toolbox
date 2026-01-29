@@ -6,11 +6,20 @@ namespace Toolbox.Data.Services;
 
 public class LogService
 {
-    private readonly string _logName;
+    private readonly List<string> _logNames;
 
     public LogService(string logName)
     {
-        _logName = logName;
+        _logNames = new List<string> { logName };
+    }
+
+    public LogService(IEnumerable<string> logNames)
+    {
+        _logNames = logNames
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .Select(n => n.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     public static DateTime? ExtractTimestamp(string logText)
@@ -30,23 +39,49 @@ public class LogService
 
     public IEnumerable<LogEntry> GetLogs(DateTime since, LogLevel level = LogLevel.All)
     {
-        using var log = new EventLog(_logName);
-        var entries = log.Entries.Cast<EventLogEntry>()
-            .Where(e => e.TimeGenerated >= since);
-
-        if (level != LogLevel.All)
+        if (_logNames.Count == 0)
         {
-            entries = entries.Where(e => MapEntryType(e.EntryType) == level);
+            return Enumerable.Empty<LogEntry>();
         }
 
-        return entries
-            .OrderByDescending(e => e.TimeGenerated)
-            .Select(e => new LogEntry
+        var allEntries = new List<EventLogEntry>();
+
+        foreach (var logName in _logNames)
+        {
+            if (string.IsNullOrWhiteSpace(logName))
+                continue;
+
+            try
             {
-                Level = MapEntryType(e.EntryType),
-                ParsedMessage = ParseLog(e.Message),
-                Message = e.Message,
-                Time = ExtractTimestamp(ParseLog(e.Message).Metadata) ?? e.TimeGenerated
+                using var log = new EventLog(logName);
+                var entries = log.Entries.Cast<EventLogEntry>()
+                    .Where(e => e.TimeGenerated >= since);
+
+                if (level != LogLevel.All)
+                {
+                    entries = entries.Where(e => MapEntryType(e.EntryType) == level);
+                }
+
+                allEntries.AddRange(entries);
+            }
+            catch
+            {
+                // ignore invalid log names or access issues
+            }
+        }
+
+        return allEntries
+            .OrderByDescending(e => e.TimeGenerated)
+            .Select(e =>
+            {
+                var parsed = ParseLog(e.Message);
+                return new LogEntry
+                {
+                    Level = MapEntryType(e.EntryType),
+                    ParsedMessage = parsed,
+                    Message = e.Message,
+                    Time = ExtractTimestamp(parsed.Metadata) ?? e.TimeGenerated
+                };
             })
             .ToList();
     }
