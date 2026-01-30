@@ -16,6 +16,11 @@ class Program
 {
     private static string isccPath = @"C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe";
     private static string scriptPath = Path.Combine(AppContext.BaseDirectory, "toolbox.iss");
+    private static readonly string innoDurationPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Shop-Toolbox",
+        "Versioning",
+        "inno-duration.txt");
     private const int KeepInstallerCount = 5;
 
     static void Main(string[] args)
@@ -84,7 +89,7 @@ class Program
             CreateNoWindow = true
         };
 
-        var exitCode = RunProcessWithSpinner(psi, "Inno Setup laeuft");
+        var exitCode = RunProcessWithSpinner(psi, "Inno Setup laeuft", TryReadLastInnoDuration());
         WriteInfo($"Exit-Code: {exitCode}");
 
         // Commit + Push erst NACH erfolgreichem Installer-Build
@@ -178,7 +183,7 @@ class Program
             var seedContent = TryLoadPreviousChangelog(changelogDir, prevVersion);
             var content = string.IsNullOrWhiteSpace(seedContent)
                 ? BuildChangelogContent(appVersion, prevVersion, BuildChangelogContext(repoRoot, prevVersion))
-                : AdaptChangelogVersion(seedContent, normalizedVersion);
+                : seedContent;
 
             File.WriteAllText(changelogPath, content);
             WriteSuccess($"Changelog erstellt: {changelogPath}");
@@ -281,60 +286,66 @@ class Program
 
     private static string? TryLoadPreviousChangelog(string changelogDir, string? prevVersion)
     {
-        if (string.IsNullOrWhiteSpace(prevVersion))
-        {
-            return null;
-        }
-
         try
         {
-            var normalizedPrev = NormalizeVersionText(prevVersion);
-            var path = Path.Combine(changelogDir, $"{normalizedPrev}.md");
-            return File.Exists(path) ? File.ReadAllText(path) : null;
+            if (!string.IsNullOrWhiteSpace(prevVersion))
+            {
+                var normalizedPrev = NormalizeVersionText(prevVersion);
+                var path = Path.Combine(changelogDir, $"{normalizedPrev}.md");
+                if (File.Exists(path))
+                {
+                    return File.ReadAllText(path);
+                }
+
+                WriteWarning($"Hinweis: Vorheriger Changelog nicht gefunden: {path}");
+            }
+
+            var fallback = TryFindLatestChangelogPath(changelogDir);
+            if (!string.IsNullOrWhiteSpace(fallback) && File.Exists(fallback))
+            {
+                WriteInfo($"Fallback: Verwende Changelog {Path.GetFileName(fallback)}");
+                return File.ReadAllText(fallback);
+            }
         }
         catch
         {
             return null;
         }
+
+        return null;
     }
 
-    private static string AdaptChangelogVersion(string content, string newVersion)
+    private static string? TryFindLatestChangelogPath(string changelogDir)
     {
-        if (string.IsNullOrWhiteSpace(content))
+        if (!Directory.Exists(changelogDir))
         {
-            return $"# {newVersion}\n";
+            return null;
         }
 
-        using var reader = new StringReader(content);
-        var sb = new StringBuilder();
-        var replacedHeader = false;
-        string? line;
-
-        while ((line = reader.ReadLine()) != null)
+        var candidates = new List<(string Version, string Path)>();
+        foreach (var file in Directory.EnumerateFiles(changelogDir, "*.md", SearchOption.TopDirectoryOnly))
         {
-            if (!replacedHeader && !string.IsNullOrWhiteSpace(line))
+            var name = Path.GetFileNameWithoutExtension(file);
+            if (string.IsNullOrWhiteSpace(name) || name.StartsWith("_", StringComparison.OrdinalIgnoreCase))
             {
-                if (line.TrimStart().StartsWith("#"))
-                {
-                    sb.AppendLine($"# {newVersion}");
-                    replacedHeader = true;
-                    continue;
-                }
-
-                sb.AppendLine($"# {newVersion}");
-                sb.AppendLine();
-                replacedHeader = true;
+                continue;
             }
 
-            sb.AppendLine(line);
+            if (!TryParseVersionInput(name, out var parsed, out _))
+            {
+                continue;
+            }
+
+            candidates.Add((parsed.FullText, file));
         }
 
-        if (!replacedHeader)
+        if (candidates.Count == 0)
         {
-            return $"# {newVersion}\n{content.Trim()}";
+            return null;
         }
 
-        return sb.ToString().TrimEnd();
+        candidates.Sort((a, b) => CompareVersions(a.Version, b.Version));
+        return candidates[^1].Path;
     }
 
     private static ChangelogContext BuildChangelogContext(string repoRoot, string? prevVersion)
@@ -1365,20 +1376,27 @@ class Program
         Console.ResetColor();
     }
 
-    private static int RunProcessWithSpinner(ProcessStartInfo psi, string label)
+    private static int RunProcessWithSpinner(ProcessStartInfo psi, string label, TimeSpan? expectedDuration)
     {
         var stdout = new StringBuilder();
         var stderr = new StringBuilder();
-        using var spinner = new ConsoleSpinner(label);
+        using var spinner = new ConsoleSpinner(label, expectedDuration);
         using var process = new Process { StartInfo = psi };
 
         process.OutputDataReceived += (s, e) => { if (e.Data != null) stdout.AppendLine(e.Data); };
         process.ErrorDataReceived += (s, e) => { if (e.Data != null) stderr.AppendLine(e.Data); };
 
+        var started = Stopwatch.StartNew();
         process.Start();
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
         process.WaitForExit();
+        started.Stop();
+
+        if (process.ExitCode == 0)
+        {
+            TryStoreInnoDuration(started.Elapsed);
+        }
 
         if (process.ExitCode == 0)
         {
@@ -1412,9 +1430,12 @@ class Program
         private readonly int _top;
         private bool _stopped;
 
-        public ConsoleSpinner(string label)
+        private readonly TimeSpan? _expectedDuration;
+
+        public ConsoleSpinner(string label, TimeSpan? expectedDuration = null)
         {
             _label = label;
+            _expectedDuration = expectedDuration;
             _left = Console.CursorLeft;
             _top = Console.CursorTop;
             Console.CursorVisible = false;
@@ -1439,7 +1460,7 @@ class Program
             Console.ForegroundColor = ConsoleColor.DarkCyan;
             Console.Write(frame);
             Console.ResetColor();
-            Console.Write($" {_label} ({FormatElapsed(elapsed)})");
+            Console.Write($" {_label} ({FormatElapsed(elapsed)}{FormatEta(elapsed)})");
             Console.Write("   ");
         }
 
@@ -1472,6 +1493,22 @@ class Program
                 : elapsed.ToString("mm\\:ss");
         }
 
+        private string FormatEta(TimeSpan elapsed)
+        {
+            if (!_expectedDuration.HasValue)
+            {
+                return string.Empty;
+            }
+
+            var remaining = _expectedDuration.Value - elapsed;
+            if (remaining.TotalSeconds > 0)
+            {
+                return $", ETA ~{FormatElapsed(remaining)}";
+            }
+
+            return $", +{FormatElapsed(remaining.Negate())}";
+        }
+
         private static void ClearLine()
         {
             var width = Console.WindowWidth;
@@ -1480,6 +1517,41 @@ class Program
             Console.Write(new string(' ', width - 1));
             Console.SetCursorPosition(0, Console.CursorTop);
         }
+    }
+
+    private static TimeSpan? TryReadLastInnoDuration()
+    {
+        try
+        {
+            if (!File.Exists(innoDurationPath))
+            {
+                return null;
+            }
+
+            var text = File.ReadAllText(innoDurationPath).Trim();
+            if (double.TryParse(text, out var seconds) && seconds > 0)
+            {
+                return TimeSpan.FromSeconds(seconds);
+            }
+        }
+        catch { }
+
+        return null;
+    }
+
+    private static void TryStoreInnoDuration(TimeSpan duration)
+    {
+        try
+        {
+            var dir = Path.GetDirectoryName(innoDurationPath);
+            if (!string.IsNullOrWhiteSpace(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+
+            File.WriteAllText(innoDurationPath, ((int)Math.Round(duration.TotalSeconds)).ToString());
+        }
+        catch { }
     }
 
     private static bool TryGetCurrentCsprojVersion(out string version)
