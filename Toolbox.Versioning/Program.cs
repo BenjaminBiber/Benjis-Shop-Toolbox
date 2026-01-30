@@ -55,6 +55,14 @@ class Program
         {
             TryEnsureChangelogFile(repoRoot, appVersion, hadPrev ? prevVersion : null);
             TryUpdateChangelogIndex(repoRoot);
+            if (!ConfirmChangelogReady(repoRoot, appVersion))
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("Abbruch: Changelog nicht bestaetigt.");
+                Console.ResetColor();
+                Environment.Exit(3);
+                return;
+            }
         }
 
         // 2) Toolbox publishen (Release) in ein temporäres Verzeichnis und Pfad an Inno weiterreichen
@@ -247,6 +255,45 @@ class Program
             Console.WriteLine($"Hinweis: Changelog-Index konnte nicht aktualisiert werden: {ex.Message}");
             Console.ResetColor();
         }
+    }
+
+    private static bool ConfirmChangelogReady(string repoRoot, string appVersion)
+    {
+        var skip = Environment.GetEnvironmentVariable("TOOLBOX_SKIP_CHANGELOG_CONFIRM");
+        if (IsAffirmative(skip))
+        {
+            Console.WriteLine("Changelog-Check uebersprungen (TOOLBOX_SKIP_CHANGELOG_CONFIRM).");
+            return true;
+        }
+
+        var normalizedVersion = NormalizeVersionText(appVersion);
+        var changelogPath = Path.Combine(repoRoot, "Toolbox", "wwwroot", "Changelog", $"{normalizedVersion}.md");
+        Console.WriteLine($"Changelog: {changelogPath}");
+
+        if (File.Exists(changelogPath))
+        {
+            try
+            {
+                var content = File.ReadAllText(changelogPath);
+                if (content.Contains("TODO", StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine("Hinweis: Changelog enthaelt noch TODO.");
+                    Console.ResetColor();
+                }
+            }
+            catch { }
+        }
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("Hinweis: Changelog-Datei nicht gefunden.");
+            Console.ResetColor();
+        }
+
+        Console.Write("Changelog fertig und geprueft? (j/N): ");
+        var input = Console.ReadLine();
+        return IsAffirmative(input);
     }
 
     private sealed record ChangelogContext(string? BaseCommit, string GitLog, string DiffStat);
@@ -800,8 +847,12 @@ class Program
                 return false;
             }
 
-            var v = parsed.Numeric;
-            var fourPart = $"{v.Major}.{v.Minor}.{(v.Build >= 0 ? v.Build : 0)}.{(v.Revision >= 0 ? v.Revision : 0)}";
+            var parts = parsed.NumericText.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var major = parts.Length > 0 ? parts[0] : "0";
+            var minor = parts.Length > 1 ? parts[1] : "0";
+            var build = parts.Length > 2 ? parts[2] : "0";
+            var revision = parts.Length > 3 ? parts[3] : "0";
+            var fourPart = $"{major}.{minor}.{build}.{revision}";
 
             var doc = XDocument.Load(path, LoadOptions.PreserveWhitespace);
             if (doc.Root is null)
