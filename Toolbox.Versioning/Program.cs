@@ -54,6 +54,7 @@ class Program
         else
         {
             TryEnsureChangelogFile(repoRoot, appVersion, hadPrev ? prevVersion : null);
+            TryUpdateChangelogIndex(repoRoot);
         }
 
         // 2) Toolbox publishen (Release) in ein temporäres Verzeichnis und Pfad an Inno weiterreichen
@@ -195,6 +196,55 @@ class Program
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"Hinweis: Changelog konnte nicht erstellt werden: {ex.Message}");
+            Console.ResetColor();
+        }
+    }
+
+    private static void TryUpdateChangelogIndex(string repoRoot)
+    {
+        try
+        {
+            var changelogDir = Path.Combine(repoRoot, "Toolbox", "wwwroot", "Changelog");
+            if (!Directory.Exists(changelogDir))
+            {
+                return;
+            }
+
+            var versions = new List<string>();
+            foreach (var file in Directory.EnumerateFiles(changelogDir, "*.md", SearchOption.TopDirectoryOnly))
+            {
+                var name = Path.GetFileNameWithoutExtension(file);
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    continue;
+                }
+                if (name.StartsWith("_", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (!TryParseVersionInput(name, out var parsed, out _))
+                {
+                    continue;
+                }
+
+                versions.Add(parsed.FullText);
+            }
+
+            versions = versions
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            versions.Sort(CompareVersions);
+
+            var indexPath = Path.Combine(changelogDir, "index.json");
+            var json = JsonSerializer.Serialize(versions, new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(indexPath, json);
+            Console.WriteLine($"Changelog-Index aktualisiert: {indexPath}");
+        }
+        catch (Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"Hinweis: Changelog-Index konnte nicht aktualisiert werden: {ex.Message}");
             Console.ResetColor();
         }
     }

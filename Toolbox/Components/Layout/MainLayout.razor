@@ -3,11 +3,14 @@
 @using Toolbox.Components.Layout.TopBar
 @using Toolbox.Components.Dialogs
 @using Toolbox.Services
+@using Toolbox.Data.Models.Interfaces
 @inherits LayoutComponentBase
 @implements IDisposable
 @inject UiThemeState ThemeState
 @inject IDialogService DialogService
-@inject ChangelogService ChangelogService
+@inject IChangelogService ChangelogService
+@inject IAppInfoService AppInfoService
+@inject IVersionService VersionService
 
 <MudThemeProvider Theme="@CurrentTheme" />
 <MudPopoverProvider />
@@ -46,26 +49,40 @@
 
         try
         {
-            var report = await ChangelogService.TryBuildPendingReportAsync(ChangelogService.GetCurrentVersion());
-            if (report == null)
+            var currentVersion = VersionService.GetCurrentVersion();
+            var appInfo = await AppInfoService.GetOrCreateAsync();
+            var previousVersion = appInfo.LastInstalledVersion;
+
+            appInfo.CurrentVersion = currentVersion;
+
+            var hasPrevious = !string.IsNullOrWhiteSpace(previousVersion);
+            var isUpdate = hasPrevious && VersionService.IsNewer(currentVersion, previousVersion!);
+            var alreadyShown = string.Equals(appInfo.LastShownChangelogForVersion, currentVersion, StringComparison.OrdinalIgnoreCase);
+
+            if (isUpdate && !alreadyShown)
             {
-                return;
+                var markdown = await ChangelogService.BuildMarkdownAsync(previousVersion!, currentVersion);
+                var parameters = new DialogParameters
+                {
+                    { nameof(ChangelogDialog.MarkdownContent), markdown },
+                    { nameof(ChangelogDialog.CurrentVersion), currentVersion },
+                    { nameof(ChangelogDialog.PreviousVersion), previousVersion! }
+                };
+                var options = new DialogOptions
+                {
+                    CloseButton = true,
+                    FullWidth = true,
+                    MaxWidth = MaxWidth.Large
+                };
+
+                var dialog = await DialogService.ShowAsync<ChangelogDialog>("Changelog", parameters, options);
+                await dialog.Result;
+
+                appInfo.LastShownChangelogForVersion = currentVersion;
             }
 
-            var parameters = new DialogParameters
-            {
-                { nameof(ChangelogDialog.Report), report }
-            };
-            var options = new DialogOptions
-            {
-                CloseButton = true,
-                FullWidth = true,
-                MaxWidth = MaxWidth.Large
-            };
-
-            var dialog = await DialogService.ShowAsync<ChangelogDialog>("Changelog", parameters, options);
-            await dialog.Result;
-            ChangelogService.MarkPendingAsShown();
+            appInfo.LastInstalledVersion = currentVersion;
+            await AppInfoService.UpdateAsync(appInfo);
         }
         catch
         {

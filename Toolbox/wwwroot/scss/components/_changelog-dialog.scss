@@ -24,19 +24,31 @@
     gap: $space-16;
 }
 
-.changelog-entry__version {
-    margin-bottom: $space-8;
-}
+.changelog-dialog__markdown {
+    line-height: 1.5;
 
-.changelog-entry__body {
-    background: $color-log-bg;
-    color: $color-muted-light;
-    padding: $space-12;
-    border-radius: $radius-8;
-}
+    h1,
+    h2,
+    h3,
+    h4 {
+        margin: 0 0 $space-8 0;
+    }
 
-.changelog-entry__text {
-    white-space: pre-wrap;
-    margin: 0;
-    font-family: Consolas, "Courier New", monospace;
+    p,
+    ul,
+    ol {
+        margin: 0 0 $space-8 0;
+    }
+
+    pre {
+        background: $color-log-bg;
+        color: $color-muted-light;
+        padding: $space-12;
+        border-radius: $radius-8;
+        overflow: auto;
+    }
+
+    code {
+        font-family: Consolas, "Courier New", monospace;
+    }
 }
