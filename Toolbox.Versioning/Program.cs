@@ -6,6 +6,8 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Xml.Linq;
 
 namespace Toolbox.Versioning;
@@ -22,11 +24,12 @@ class Program
         var appVersion = GetVersion(args);
         if (appVersion is null)
         {
-            Console.Error.WriteLine("Abbruch: Keine gültige Version angegeben.");
+            WriteError("Abbruch: Keine gueltige Version angegeben.");
             Environment.Exit(1);
             return;
         }
 
+        WriteSection("Versioning");
         // Vorherige Version ermitteln, um nur bei Änderung zu committen
         var hadPrev = TryGetCurrentCsprojVersion(out var prevVersion);
         var versionChanged = false;
@@ -34,22 +37,18 @@ class Program
         // 1) Version auch in Toolbox.csproj setzen
         if (TryUpdateToolboxCsprojVersion(appVersion, out var csprojPath, out var csprojError))
         {
-            Console.WriteLine($"csproj aktualisiert: {csprojPath} -> Version {appVersion}");
+            WriteSuccess($"csproj aktualisiert: {csprojPath} -> Version {appVersion}");
             versionChanged = !hadPrev || !string.Equals(prevVersion, appVersion, StringComparison.OrdinalIgnoreCase);
         }
         else
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Error.WriteLine($"Hinweis: csproj konnte nicht aktualisiert werden: {csprojError}");
-            Console.ResetColor();
+            WriteWarning($"Hinweis: csproj konnte nicht aktualisiert werden: {csprojError}");
         }
 
         var repoRoot = FindRepoRoot();
         if (repoRoot is null)
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("Hinweis: Kein Git-Repository gefunden (.git nicht vorhanden). Changelog-Erstellung wird uebersprungen.");
-            Console.ResetColor();
+            WriteWarning("Hinweis: Kein Git-Repository gefunden (.git nicht vorhanden). Changelog-Erstellung wird uebersprungen.");
         }
         else
         {
@@ -57,24 +56,24 @@ class Program
             TryUpdateChangelogIndex(repoRoot);
             if (!ConfirmChangelogReady(repoRoot, appVersion))
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine("Abbruch: Changelog nicht bestaetigt.");
-                Console.ResetColor();
+                WriteWarning("Abbruch: Changelog nicht bestaetigt.");
                 Environment.Exit(3);
                 return;
             }
         }
 
         // 2) Toolbox publishen (Release) in ein temporäres Verzeichnis und Pfad an Inno weiterreichen
+        WriteSection("Publish");
         var publishDir = PublishToolbox(appVersion);
         if (publishDir is null)
         {
-            Console.Error.WriteLine("Abbruch: Publish fehlgeschlagen.");
+            WriteError("Abbruch: Publish fehlgeschlagen.");
             Environment.Exit(2);
             return;
         }
 
         // 3) Inno Setup ausführen und Version + PublishDir an das Script übergeben
+        WriteSection("Installer");
         var psi = new ProcessStartInfo
         {
             FileName = isccPath,
@@ -85,27 +84,16 @@ class Program
             CreateNoWindow = true
         };
 
-        using var process = new Process { StartInfo = psi };
-
-        process.OutputDataReceived += (s, e) => { if (e.Data != null) Console.WriteLine(e.Data); };
-        process.ErrorDataReceived  += (s, e) => { if (e.Data != null) Console.Error.WriteLine(e.Data); };
-
-        process.Start();
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
-        process.WaitForExit();
-
-        Console.WriteLine($"Exit-Code: {process.ExitCode}");
+        var exitCode = RunProcessWithSpinner(psi, "Inno Setup laeuft");
+        WriteInfo($"Exit-Code: {exitCode}");
 
         // Commit + Push erst NACH erfolgreichem Installer-Build
-        if (process.ExitCode == 0)
+        if (exitCode == 0)
         {
             TryCleanupOldInstallers();
             if (repoRoot is null)
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine("Hinweis: Kein Git-Repository gefunden (.git nicht vorhanden). Commit/Push wird übersprungen.");
-                Console.ResetColor();
+                WriteWarning("Hinweis: Kein Git-Repository gefunden (.git nicht vorhanden). Commit/Push wird uebersprungen.");
             }
             else
             {
@@ -121,18 +109,14 @@ class Program
             var outputDir = TryGetOutputDirFromInno(scriptPath);
             if (string.IsNullOrWhiteSpace(outputDir))
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine("Hinweis: OutputDir aus toolbox.iss nicht gefunden. Cleanup uebersprungen.");
-                Console.ResetColor();
+                WriteWarning("Hinweis: OutputDir aus toolbox.iss nicht gefunden. Cleanup uebersprungen.");
                 return;
             }
 
             outputDir = Environment.ExpandEnvironmentVariables(outputDir);
             if (!Directory.Exists(outputDir))
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"Hinweis: OutputDir nicht gefunden: {outputDir}. Cleanup uebersprungen.");
-                Console.ResetColor();
+                WriteWarning($"Hinweis: OutputDir nicht gefunden: {outputDir}. Cleanup uebersprungen.");
                 return;
             }
 
@@ -162,21 +146,17 @@ class Program
                 try
                 {
                     File.Delete(c.FullPath);
-                    Console.WriteLine($"Installer entfernt: {Path.GetFileName(c.FullPath)}");
+                WriteInfo($"Installer entfernt: {Path.GetFileName(c.FullPath)}");
                 }
                 catch (Exception ex)
                 {
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"Hinweis: Konnte Installer nicht loeschen: {c.FullPath} ({ex.Message})");
-                    Console.ResetColor();
+                    WriteWarning($"Hinweis: Konnte Installer nicht loeschen: {c.FullPath} ({ex.Message})");
                 }
             }
         }
         catch (Exception ex)
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"Hinweis: Cleanup uebersprungen: {ex.Message}");
-            Console.ResetColor();
+            WriteWarning($"Hinweis: Cleanup uebersprungen: {ex.Message}");
         }
     }
 
@@ -191,7 +171,7 @@ class Program
 
             if (File.Exists(changelogPath))
             {
-                Console.WriteLine($"Changelog existiert bereits: {changelogPath}");
+                WriteInfo($"Changelog existiert bereits: {changelogPath}");
                 return;
             }
 
@@ -200,15 +180,12 @@ class Program
                 ? BuildChangelogContent(appVersion, prevVersion, BuildChangelogContext(repoRoot, prevVersion))
                 : AdaptChangelogVersion(seedContent, normalizedVersion);
 
-            content = TryProofreadChangelogOpenAi(content) ?? content;
             File.WriteAllText(changelogPath, content);
-            Console.WriteLine($"Changelog erstellt: {changelogPath}");
+            WriteSuccess($"Changelog erstellt: {changelogPath}");
         }
         catch (Exception ex)
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"Hinweis: Changelog konnte nicht erstellt werden: {ex.Message}");
-            Console.ResetColor();
+            WriteWarning($"Hinweis: Changelog konnte nicht erstellt werden: {ex.Message}");
         }
     }
 
@@ -251,13 +228,11 @@ class Program
             var indexPath = Path.Combine(changelogDir, "index.json");
             var json = JsonSerializer.Serialize(versions, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(indexPath, json);
-            Console.WriteLine($"Changelog-Index aktualisiert: {indexPath}");
+            WriteSuccess($"Changelog-Index aktualisiert: {indexPath}");
         }
         catch (Exception ex)
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"Hinweis: Changelog-Index konnte nicht aktualisiert werden: {ex.Message}");
-            Console.ResetColor();
+            WriteWarning($"Hinweis: Changelog-Index konnte nicht aktualisiert werden: {ex.Message}");
         }
     }
 
@@ -266,13 +241,13 @@ class Program
         var skip = Environment.GetEnvironmentVariable("TOOLBOX_SKIP_CHANGELOG_CONFIRM");
         if (IsAffirmative(skip))
         {
-            Console.WriteLine("Changelog-Check uebersprungen (TOOLBOX_SKIP_CHANGELOG_CONFIRM).");
+            WriteInfo("Changelog-Check uebersprungen (TOOLBOX_SKIP_CHANGELOG_CONFIRM).");
             return true;
         }
 
         var normalizedVersion = NormalizeVersionText(appVersion);
         var changelogPath = Path.Combine(repoRoot, "Toolbox", "wwwroot", "Changelog", $"{normalizedVersion}.md");
-        Console.WriteLine($"Changelog: {changelogPath}");
+        WriteInfo($"Changelog: {changelogPath}");
 
         if (File.Exists(changelogPath))
         {
@@ -281,23 +256,25 @@ class Program
                 var content = File.ReadAllText(changelogPath);
                 if (content.Contains("TODO", StringComparison.OrdinalIgnoreCase))
                 {
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine("Hinweis: Changelog enthaelt noch TODO.");
-                    Console.ResetColor();
+                    WriteWarning("Hinweis: Changelog enthaelt noch TODO.");
                 }
             }
             catch { }
         }
         else
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("Hinweis: Changelog-Datei nicht gefunden.");
-            Console.ResetColor();
+            WriteWarning("Hinweis: Changelog-Datei nicht gefunden.");
         }
 
         Console.Write("Changelog fertig und geprueft? (j/N): ");
         var input = Console.ReadLine();
-        return IsAffirmative(input);
+        if (!IsAffirmative(input))
+        {
+            return false;
+        }
+
+        TryProofreadChangelogFile(changelogPath);
+        return true;
     }
 
     private sealed record ChangelogContext(string? BaseCommit, string GitLog, string DiffStat);
@@ -538,11 +515,13 @@ class Program
             var json = JsonSerializer.Serialize(payload);
             using var client = new HttpClient();
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            using var spinner = new ConsoleSpinner("Proofreading (OpenAI)");
             var response = client.PostAsync("https://api.openai.com/v1/chat/completions",
                 new StringContent(json, Encoding.UTF8, "application/json")).GetAwaiter().GetResult();
 
             if (!response.IsSuccessStatusCode)
             {
+                spinner.Stop("Proofreading fehlgeschlagen.", ConsoleColor.Yellow);
                 return null;
             }
 
@@ -551,14 +530,41 @@ class Program
             var content = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
             if (string.IsNullOrWhiteSpace(content))
             {
+                spinner.Stop("Proofreading ohne Ergebnis.", ConsoleColor.Yellow);
                 return null;
             }
 
+            spinner.Stop("Proofreading abgeschlossen.", ConsoleColor.Green);
             return content.Trim();
         }
         catch
         {
             return null;
+        }
+    }
+
+    private static void TryProofreadChangelogFile(string changelogPath)
+    {
+        try
+        {
+            if (!File.Exists(changelogPath))
+            {
+                return;
+            }
+
+            var content = File.ReadAllText(changelogPath);
+            var proofread = TryProofreadChangelogOpenAi(content);
+            if (string.IsNullOrWhiteSpace(proofread) || string.Equals(proofread, content, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            File.WriteAllText(changelogPath, proofread);
+            WriteSuccess("Changelog Proofreading angewendet.");
+        }
+        catch (Exception ex)
+        {
+            WriteWarning($"Hinweis: Proofreading fehlgeschlagen: {ex.Message}");
         }
     }
 
@@ -778,14 +784,12 @@ class Program
             var status = RunProcess("git", "status --porcelain", repoRoot, out var so, out var se);
             if (status != 0)
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"Git-Status fehlgeschlagen ({status}). Überspringe Commit/Push.\n{se}");
-                Console.ResetColor();
+                WriteWarning($"Git-Status fehlgeschlagen ({status}). Ueberspringe Commit/Push.\n{se}");
                 return;
             }
             if (string.IsNullOrWhiteSpace(so))
             {
-                Console.WriteLine("Keine Änderungen zum Commit. Überspringe Commit/Push.");
+                WriteInfo("Keine Aenderungen zum Commit. Ueberspringe Commit/Push.");
                 return;
             }
 
@@ -793,9 +797,7 @@ class Program
             var addCode = RunProcess("git", "add -A", repoRoot, out so, out se);
             if (addCode != 0)
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"Git add fehlgeschlagen ({addCode}).\n{se}");
-                Console.ResetColor();
+                WriteWarning($"Git add fehlgeschlagen ({addCode}).\n{se}");
                 return;
             }
 
@@ -805,20 +807,16 @@ class Program
             if (commitCode != 0)
             {
                 // Häufig: nothing to commit
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"Git commit nicht ausgeführt ({commitCode}).\n{so}{se}");
-                Console.ResetColor();
+                WriteWarning($"Git commit nicht ausgefuehrt ({commitCode}).\n{so}{se}");
                 return;
             }
 
-            Console.WriteLine("Git commit erstellt. Pushe Änderungen…");
+            WriteSuccess("Git commit erstellt. Pushe Aenderungen...");
             TryPushAllRemotes(repoRoot);
         }
         catch (Exception ex)
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"Git Commit/Push übersprungen: {ex.Message}");
-            Console.ResetColor();
+            WriteWarning($"Git Commit/Push uebersprungen: {ex.Message}");
         }
     }
 
@@ -827,9 +825,7 @@ class Program
         var remotesCode = RunProcess("git", "remote", repoRoot, out var remotesOut, out var remotesErr);
         if (remotesCode != 0)
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"Git remotes fehlgeschlagen ({remotesCode}).\n{remotesErr}");
-            Console.ResetColor();
+            WriteWarning($"Git remotes fehlgeschlagen ({remotesCode}).\n{remotesErr}");
             return;
         }
 
@@ -841,9 +837,7 @@ class Program
 
         if (remotes.Count == 0)
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("Keine Git Remotes gefunden. Push wird uebersprungen.");
-            Console.ResetColor();
+            WriteWarning("Keine Git Remotes gefunden. Push wird uebersprungen.");
             return;
         }
 
@@ -852,13 +846,11 @@ class Program
             var pushCode = RunProcess("git", $"push \"{remote}\" --all", repoRoot, out var so, out var se);
             if (pushCode != 0)
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"Git push zu '{remote}' fehlgeschlagen ({pushCode}).\n{se}");
-                Console.ResetColor();
+                WriteWarning($"Git push zu '{remote}' fehlgeschlagen ({pushCode}).\n{se}");
                 continue;
             }
 
-            Console.WriteLine($"Git push zu '{remote}' erfolgreich.");
+            WriteSuccess($"Git push zu '{remote}' erfolgreich.");
         }
     }
 
@@ -890,7 +882,7 @@ class Program
             var csproj = FindCsprojPath();
             if (csproj is null)
             {
-                Console.Error.WriteLine("Toolbox.csproj nicht gefunden.");
+                WriteError("Toolbox.csproj nicht gefunden.");
                 return null;
             }
 
@@ -914,7 +906,7 @@ class Program
             p.WaitForExit();
             if (p.ExitCode != 0)
             {
-                Console.Error.WriteLine("dotnet publish fehlgeschlagen:");
+                WriteError("dotnet publish fehlgeschlagen:");
                 Console.Error.WriteLine(stdOut);
                 Console.Error.WriteLine(stdErr);
                 return null;
@@ -923,7 +915,7 @@ class Program
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Fehler beim Publish: {ex.Message}");
+            WriteError($"Fehler beim Publish: {ex.Message}");
             return null;
         }
     }
@@ -937,18 +929,18 @@ class Program
             if (requested && !Debugger.IsAttached)
             {
                 var pid = Environment.ProcessId;
-                Console.WriteLine($"[{appName}] Warte auf Debugger… PID={pid}");
+                WriteInfo($"[{appName}] Warte auf Debugger... PID={pid}");
                 var last = DateTime.UtcNow;
                 while (!Debugger.IsAttached)
                 {
                     System.Threading.Thread.Sleep(250);
                     if ((DateTime.UtcNow - last) > TimeSpan.FromSeconds(5))
                     {
-                        Console.WriteLine($"[{appName}] …warte weiterhin auf Debugger…");
+                        WriteInfo($"[{appName}] ...warte weiterhin auf Debugger...");
                         last = DateTime.UtcNow;
                     }
                 }
-                Console.WriteLine($"[{appName}] Debugger angehängt.");
+                WriteSuccess($"[{appName}] Debugger angehaengt.");
             }
         }
         catch
@@ -1092,11 +1084,9 @@ class Program
 
             if (!TryParseVersionInput(input, out var parsed, out var parseError))
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.Error.WriteLine($"Ungueltiges Format. {parseError}");
-                Console.Error.WriteLine("Beispiele: 1.2.3, 1.2.3.4, 1.2.3-beta");
-                Console.Error.WriteLine("Trennzeichen: '.', '_' oder ',' (z.B. 1_2_3).");
-                Console.ResetColor();
+                WriteWarning($"Ungueltiges Format. {parseError}");
+                WriteInfo("Beispiele: 1.2.3, 1.2.3.4, 1.2.3-beta");
+                WriteInfo("Trennzeichen: '.', '_' oder ',' (z.B. 1_2_3).");
                 continue;
             }
 
@@ -1318,9 +1308,7 @@ class Program
     {
         if (!IsSupportedPreRelease(preRelease))
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"Hinweis: PreRelease '{preRelease}' ist nicht erlaubt.");
-            Console.ResetColor();
+            WriteWarning($"Hinweis: PreRelease '{preRelease}' ist nicht erlaubt.");
             return false;
         }
         Console.Write("Beta-Version erkannt. Fortfahren? (j/N): ");
@@ -1339,6 +1327,159 @@ class Program
         if (string.IsNullOrWhiteSpace(value)) return false;
         var v = value.Trim().ToLowerInvariant();
         return v is "0" or "false" or "nein" or "no" or "n";
+    }
+
+    private static void WriteSection(string title)
+    {
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine($"== {title} ==");
+        Console.ResetColor();
+    }
+
+    private static void WriteInfo(string message)
+    {
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.WriteLine(message);
+        Console.ResetColor();
+    }
+
+    private static void WriteSuccess(string message)
+    {
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine(message);
+        Console.ResetColor();
+    }
+
+    private static void WriteWarning(string message)
+    {
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine(message);
+        Console.ResetColor();
+    }
+
+    private static void WriteError(string message)
+    {
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.Error.WriteLine(message);
+        Console.ResetColor();
+    }
+
+    private static int RunProcessWithSpinner(ProcessStartInfo psi, string label)
+    {
+        var stdout = new StringBuilder();
+        var stderr = new StringBuilder();
+        using var spinner = new ConsoleSpinner(label);
+        using var process = new Process { StartInfo = psi };
+
+        process.OutputDataReceived += (s, e) => { if (e.Data != null) stdout.AppendLine(e.Data); };
+        process.ErrorDataReceived += (s, e) => { if (e.Data != null) stderr.AppendLine(e.Data); };
+
+        process.Start();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+        process.WaitForExit();
+
+        if (process.ExitCode == 0)
+        {
+            spinner.Stop("Inno Setup abgeschlossen.", ConsoleColor.Green);
+        }
+        else
+        {
+            spinner.Stop("Inno Setup fehlgeschlagen.", ConsoleColor.Red);
+            if (stdout.Length > 0)
+            {
+                WriteInfo("Inno Output:");
+                Console.WriteLine(stdout.ToString().TrimEnd());
+            }
+            if (stderr.Length > 0)
+            {
+                WriteWarning("Inno Errors:");
+                Console.WriteLine(stderr.ToString().TrimEnd());
+            }
+        }
+
+        return process.ExitCode;
+    }
+
+    private sealed class ConsoleSpinner : IDisposable
+    {
+        private readonly string _label;
+        private readonly CancellationTokenSource _cts = new();
+        private readonly Task _task;
+        private readonly Stopwatch _sw = Stopwatch.StartNew();
+        private readonly int _left;
+        private readonly int _top;
+        private bool _stopped;
+
+        public ConsoleSpinner(string label)
+        {
+            _label = label;
+            _left = Console.CursorLeft;
+            _top = Console.CursorTop;
+            Console.CursorVisible = false;
+            _task = Task.Run(SpinAsync);
+        }
+
+        private async Task SpinAsync()
+        {
+            var frames = new[] { "|", "/", "-", "\\" };
+            var i = 0;
+            while (!_cts.IsCancellationRequested)
+            {
+                WriteFrame(frames[i++ % frames.Length]);
+                await Task.Delay(120);
+            }
+        }
+
+        private void WriteFrame(string frame)
+        {
+            var elapsed = _sw.Elapsed;
+            Console.SetCursorPosition(_left, _top);
+            Console.ForegroundColor = ConsoleColor.DarkCyan;
+            Console.Write(frame);
+            Console.ResetColor();
+            Console.Write($" {_label} ({FormatElapsed(elapsed)})");
+            Console.Write("   ");
+        }
+
+        public void Stop(string? finalMessage, ConsoleColor? color = null)
+        {
+            if (_stopped) return;
+            _stopped = true;
+            _cts.Cancel();
+            try { _task.Wait(500); } catch { }
+            ClearLine();
+            if (!string.IsNullOrWhiteSpace(finalMessage))
+            {
+                if (color.HasValue) Console.ForegroundColor = color.Value;
+                Console.WriteLine(finalMessage);
+                Console.ResetColor();
+            }
+            Console.CursorVisible = true;
+        }
+
+        public void Dispose()
+        {
+            Stop(null);
+            _cts.Dispose();
+        }
+
+        private static string FormatElapsed(TimeSpan elapsed)
+        {
+            return elapsed.TotalHours >= 1
+                ? elapsed.ToString("hh\\:mm\\:ss")
+                : elapsed.ToString("mm\\:ss");
+        }
+
+        private static void ClearLine()
+        {
+            var width = Console.WindowWidth;
+            if (width <= 0) return;
+            Console.SetCursorPosition(0, Console.CursorTop);
+            Console.Write(new string(' ', width - 1));
+            Console.SetCursorPosition(0, Console.CursorTop);
+        }
     }
 
     private static bool TryGetCurrentCsprojVersion(out string version)

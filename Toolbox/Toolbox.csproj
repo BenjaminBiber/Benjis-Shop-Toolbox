@@ -7,11 +7,11 @@
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>0.5.12</Version>
-    <AssemblyVersion>0.5.12.0</AssemblyVersion>
-    <FileVersion>0.5.12.0</FileVersion>
+    <Version>0.5.13</Version>
+    <AssemblyVersion>0.5.13.0</AssemblyVersion>
+    <FileVersion>0.5.13.0</FileVersion>
     <ApplicationIcon>wwwroot\favicon.ico</ApplicationIcon>
-  <InformationalVersion>0.5.12</InformationalVersion></PropertyGroup>
+  <InformationalVersion>0.5.13</InformationalVersion></PropertyGroup>
   <PropertyGroup>
     <NoWarn>$(NoWarn);NU1605</NoWarn>
     <DartSassOutputStyle>expanded</DartSassOutputStyle>
