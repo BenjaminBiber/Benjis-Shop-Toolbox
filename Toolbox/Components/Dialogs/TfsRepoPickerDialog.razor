@@ -1,0 +1,233 @@
+@using Toolbox.Services
+
+@inject TfsRepoService TfsRepoService
+
+<MudDialog>
+    <DialogContent>
+        <div class="d-flex align-items-center mb-3">
+            <MudText Typo="Typo.h6" Class="me-auto">Repos aus TFS/Azure DevOps</MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                           Disabled="_loading"
+                           OnClick="@(async _ => await LoadAsync())" />
+        </div>
+
+        <MudTextField Value="@_searchText"
+                      ValueChanged="@((string v) => OnSearchChanged(v))"
+                      Immediate="true"
+                      Placeholder="Suche..."
+                      Variant="Variant.Text"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Class="mb-3 w-100" />
+
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            <MudSelect T="string"
+                       Label="Projekt"
+                       Variant="Variant.Text"
+                       Dense="true"
+                       Value="@_projectFilter"
+                       ValueChanged="@((string v) => OnProjectFilterChanged(v))"
+                       Class="settings-field-grow">
+                <MudSelectItem Value="@AllProjectsValue">Alle Projekte</MudSelectItem>
+                @foreach (var project in _projects)
+                {
+                    <MudSelectItem Value="@project">@project</MudSelectItem>
+                }
+            </MudSelect>
+            <MudCheckBox Value="_showSelectedOnly"
+                         ValueChanged="@((bool v) => OnShowSelectedOnlyChanged(v))"
+                         Color="Color.Primary"
+                         Label="Nur ausgewählte" />
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Filled" Class="mb-2">@_error</MudAlert>
+        }
+        else if (_loading)
+        {
+            <MudProgressCircular Indeterminate="true" Size="Size.Medium" Color="Color.Primary" />
+        }
+        else if (!_filtered.Any())
+        {
+            <MudText Typo="Typo.caption" Class="text-secondary">Keine Repos gefunden.</MudText>
+        }
+        else
+        {
+            <MudTable Items="_filtered" Dense="true" Hover="true" Elevation="0" SortLabel="Sortieren">
+                <HeaderContent>
+                    <MudTh></MudTh>
+                    <MudTh>
+                        <MudTableSortLabel SortBy="new Func<RepoRow, object>(x => x.Repo.Name)">Repo</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel SortBy="new Func<RepoRow, object>(x => x.Repo.Project)">Projekt</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel SortBy="new Func<RepoRow, object>(x => x.Repo.RemoteUrl)">URL</MudTableSortLabel>
+                    </MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Auswählen">
+                        <MudCheckBox Value="context.Selected"
+                                     ValueChanged="@((bool v) => OnSelectedChanged(context, v))"
+                                     Color="Color.Primary" />
+                    </MudTd>
+                    <MudTd DataLabel="Repo">@context.Repo.Name</MudTd>
+                    <MudTd DataLabel="Projekt">@context.Repo.Project</MudTd>
+                    <MudTd DataLabel="URL">
+                        <MudText Typo="Typo.caption">@context.Repo.RemoteUrl</MudText>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary"
+                   Disabled="@(!_filtered.Any(r => r.Selected))"
+                   OnClick="Confirm">
+            Einfügen
+        </MudButton>
+        <MudButton Color="Color.Default" OnClick="Cancel">Abbrechen</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private string _searchText = string.Empty;
+    private string _searchTextNormalized = string.Empty;
+    private const string AllProjectsValue = "__ALL_PROJECTS__";
+    private string _projectFilter = AllProjectsValue;
+    private bool _showSelectedOnly;
+    private bool _loading;
+    private string? _error;
+    private List<RepoRow> _repos = new();
+    private List<RepoRow> _filtered = new();
+    private readonly List<string> _projects = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            var repos = await TfsRepoService.GetRepositoriesAsync();
+            _repos = repos.Select(r => new RepoRow(r)).ToList();
+            BuildProjectFilterOptions();
+            ApplyFilter();
+        }
+        catch (Exception ex)
+        {
+            _repos.Clear();
+            _filtered.Clear();
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OnSearchChanged(string value)
+    {
+        _searchText = value ?? string.Empty;
+        _searchTextNormalized = _searchText.Trim().ToLowerInvariant();
+        ApplyFilter();
+    }
+
+    private void OnProjectFilterChanged(string value)
+    {
+        _projectFilter = string.IsNullOrWhiteSpace(value) ? AllProjectsValue : value;
+        ApplyFilter();
+    }
+
+    private void OnShowSelectedOnlyChanged(bool value)
+    {
+        _showSelectedOnly = value;
+        ApplyFilter();
+    }
+
+    private void BuildProjectFilterOptions()
+    {
+        var current = _projectFilter;
+        _projects.Clear();
+        _projects.AddRange(_repos
+            .Select(r => r.Repo.Project)
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(p => p, StringComparer.OrdinalIgnoreCase));
+
+        if (current != AllProjectsValue &&
+            !_projects.Any(p => string.Equals(p, current, StringComparison.OrdinalIgnoreCase)))
+        {
+            _projectFilter = AllProjectsValue;
+        }
+    }
+
+    private void ApplyFilter()
+    {
+        IEnumerable<RepoRow> query = _repos;
+
+        if (!string.IsNullOrWhiteSpace(_searchTextNormalized))
+        {
+            query = query.Where(r =>
+                r.Repo.Name.Contains(_searchTextNormalized, StringComparison.OrdinalIgnoreCase) ||
+                r.Repo.Project.Contains(_searchTextNormalized, StringComparison.OrdinalIgnoreCase) ||
+                r.Repo.RemoteUrl.Contains(_searchTextNormalized, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (_projectFilter != AllProjectsValue)
+        {
+            query = query.Where(r => string.Equals(r.Repo.Project, _projectFilter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (_showSelectedOnly)
+        {
+            query = query.Where(r => r.Selected);
+        }
+
+        _filtered = query.ToList();
+    }
+
+    private void OnSelectedChanged(RepoRow row, bool value)
+    {
+        row.Selected = value;
+        if (_showSelectedOnly)
+        {
+            ApplyFilter();
+        }
+    }
+
+    private void Confirm()
+    {
+        var urls = _repos
+            .Where(r => r.Selected)
+            .Select(r => r.Repo.RemoteUrl)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        MudDialog.Close(DialogResult.Ok(urls));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private sealed class RepoRow
+    {
+        public RepoRow(TfsRepoInfo repo)
+        {
+            Repo = repo;
+        }
+
+        public TfsRepoInfo Repo { get; }
+        public bool Selected { get; set; }
+    }
+}

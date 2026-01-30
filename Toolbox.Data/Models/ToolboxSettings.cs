@@ -12,6 +12,10 @@ public class ToolboxSettings
     public string? IisAppName { get; set; }
     [Description("Liste der Windows-Ereignislog-Namen. Mehrere Logs sind möglich (Trennung per Semikolon). Hinweis: Je mehr Logs ausgewählt sind, desto länger kann das Laden dauern.")]
     public string? LogName { get; set; }
+    [Description("Liste der TFS/Azure-DevOps Projekt-URLs (Trennung per Semikolon).")]
+    public string? TfsProjectUrls { get; set; }
+    [Description("TFS/Azure-DevOps API Key (PAT) für die Repository-Abfrage.")]
+    public string? TfsApiKey { get; set; }
     [Description("Liste der Theme-Repository-Wurzelordner (mehrere Pfade sind möglich). Wird zum Finden/Verwalten von Themes genutzt.")]
     public string ThemeRepositoryPath { get; set; }
     [Description("Liste der Extension-Repository-Wurzelordner (mehrere Pfade sind möglich). Wird zum Finden/Verwalten von Extensions genutzt.")]
@@ -48,6 +52,8 @@ public class ToolboxSettings
         Id = SingletonId;
         IisAppName = null;
         LogName = "4SELLERS";
+        TfsProjectUrls = string.Empty;
+        TfsApiKey = string.Empty;
         AutoRefreshSeconds = 60;
         ThemeRepositoryPath = "C:\\Dev_Git\\KundenThemes";
         ExtensionsRepositoryPath = "C:\\Dev_Git\\Extensions";
@@ -68,6 +74,7 @@ public class ToolboxSettings
     public IEnumerable<string> GetExtensionRoots() => SplitPaths(ExtensionsRepositoryPath);
     public IEnumerable<string> GetThemeRoots() => SplitPaths(ThemeRepositoryPath);
     public IEnumerable<string> GetLogNames() => SplitPaths(LogName);
+    public IEnumerable<string> GetTfsProjectUrls() => SplitPaths(TfsProjectUrls);
 
     public string? GetPrimaryExtensionRoot() => GetExtensionRoots().FirstOrDefault();
     public string? GetPrimaryThemeRoot() => GetThemeRoots().FirstOrDefault();
@@ -75,6 +82,7 @@ public class ToolboxSettings
     public void SetExtensionRoots(IEnumerable<string> paths) => ExtensionsRepositoryPath = JoinPaths(paths);
     public void SetThemeRoots(IEnumerable<string> paths) => ThemeRepositoryPath = JoinPaths(paths);
     public void SetLogNames(IEnumerable<string> names) => LogName = JoinPaths(names);
+    public void SetTfsProjectUrls(IEnumerable<string> urls) => TfsProjectUrls = JoinPaths(urls);
 
     public ShopSetting? GetShopSettingForCurrentSite()
     {
