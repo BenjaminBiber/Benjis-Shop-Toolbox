@@ -195,8 +195,12 @@ class Program
                 return;
             }
 
-            var context = BuildChangelogContext(repoRoot, prevVersion);
-            var content = BuildChangelogContent(appVersion, prevVersion, context);
+            var seedContent = TryLoadPreviousChangelog(changelogDir, prevVersion);
+            var content = string.IsNullOrWhiteSpace(seedContent)
+                ? BuildChangelogContent(appVersion, prevVersion, BuildChangelogContext(repoRoot, prevVersion))
+                : AdaptChangelogVersion(seedContent, normalizedVersion);
+
+            content = TryProofreadChangelogOpenAi(content) ?? content;
             File.WriteAllText(changelogPath, content);
             Console.WriteLine($"Changelog erstellt: {changelogPath}");
         }
@@ -297,6 +301,64 @@ class Program
     }
 
     private sealed record ChangelogContext(string? BaseCommit, string GitLog, string DiffStat);
+
+    private static string? TryLoadPreviousChangelog(string changelogDir, string? prevVersion)
+    {
+        if (string.IsNullOrWhiteSpace(prevVersion))
+        {
+            return null;
+        }
+
+        try
+        {
+            var normalizedPrev = NormalizeVersionText(prevVersion);
+            var path = Path.Combine(changelogDir, $"{normalizedPrev}.md");
+            return File.Exists(path) ? File.ReadAllText(path) : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string AdaptChangelogVersion(string content, string newVersion)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return $"# {newVersion}\n";
+        }
+
+        using var reader = new StringReader(content);
+        var sb = new StringBuilder();
+        var replacedHeader = false;
+        string? line;
+
+        while ((line = reader.ReadLine()) != null)
+        {
+            if (!replacedHeader && !string.IsNullOrWhiteSpace(line))
+            {
+                if (line.TrimStart().StartsWith("#"))
+                {
+                    sb.AppendLine($"# {newVersion}");
+                    replacedHeader = true;
+                    continue;
+                }
+
+                sb.AppendLine($"# {newVersion}");
+                sb.AppendLine();
+                replacedHeader = true;
+            }
+
+            sb.AppendLine(line);
+        }
+
+        if (!replacedHeader)
+        {
+            return $"# {newVersion}\n{content.Trim()}";
+        }
+
+        return sb.ToString().TrimEnd();
+    }
 
     private static ChangelogContext BuildChangelogContext(string repoRoot, string? prevVersion)
     {
@@ -425,6 +487,74 @@ class Program
             using var doc = JsonDocument.Parse(responseJson);
             var content = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
             return string.IsNullOrWhiteSpace(content) ? null : content.Trim();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string? TryProofreadChangelogOpenAi(string markdown)
+    {
+        try
+        {
+            var apiKey = GetOpenAiKey();
+            if (string.IsNullOrWhiteSpace(apiKey))
+            {
+                return null;
+            }
+
+            var proofreadFlag = Environment.GetEnvironmentVariable("TOOLBOX_CHANGELOG_PROOFREAD");
+            if (!string.IsNullOrWhiteSpace(proofreadFlag) && IsExplicitFalse(proofreadFlag))
+            {
+                return null;
+            }
+
+            var model = Environment.GetEnvironmentVariable("TOOLBOX_OPENAI_MODEL");
+            if (string.IsNullOrWhiteSpace(model))
+            {
+                model = "gpt-4o-mini";
+            }
+
+            var prompt = new StringBuilder();
+            prompt.AppendLine("Pruefe den folgenden Markdown-Text nur auf Rechtschreibung/Grammatik.");
+            prompt.AppendLine("Aendere NICHT die Struktur: keine neuen Ueberschriften, keine Reihenfolge aendern,");
+            prompt.AppendLine("keine Listenpunkte hinzufuegen/entfernen und keine Formatierung veraendern.");
+            prompt.AppendLine("Gib NUR den korrigierten Markdown-Text zurueck.");
+            prompt.AppendLine();
+            prompt.AppendLine(markdown);
+
+            var payload = new
+            {
+                model,
+                temperature = 0.1,
+                messages = new[]
+                {
+                    new { role = "system", content = "Du korrigierst nur Rechtschreibung/Grammatik und bewahrst die Markdown-Struktur 1:1." },
+                    new { role = "user", content = prompt.ToString() }
+                }
+            };
+
+            var json = JsonSerializer.Serialize(payload);
+            using var client = new HttpClient();
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            var response = client.PostAsync("https://api.openai.com/v1/chat/completions",
+                new StringContent(json, Encoding.UTF8, "application/json")).GetAwaiter().GetResult();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            var responseJson = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+            using var doc = JsonDocument.Parse(responseJson);
+            var content = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                return null;
+            }
+
+            return content.Trim();
         }
         catch
         {
@@ -1202,6 +1332,13 @@ class Program
     {
         var v = (value ?? string.Empty).Trim().ToLowerInvariant();
         return v is "j" or "ja" or "y" or "yes";
+    }
+
+    private static bool IsExplicitFalse(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        var v = value.Trim().ToLowerInvariant();
+        return v is "0" or "false" or "nein" or "no" or "n";
     }
 
     private static bool TryGetCurrentCsprojVersion(out string version)
