@@ -33,6 +33,7 @@ class Program
             var currentVersion = NormalizeVersionText(options.GetValueOrDefault("--current-version") ?? TryGetLocalVersion() ?? "0.0.0");
             var pidArg = options.GetValueOrDefault("--pid");
             var processName = options.GetValueOrDefault("--process-name") ?? "Toolbox";
+            var processNamesArg = options.GetValueOrDefault("--process-names");
             var interactive = options.ContainsKey("--interactive") || string.Equals(options.GetValueOrDefault("--silent"), "false", StringComparison.OrdinalIgnoreCase);
             var allowBeta = IsTruthy(options.GetValueOrDefault("--allow-beta"));
 
@@ -83,7 +84,14 @@ class Program
             {
                 TryKillProcessByPid(pid);
             }
-            if (!string.IsNullOrWhiteSpace(processName))
+            if (!string.IsNullOrWhiteSpace(processNamesArg))
+            {
+                foreach (var name in SplitProcessNames(processNamesArg))
+                {
+                    TryKillProcessesByName(name);
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(processName))
             {
                 TryKillProcessesByName(processName);
             }
@@ -396,6 +404,24 @@ class Program
             catch (Exception ex)
             {
                 Console.WriteLine($"Hinweis: Prozess {name} (PID {proc.Id}) konnte nicht beendet werden: {ex.Message}");
+            }
+        }
+    }
+
+    private static IEnumerable<string> SplitProcessNames(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            yield break;
+        }
+
+        var parts = raw.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var part in parts)
+        {
+            var name = part.Trim();
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                yield return name;
             }
         }
     }

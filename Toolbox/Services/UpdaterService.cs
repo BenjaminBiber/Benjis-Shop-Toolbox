@@ -48,7 +48,8 @@ public class UpdaterService
                 // ignore
             }
             var allowBetaArg = allowBeta ? "true" : "false";
-            var args = $"--pid {Environment.ProcessId} --process-name \"Toolbox\" --current-version {current} --allow-beta {allowBetaArg}";
+            var processNames = "Toolbox;Toolbox.TrayIcon";
+            var args = $"--pid {Environment.ProcessId} --process-name \"Toolbox\" --process-names \"{processNames}\" --current-version {current} --allow-beta {allowBetaArg}";
 #if DEBUG
             args += " --TOOLBOX_UPDATER_DEBUG=1";
 #endif
