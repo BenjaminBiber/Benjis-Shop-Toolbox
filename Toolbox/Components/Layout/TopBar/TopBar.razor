@@ -2,18 +2,18 @@
 @using Toolbox.Services
 @inject UiThemeState ThemeState
 
-<MudDrawer Color="Color.Secondary" @bind-Open="IsOpen" Class="d-flex align-items-center justify-content-center flex-column" Overlay="false" Variant="DrawerVariant.Mini" Breakpoint="Breakpoint.None" ClipMode="DrawerClipMode.Never" Anchor="Anchor.Start" Elevation="3">
-    <MudNavMenu Color="Color.Inherit" Class="w-100">
-        <MudNavLink Class="w-100" IconColor="Color.Inherit" Href="" Icon="@Icons.Material.Filled.Home" Match="NavLinkMatch.All">Home</MudNavLink>
+<MudDrawer Color="Color.Primary" @bind-Open="IsOpen" Class="d-flex align-items-center justify-content-center flex-column" Overlay="false" Variant="DrawerVariant.Mini" Breakpoint="Breakpoint.None" ClipMode="DrawerClipMode.Never" Anchor="Anchor.Start" Elevation="3">
+    <MudNavMenu Color="Color.Primary" Class="w-100">
+        <MudNavLink Class="w-100" IconColor="Color.Secondary" Href="" Icon="@Icons.Material.Filled.Home" Match="NavLinkMatch.All">Home</MudNavLink>
         <MudDivider Class="topbar-divider"></MudDivider>
-        <MudNavLink Class="w-100" IconColor="Color.Inherit" Href="themes" Icon="@Icons.Material.Filled.Link">Themes</MudNavLink>
-        <MudNavLink Class="w-100" IconColor="Color.Inherit" Href="extensions" Icon="@Icons.Material.Filled.Extension">Extensions</MudNavLink>
+        <MudNavLink Class="w-100" IconColor="Color.Secondary" Href="themes" Icon="@Icons.Material.Filled.Link">Themes</MudNavLink>
+        <MudNavLink Class="w-100" IconColor="Color.Secondary" Href="extensions" Icon="@Icons.Material.Filled.Extension">Extensions</MudNavLink>
         <MudDivider Class="topbar-divider"></MudDivider>
-        <MudNavLink Class="w-100" IconColor="Color.Inherit" Href="shop" Icon="@Icons.Material.Filled.Store">Shop</MudNavLink>
-        <MudNavLink Class="w-100" IconColor="Color.Inherit" Href="sites" Icon="@Icons.Material.Filled.Dns">IIS-Seiten</MudNavLink>
+        <MudNavLink Class="w-100" IconColor="Color.Secondary" Href="shop" Icon="@Icons.Material.Filled.Store">Shop</MudNavLink>
+        <MudNavLink Class="w-100" IconColor="Color.Secondary" Href="sites" Icon="@Icons.Material.Filled.Dns">IIS-Seiten</MudNavLink>
         <MudDivider Class="topbar-divider"></MudDivider>
         @* <MudNavLink IconColor="Color.Primary" Href="WidgetPage" Icon="@Icons.Material.Filled.Widgets">Widgets</MudNavLink> *@
-        <MudNavLink IconColor="Color.Inherit" Href="settings" Icon="@Icons.Material.Filled.Settings">Einstellungen</MudNavLink>
+        <MudNavLink IconColor="Color.Secondary" Href="settings" Icon="@Icons.Material.Filled.Settings">Einstellungen</MudNavLink>
     </MudNavMenu>
     <div class="w-100 d-flex justify-content-between align-items-center mb-3 gap-2 @(IsOpen ? "flex-row" : "flex-column-reverse")">
         <MudTooltip Text="@(IsOpen ? "Seitenleiste schließen" : "Seitenleiste öffnen")">

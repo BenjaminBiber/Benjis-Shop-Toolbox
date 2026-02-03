@@ -69,6 +69,7 @@ builder.Services.AddScoped<TfsRepoService>();
 builder.Services.AddScoped<UiThemeState>();
 builder.Services.AddScoped<ThemeLinkService>();
 builder.Services.AddScoped<ExtensionsService>();
+builder.Services.AddScoped<IExtensionVersionService, ExtensionVersionService>();
 builder.Services.AddScoped<ShopSystemConfigService>();
 builder.Services.AddSingleton<IVersionService, VersionService>();
 builder.Services.AddSingleton<IChangelogService, ChangelogService>();

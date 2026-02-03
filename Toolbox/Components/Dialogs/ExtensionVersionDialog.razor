@@ -1,0 +1,181 @@
+@using Toolbox.Services
+@inject IExtensionVersionService ExtensionVersionService
+
+<MudDialog MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Extension Version</MudText>
+        @if (!string.IsNullOrWhiteSpace(ExtensionName))
+        {
+            <MudText Typo="Typo.subtitle2">@ExtensionName</MudText>
+        }
+    </TitleContent>
+    <DialogContent>
+        @if (!string.IsNullOrWhiteSpace(_currentVersion))
+        {
+            <MudText Typo="Typo.body2">Aktuelle Version: @_currentVersion</MudText>
+        }
+
+        <MudTabs Class="mt-3" @bind-ActivePanelIndex="_tabIndex">
+            <MudTabPanel Text="Upgrade (vordefiniert)">
+                <MudSelect T="ExtensionSemanticVersion"
+                           Label="Upgrade-Step"
+                           Variant="Variant.Outlined"
+                           @bind-Value="_selectedUpgrade">
+                    @foreach (var option in UpgradeOptions)
+                    {
+                        <MudSelectItem Value="@option.Value">@option.Label</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudText Typo="Typo.caption" Class="mt-2">@GetUpgradeHint(_selectedUpgrade)</MudText>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Version setzen">
+                <MudTextField T="string"
+                              Label="Version"
+                              Variant="Variant.Outlined"
+                              Placeholder="z.B. 1.2.3"
+                              @bind-Value="_customVersion" />
+                <MudText Typo="Typo.caption" Class="mt-1">
+                    Erlaubt: 3 oder 4 Segmente (z.B. 1.2.3 oder 1.2.3.4)
+                </MudText>
+            </MudTabPanel>
+        </MudTabs>
+
+        <MudTextField T="string"
+                      Label="Changelog Nachricht (optional)"
+                      Variant="Variant.Outlined"
+                      Lines="3"
+                      Class="mt-4"
+                      @bind-Value="_changelogMessage" />
+
+        @if (!string.IsNullOrWhiteSpace(_validationError))
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mt-3">
+                @_validationError
+            </MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Default" OnClick="Cancel">Abbrechen</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Apply">Anwenden</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string ExtensionRoot { get; set; } = string.Empty;
+    [Parameter] public string ExtensionName { get; set; } = string.Empty;
+
+    private int _tabIndex;
+    private ExtensionSemanticVersion _selectedUpgrade = ExtensionSemanticVersion.Minor;
+    private string _customVersion = string.Empty;
+    private string _changelogMessage = string.Empty;
+    private string? _currentVersion;
+    private string? _validationError;
+
+    private static readonly UpgradeOption[] UpgradeOptions = new[]
+    {
+        new UpgradeOption(ExtensionSemanticVersion.Major, "Major (+1.0.0)"),
+        new UpgradeOption(ExtensionSemanticVersion.Minor, "Minor (+0.1.0)"),
+        new UpgradeOption(ExtensionSemanticVersion.Build, "Build (+0.0.1)"),
+        new UpgradeOption(ExtensionSemanticVersion.Shop, "Shop (+1.0.0)"),
+        new UpgradeOption(ExtensionSemanticVersion.Feature, "Feature (+0.1.0)"),
+        new UpgradeOption(ExtensionSemanticVersion.Bug, "Bug (+0.0.1)")
+    };
+
+    protected override void OnInitialized()
+    {
+        var current = ExtensionVersionService.ReadVersion(ExtensionRoot);
+        _currentVersion = current?.ToString();
+    }
+
+    private void Apply()
+    {
+        _validationError = null;
+        var changelogMessage = NormalizeChangelog(_changelogMessage);
+        ExtensionVersionResult result;
+
+        if (_tabIndex == 0)
+        {
+            result = ExtensionVersionService.UpgradeVersion(ExtensionRoot, _selectedUpgrade, changelogMessage);
+        }
+        else
+        {
+            if (!TryParseVersionInput(_customVersion, out var version, out var error))
+            {
+                _validationError = error;
+                return;
+            }
+
+            result = ExtensionVersionService.SetVersion(ExtensionRoot, version, changelogMessage);
+        }
+
+        MudDialog.Close(DialogResult.Ok(result));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private static string? NormalizeChangelog(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string GetUpgradeHint(ExtensionSemanticVersion step)
+    {
+        return step switch
+        {
+            ExtensionSemanticVersion.Major or ExtensionSemanticVersion.Shop => "Erhoeht Major, Minor und Build werden auf 0 gesetzt.",
+            ExtensionSemanticVersion.Build or ExtensionSemanticVersion.Bug => "Erhoeht Build.",
+            _ => "Erhoeht Minor, Build wird auf 0 gesetzt."
+        };
+    }
+
+    private static bool TryParseVersionInput(string? input, out Version version, out string error)
+    {
+        version = new Version(0, 0, 0);
+        error = string.Empty;
+
+        var s = (input ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(s))
+        {
+            error = "Bitte eine Version angeben.";
+            return false;
+        }
+
+        if (s.StartsWith('v') || s.StartsWith('V'))
+        {
+            s = s[1..];
+        }
+
+        if (s.Contains('-'))
+        {
+            error = "PreRelease ist hier nicht erlaubt.";
+            return false;
+        }
+
+        s = s.Replace('_', '.').Replace(',', '.');
+        while (s.Contains(".."))
+        {
+            s = s.Replace("..", ".");
+        }
+        s = s.Trim('.');
+
+        if (!Version.TryParse(s, out var parsed))
+        {
+            error = "Ungueltiges Format. Beispiel: 1.2.3";
+            return false;
+        }
+
+        if (parsed.Build < 0)
+        {
+            error = "Bitte mindestens drei Segmente angeben (z.B. 1.2.3).";
+            return false;
+        }
+
+        version = parsed;
+        return true;
+    }
+
+    private sealed record UpgradeOption(ExtensionSemanticVersion Value, string Label);
+}

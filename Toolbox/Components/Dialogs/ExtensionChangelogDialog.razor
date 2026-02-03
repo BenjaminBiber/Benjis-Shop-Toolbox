@@ -1,0 +1,147 @@
+@using System.IO
+@using System.Text
+@using System.Text.Json
+@using Markdig
+@using Microsoft.AspNetCore.Components
+
+<MudDialog Class="changelog-dialog" MaxWidth="MaxWidth.Large" FullWidth="true">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Class="fw-bold">Changelog</MudText>
+        @if (!string.IsNullOrWhiteSpace(ExtensionName))
+        {
+            <MudText Typo="Typo.subtitle2">@ExtensionName</MudText>
+        }
+    </TitleContent>
+    <DialogContent>
+        @if (!string.IsNullOrWhiteSpace(_loadError))
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">
+                @_loadError
+            </MudAlert>
+        }
+        else if (string.IsNullOrWhiteSpace(_markdownContent))
+        {
+            <MudText Typo="Typo.body1">Kein Changelog gefunden.</MudText>
+        }
+        else
+        {
+            <div class="changelog-dialog__markdown">@((MarkupString)_htmlContent)</div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="Close">Schliessen</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string ExtensionRoot { get; set; } = string.Empty;
+    [Parameter] public string ExtensionName { get; set; } = string.Empty;
+
+    private static readonly MarkdownPipeline MarkdownPipeline = new MarkdownPipelineBuilder()
+        .UseAdvancedExtensions()
+        .DisableHtml()
+        .Build();
+
+    private string _markdownContent = string.Empty;
+    private string _htmlContent = string.Empty;
+    private string? _loadError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadChangelogAsync();
+        _htmlContent = RenderMarkdown(_markdownContent);
+    }
+
+    private async Task LoadChangelogAsync()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(ExtensionRoot))
+            {
+                _loadError = "Kein Extension-Ordner angegeben.";
+                return;
+            }
+
+            var path = Path.Combine(ExtensionRoot, "changelog.json");
+            if (!File.Exists(path))
+            {
+                _markdownContent = string.Empty;
+                return;
+            }
+
+            var json = await File.ReadAllTextAsync(path);
+            var data = JsonSerializer.Deserialize<Dictionary<string, string[]>>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            }) ?? new Dictionary<string, string[]>();
+
+            var entries = data
+                .Select(kvp => new ChangelogEntry(kvp.Key, kvp.Value ?? Array.Empty<string>()))
+                .ToList();
+
+            if (entries.Count == 0)
+            {
+                _markdownContent = string.Empty;
+                return;
+            }
+
+            entries.Sort((a, b) => CompareVersions(b.Version, a.Version));
+
+            var sb = new StringBuilder();
+            foreach (var entry in entries)
+            {
+                sb.AppendLine($"## {entry.Version}");
+                if (entry.Messages.Length == 0)
+                {
+                    sb.AppendLine("- (keine Eintraege)");
+                }
+                else
+                {
+                    foreach (var msg in entry.Messages)
+                    {
+                        var line = string.IsNullOrWhiteSpace(msg) ? "(leer)" : msg.Trim();
+                        sb.AppendLine($"- {line}");
+                    }
+                }
+                sb.AppendLine();
+            }
+
+            _markdownContent = sb.ToString().Trim();
+        }
+        catch (Exception ex)
+        {
+            _loadError = $"Changelog konnte nicht geladen werden: {ex.Message}";
+        }
+    }
+
+    private static string RenderMarkdown(string markdown)
+    {
+        if (string.IsNullOrWhiteSpace(markdown))
+        {
+            return string.Empty;
+        }
+
+        return Markdown.ToHtml(markdown, MarkdownPipeline);
+    }
+
+    private static int CompareVersions(string a, string b)
+    {
+        var hasA = Version.TryParse(a, out var va);
+        var hasB = Version.TryParse(b, out var vb);
+
+        if (hasA && hasB)
+        {
+            return va.CompareTo(vb);
+        }
+
+        if (hasA) return 1;
+        if (hasB) return -1;
+
+        return string.Compare(a, b, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void Close() => MudDialog.Close();
+
+    private sealed record ChangelogEntry(string Version, string[] Messages);
+}
