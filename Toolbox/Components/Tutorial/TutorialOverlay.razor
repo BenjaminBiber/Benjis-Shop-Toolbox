@@ -42,18 +42,19 @@
 
             @if (TutorialService.CurrentStep.Task.Type != TutorialTaskType.None)
             {
-                <div class="tutorial-overlay__task">
-                    <MudText Typo="Typo.subtitle2" Class="fw-bold">Aufgabe</MudText>
+                <div class="tutorial-overlay__task d-flex align-items-center justify-content-center flex-column">
+                    <div class="tutorial-overlay__task-status d-flex align-items-center justify-content-evenly flex-row">
+                        <MudText Typo="Typo.subtitle2" Class="fw-bold">Aufgabe</MudText>
+                        <MudIcon Icon="@(TutorialService.IsCurrentTaskCompleted ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
+                                 Color="@(TutorialService.IsCurrentTaskCompleted ? Color.Success : Color.Error)"
+                                 Class="tutorial-overlay__status-icon"/>
+                    </div>
                     <MudText Typo="Typo.body2">@TutorialService.CurrentStep.Task.Instruction</MudText>
                     @if (_targetMissing)
                     {
                         <MudText Typo="Typo.caption" Class="tutorial-overlay__missing">Ziel nicht gefunden. Bitte warte kurz oder prüfe die Seite.</MudText>
                     }
-                    <div class="tutorial-overlay__task-status">
-                        <MudIcon Icon="@(TutorialService.IsCurrentTaskCompleted ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
-                                 Color="@(TutorialService.IsCurrentTaskCompleted ? Color.Success : Color.Error)"
-                                 Class="tutorial-overlay__status-icon" />
-                    </div>
+
                 </div>
             }
 

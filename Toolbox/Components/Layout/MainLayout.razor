@@ -55,6 +55,7 @@
             var currentVersion = VersionService.GetCurrentVersion();
             var appInfo = await AppInfoService.GetOrCreateAsync();
             var previousVersion = appInfo.LastInstalledVersion;
+            var isCleanInstall = string.IsNullOrWhiteSpace(previousVersion);
 
             appInfo.CurrentVersion = currentVersion;
 
@@ -84,10 +85,15 @@
                 appInfo.LastShownChangelogForVersion = currentVersion;
             }
 
+            if (!isCleanInstall && !appInfo.HasCompletedTutorial)
+            {
+                appInfo.HasCompletedTutorial = true;
+            }
+
             appInfo.LastInstalledVersion = currentVersion;
             await AppInfoService.UpdateAsync(appInfo);
 
-            if (!appInfo.HasCompletedTutorial && !_tutorialStarted)
+            if (isCleanInstall && !appInfo.HasCompletedTutorial && !_tutorialStarted)
             {
                 _tutorialStarted = true;
                 TutorialService.Start();
