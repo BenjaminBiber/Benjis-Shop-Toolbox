@@ -282,8 +282,8 @@
     private string _searchText = string.Empty;
     private string _searchTextNormalized = string.Empty;
     private LogEntry? _selectedLog;
-    private bool expandFailedExtensions = true;
-    private bool expandLoadedExtensions = true;
+    private bool expandFailedExtensions;
+    private bool expandLoadedExtensions;
     private LogService? _logService;
     private bool _isPopOverOpen = false;
     private HashSet<LogLevel> _selectedLevels = new(Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All));
