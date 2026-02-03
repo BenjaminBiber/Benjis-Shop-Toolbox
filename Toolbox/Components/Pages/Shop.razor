@@ -201,6 +201,7 @@
     private string adornmentIcon => showPassword ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff;
     private InputType passwordInputType => showPassword ? InputType.Text : InputType.Password;
     private bool _noShopDialogShown;
+    private readonly HashSet<string> _notifiedShopYamlPaths = new(StringComparer.OrdinalIgnoreCase);
     
     protected override async Task OnInitializedAsync()
     {
@@ -260,11 +261,14 @@
 
     private bool DisableYamlSaveButton()
     {
-        if (SelectedSetting == null || String.IsNullOrEmpty(SelectedSetting.ShopYamlPath))
+        if (SelectedSetting == null || String.IsNullOrEmpty(SelectedSetting.ShopYamlPath) || ShopsystemConfig == null)
         {
             return true;
         }
-        var savedYaml = ShopYamlService.LoadConfiguration(SelectedSetting.ShopYamlPath);
+        if (!TryLoadShopYaml(SelectedSetting.ShopYamlPath, out var savedYaml, notify: false))
+        {
+            return true;
+        }
         return ShopsystemConfig.Equals(savedYaml);
     }
     
@@ -288,7 +292,10 @@
         var configs = new List<ShopsystemConfig>();
         foreach (var shopSetting in Settings.ShopSettingsList)
         {
-            configs.Add(ShopYamlService.LoadConfiguration(shopSetting.ShopYamlPath));
+            if (TryLoadShopYaml(shopSetting.ShopYamlPath, out var config, notify: false))
+            {
+                configs.Add(config);
+            }
         }
 
         var configConnections = configs.SelectMany(x => x.ZionConfiguration.DatabaseConnections).ToList();
@@ -348,10 +355,19 @@
     
     private void GetYamlContent()
     {
-        if (SelectedSetting != null && !String.IsNullOrEmpty(SelectedSetting.ShopYamlPath))
+        if (SelectedSetting == null || String.IsNullOrEmpty(SelectedSetting.ShopYamlPath))
         {
-            ShopsystemConfig = ShopYamlService.LoadConfiguration(SelectedSetting.ShopYamlPath);
+            ShopsystemConfig = null;
+            return;
         }
+
+        if (TryLoadShopYaml(SelectedSetting.ShopYamlPath, out var config))
+        {
+            ShopsystemConfig = config;
+            return;
+        }
+
+        ShopsystemConfig = null;
     }
     
     private Task OnShopChanged(string shopPath)
@@ -446,6 +462,48 @@
         catch
         {
             return s.ShopYamlPath;
+        }
+    }
+
+    private bool TryLoadShopYaml(string? yamlPath, out ShopsystemConfig config, bool notify = true)
+    {
+        config = new ShopsystemConfig();
+        if (string.IsNullOrWhiteSpace(yamlPath))
+        {
+            return false;
+        }
+
+        if (!File.Exists(yamlPath))
+        {
+            if (notify) NotifyMissingShopYaml(yamlPath);
+            return false;
+        }
+
+        try
+        {
+            config = ShopYamlService.LoadConfiguration(yamlPath);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            if (notify) NotifyShopYamlError(yamlPath, ex);
+            return false;
+        }
+    }
+
+    private void NotifyMissingShopYaml(string yamlPath)
+    {
+        if (_notifiedShopYamlPaths.Add(yamlPath))
+        {
+            Snackbar.Add($"Shop-Pfad existiert nicht: {yamlPath}", Severity.Warning);
+        }
+    }
+
+    private void NotifyShopYamlError(string yamlPath, Exception ex)
+    {
+        if (_notifiedShopYamlPaths.Add(yamlPath))
+        {
+            Snackbar.Add($"Fehler beim Laden der shop.yaml ({yamlPath}): {ex.Message}", Severity.Warning);
         }
     }
 }

@@ -3,6 +3,7 @@
 @using Toolbox.Components.Dialogs
 @using Toolbox.Data.Models
 @using Toolbox.Data.Models.Extensions
+@using Toolbox.Data.Models.ShopYaml
 @using Toolbox.Data.Services
 @inject IConnectionStringResolver Resolver
 @inject IExternalDbContextFactory ShopFactory
@@ -18,7 +19,7 @@
         <MudSelect Variant="Variant.Outlined" Value="_selectedShopPath" ValueChanged="ChangeSelectedShop" T="string">
             @foreach (var shopPaths in Settings.ShopSettingsList)
             {
-                <MudSelectItem Value="@shopPaths.ShopYamlPath">@GetShopDisplayName(shopPaths) (@shopPaths.GetShopYamlContent().ZionConfiguration.DatabaseConnections.FirstOrDefault().ToString())</MudSelectItem>
+                <MudSelectItem Value="@shopPaths.ShopYamlPath">@GetShopDisplayName(shopPaths) @GetConnectionLabel(shopPaths)</MudSelectItem>
             }
         </MudSelect>
     </div>
@@ -79,6 +80,7 @@ else
         Settings.ShopSettingsList.FirstOrDefault(s => string.Equals(s.ShopYamlPath, _selectedShopPath, StringComparison.OrdinalIgnoreCase))
         ?? Settings.GetShopSettingForCurrentSite();
     private HashSet<Widget> _selectedWidgets = [];
+    private readonly HashSet<string> _notifiedShopYamlPaths = new(StringComparer.OrdinalIgnoreCase);
     
     protected override async Task OnInitializedAsync()
     {
@@ -160,14 +162,16 @@ else
     {
         _loading = true;
         
-        if (SelectedShopSetting == null || SelectedShopSetting.GetConnectionString() == null)
+        if (SelectedShopSetting == null || !TryGetConnectionString(SelectedShopSetting, out var connectionString))
         {
+            _loading = false;
+            StateHasChanged();
             return;
         }
 
         try
         {
-            Resolver.SetCurrent(SelectedShopSetting.GetConnectionString());
+            Resolver.SetCurrent(connectionString);
             using var db = ShopFactory.Create();
             Widgets = await db.Widgets.ToListAsync();
         }
@@ -193,6 +197,88 @@ else
         }
 
         await LoadWidgets();
+    }
+
+    private string GetConnectionLabel(ShopSetting setting)
+    {
+        if (!TryLoadShopYaml(setting, out var config))
+        {
+            return string.Empty;
+        }
+
+        var conn = config.ZionConfiguration.DatabaseConnections?.FirstOrDefault();
+        if (conn == null)
+        {
+            return string.Empty;
+        }
+
+        return $"({conn})";
+    }
+
+    private bool TryGetConnectionString(ShopSetting setting, out string connectionString)
+    {
+        connectionString = string.Empty;
+        if (!TryLoadShopYaml(setting, out var config))
+        {
+            return false;
+        }
+
+        var conn = config.ZionConfiguration.DatabaseConnections?.FirstOrDefault();
+        if (conn == null)
+        {
+            return false;
+        }
+
+        connectionString = conn.GetConnectionString();
+        return !string.IsNullOrWhiteSpace(connectionString);
+    }
+
+    private bool TryLoadShopYaml(ShopSetting setting, out ShopsystemConfig config, bool notify = true)
+    {
+        config = new ShopsystemConfig();
+        if (setting == null)
+        {
+            return false;
+        }
+
+        var yamlPath = setting.ShopYamlPath ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(yamlPath))
+        {
+            return false;
+        }
+
+        if (!System.IO.File.Exists(yamlPath))
+        {
+            if (notify) NotifyMissingShopYaml(yamlPath);
+            return false;
+        }
+
+        try
+        {
+            config = ShopYamlService.LoadConfiguration(yamlPath);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            if (notify) NotifyShopYamlError(yamlPath, ex);
+            return false;
+        }
+    }
+
+    private void NotifyMissingShopYaml(string yamlPath)
+    {
+        if (_notifiedShopYamlPaths.Add(yamlPath))
+        {
+            NotificationService.Warning($"Shop-Pfad existiert nicht: {yamlPath}");
+        }
+    }
+
+    private void NotifyShopYamlError(string yamlPath, Exception ex)
+    {
+        if (_notifiedShopYamlPaths.Add(yamlPath))
+        {
+            NotificationService.Warning($"Fehler beim Laden der shop.yaml ({yamlPath}): {ex.Message}");
+        }
     }
     
 }

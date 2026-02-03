@@ -3,6 +3,7 @@
 @using System.IO
 @using Toolbox.Components.Dialogs
 @using Toolbox.Data.Models
+@using Toolbox.Data.Models.ShopYaml
 @using Toolbox.Data.Services
 @using Toolbox.ExtensionMethods
 @inject NotificationService NotificationService
@@ -184,6 +185,7 @@ else
     private MudTable<ExtensionInfo> _table = null!;
     private string _searchText = string.Empty;
     private readonly HashSet<string> _pinnedExtensionGroups = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _notifiedShopYamlPaths = new(StringComparer.OrdinalIgnoreCase);
   
     private TableGroupDefinition<ExtensionInfo> _groupDefinition = new()
     {
@@ -454,7 +456,7 @@ else
             }
         }
 
-        var conn = s.GetConnection();
+        var conn = TryGetConnection(s);
         if (conn != null && (!string.IsNullOrWhiteSpace(conn.Server) || !string.IsNullOrWhiteSpace(conn.Database)))
         {
             var server = string.IsNullOrWhiteSpace(conn.Server) ? "?" : conn.Server;
@@ -534,7 +536,7 @@ else
                         HasThemeV4 = Directory.GetDirectories(dir, "4SELLERS_Responsive_4", SearchOption.AllDirectories).Length > 0
                     };
 
-                    var conn = SelectedShopSetting?.GetConnection();
+                    var conn = TryGetConnection(SelectedShopSetting);
                     if (conn == null)
                     {
                         error?.Report("Keine Datenbankverbindung (shop.yaml) gefunden.\n");
@@ -608,7 +610,7 @@ else
     {
         try
         {
-            var conn = SelectedShopSetting?.GetConnection();
+            var conn = TryGetConnection(SelectedShopSetting);
             if (conn == null)
             {
                 Snackbar.Add("Keine Datenbankverbindung (shop.yaml) gefunden.", Severity.Warning);
@@ -688,6 +690,52 @@ else
         {
             Snackbar.Add($"Build-Fehler: {ex.Message}", Severity.Error);
             return false;
+        }
+    }
+
+    private DatabaseConnection? TryGetConnection(ShopSetting? setting)
+    {
+        if (setting == null)
+        {
+            return null;
+        }
+
+        var yamlPath = setting.ShopYamlPath ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(yamlPath))
+        {
+            return null;
+        }
+
+        if (!File.Exists(yamlPath))
+        {
+            NotifyMissingShopYaml(yamlPath);
+            return null;
+        }
+
+        try
+        {
+            return setting.GetConnection();
+        }
+        catch (Exception ex)
+        {
+            NotifyShopYamlError(yamlPath, ex);
+            return null;
+        }
+    }
+
+    private void NotifyMissingShopYaml(string yamlPath)
+    {
+        if (_notifiedShopYamlPaths.Add(yamlPath))
+        {
+            Snackbar.Add($"Shop-Pfad existiert nicht: {yamlPath}", Severity.Warning);
+        }
+    }
+
+    private void NotifyShopYamlError(string yamlPath, Exception ex)
+    {
+        if (_notifiedShopYamlPaths.Add(yamlPath))
+        {
+            Snackbar.Add($"Fehler beim Laden der shop.yaml ({yamlPath}): {ex.Message}", Severity.Warning);
         }
     }
 }

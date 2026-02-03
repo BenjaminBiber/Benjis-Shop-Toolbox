@@ -15,7 +15,7 @@
       <MudListSubheader Class="fw-bold">Einstellungen</MudListSubheader>
       <MudListItem Class="m-0" T="object" Selected="@(_section==SettingsSection.General)" Icon="@Icons.Material.Filled.Tune" OnClick="@(()=>Select(SettingsSection.General))">Allgemein</MudListItem>
       <MudListItem Class="m-0" T="object" Selected="@(_section==SettingsSection.Logs)" Icon="@Icons.Material.Filled.Message" OnClick="@(()=>Select(SettingsSection.Logs))">Logs</MudListItem>
-      <MudListItem Class="m-0" T="object" Selected="@(_section==SettingsSection.Shops)" Icon="@Icons.Material.Filled.Store" OnClick="@(()=>Select(SettingsSection.Shops))">Shop</MudListItem>
+      <MudListItem Class="m-0" T="object" Selected="@(_section==SettingsSection.Shops)" Icon="@Icons.Material.Filled.Store" OnClick="@(()=>Select(SettingsSection.Shops))">Shops</MudListItem>
       <MudListItem Class="m-0" T="object" Selected="@(_section==SettingsSection.IIS)" Icon="@Icons.Material.Filled.Computer" OnClick="@(()=>Select(SettingsSection.IIS))">IIS</MudListItem>
       @if (EasterEggService.IsSecretUnlocked)
       {
