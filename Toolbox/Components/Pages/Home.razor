@@ -57,7 +57,7 @@
                 </MudMenu>
             </div>
             <div class="col-7 d-flex col-lg-12 justify-content-evenly gap-3 flex-lg-column align-items-center">
-                <MudButton Color="Color.Success" Class="w-100" StartIcon="@Icons.Material.Filled.Start" Variant="Variant.Filled" OnClick="@IisService.StartIisApp">Start</MudButton>
+                <MudButton Color="Color.Success" Class="w-100" StartIcon="@Icons.Material.Filled.Start" Variant="Variant.Filled" OnClick="@IisService.StartIisApp" data-tutorial="iis-start">Start</MudButton>
                 <MudButton Color="Color.Warning" Class="w-100" StartIcon="@Icons.Material.Filled.RestartAlt" Variant="Variant.Filled" OnClick="RestartIisAppAndRefresh">Neustart</MudButton>
                 <MudButton Color="Color.Error" Class="w-100" StartIcon="@Icons.Material.Filled.Stop" Variant="Variant.Filled" OnClick="@IisService.StopCurrentIisApp">Stop</MudButton>
             </div>
@@ -144,13 +144,13 @@
                             <div class="row w-100">
                                 @*SEARCH*@
                                 <div class="col">
-                                    <MudTextField T="string" Variant="Variant.Text" Value="_searchTextInput" ValueChanged="OnSearchTextChanged" Immediate="true" Label="Suche" Class="w-100"/>
+                                    <MudTextField T="string" Variant="Variant.Text" Value="_searchTextInput" ValueChanged="OnSearchTextChanged" Immediate="true" Label="Suche" Class="w-100 tutorial-log-search"/>
                                 </div>
                                 @*FILTER*@
                                 <div class="col-1">
-                                    <MudIconButton Icon="@Icons.Material.Filled.FilterAlt" OnClick="HandlePopOver"></MudIconButton>
+                                    <MudIconButton Icon="@Icons.Material.Filled.FilterAlt" OnClick="HandlePopOver" data-tutorial="log-filter"></MudIconButton>
                                     <div @onclick="HandlePopOver" class="home-filter-overlay @(_isPopOverOpen ? "home-filter-overlay--visible" : "home-filter-overlay--hidden")"></div>
-                                    <MudPopover Class="pa-6" Open="@_isPopOverOpen" AnchorOrigin="Origin.BottomRight">
+                                    <MudPopover Class="pa-6 tutorial-popover" Open="@_isPopOverOpen" AnchorOrigin="Origin.BottomRight">
                                         <div class="d-flex gap-3 flex-column">
                                             <MudText Class="fw-bold fs-3">Filter</MudText>
                                             <MudSelect T="LogLevel" MultiSelection="true" MultiSelectionTextFunc="@(new Func<List<string>, string>(GetMultiSelectionText))" SelectedValues="_selectedLevels" SelectedValuesChanged="@(async levels => await SelectedLevelsChanged(levels))" Label="Ebene">

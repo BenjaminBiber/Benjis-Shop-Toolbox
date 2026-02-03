@@ -1,0 +1,315 @@
+﻿@using MudBlazor
+@using Microsoft.AspNetCore.Components
+
+<MudDialog ActionsClass="tutorial-dialog__actions" Class="tutorial-dialog" MaxWidth="MaxWidth.Large" FullWidth="true">
+    <TitleContent>
+        <div class="tutorial-dialog__header">
+            <div class="tutorial-dialog__title-block">
+                <MudText Typo="Typo.h5" Class="fw-bold">Erste Schritte</MudText>
+                <MudText Typo="Typo.body2">Schritt @(_stepIndex + 1) von @StepCount</MudText>
+            </div>
+            <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined" Class="tutorial-dialog__time">~ 1 Minute</MudChip>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div class="tutorial-dialog__progress">
+            <MudProgressLinear Value="@ProgressValue" Color="Color.Primary" Rounded="true" Size="Size.Small" />
+        </div>
+        <div class="tutorial-dialog__body">
+            @switch (_stepIndex)
+            {
+                case 0:
+                    <div class="tutorial-dialog__hero">
+                        <div>
+                            <MudText Typo="Typo.h4" Class="fw-bold mb-2">Willkommen in der Shop Toolbox</MudText>
+                            <MudText Typo="Typo.body1">Wir zeigen dir die wichtigsten Funktionen in kurzen, interaktiven Schritten.</MudText>
+                        </div>
+                        <div class="tutorial-dialog__hero-tags">
+                            <MudChip T="string" Icon="@Icons.Material.Filled.TouchApp" Color="Color.Info" Variant="Variant.Filled">Interaktiv</MudChip>
+                            <MudChip T="string" Icon="@Icons.Material.Filled.Bolt" Color="Color.Success" Variant="Variant.Filled">Schnell</MudChip>
+                            <MudChip T="string" Icon="@Icons.Material.Filled.HelpOutline" Color="Color.Secondary" Variant="Variant.Filled">Basics</MudChip>
+                        </div>
+                    </div>
+                    <div class="tutorial-dialog__grid">
+                        <MudPaper Elevation="0" Class="tutorial-dialog__card">
+                            <MudIcon Icon="@Icons.Material.Filled.Power" Class="tutorial-dialog__card-icon" />
+                            <MudText Typo="Typo.subtitle1" Class="fw-bold">IIS steuern</MudText>
+                            <MudText Typo="Typo.body2">Apps starten, stoppen und neu starten.</MudText>
+                        </MudPaper>
+                        <MudPaper Elevation="0" Class="tutorial-dialog__card">
+                            <MudIcon Icon="@Icons.Material.Filled.ManageSearch" Class="tutorial-dialog__card-icon" />
+                            <MudText Typo="Typo.subtitle1" Class="fw-bold">Logs finden</MudText>
+                            <MudText Typo="Typo.body2">Schnell suchen, filtern und Details ansehen.</MudText>
+                        </MudPaper>
+                        <MudPaper Elevation="0" Class="tutorial-dialog__card">
+                            <MudIcon Icon="@Icons.Material.Filled.Dashboard" Class="tutorial-dialog__card-icon" />
+                            <MudText Typo="Typo.subtitle1" Class="fw-bold">Bereiche entdecken</MudText>
+                            <MudText Typo="Typo.body2">Themes, Extensions, Shop und Einstellungen.</MudText>
+                        </MudPaper>
+                    </div>
+                    break;
+                case 1:
+                    <div class="tutorial-dialog__step">
+                        <MudText Typo="Typo.h6" Class="fw-bold">IIS App steuern</MudText>
+                        <MudText Typo="Typo.body2">Waehle eine App und simuliere Start, Neustart oder Stop.</MudText>
+                        <MudPaper Elevation="0" Class="tutorial-dialog__panel">
+                            <div class="tutorial-dialog__row">
+                                <MudSelect T="string" Value="_demoIisApp" ValueChanged="OnDemoIisAppChanged" Label="IIS App" Variant="Variant.Outlined" Class="tutorial-dialog__select">
+                                    @foreach (var app in _demoIisApps)
+                                    {
+                                        <MudSelectItem Value="@app">@app</MudSelectItem>
+                                    }
+                                </MudSelect>
+                                <MudChip T="string" Color="@DemoIisStatusColor" Variant="Variant.Filled">@DemoIisStatusText</MudChip>
+                            </div>
+                            <div class="tutorial-dialog__button-row">
+                                <MudButton Color="Color.Success" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Start" OnClick="DemoStart">Start</MudButton>
+                                <MudButton Color="Color.Warning" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.RestartAlt" OnClick="DemoRestart">Neustart</MudButton>
+                                <MudButton Color="Color.Error" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Stop" OnClick="DemoStop">Stop</MudButton>
+                            </div>
+                            <MudText Typo="Typo.caption" Class="tutorial-dialog__hint">Tipp: Status und Aktionen findest du im linken Panel der Startseite.</MudText>
+                        </MudPaper>
+                    </div>
+                    break;
+                case 2:
+                    <div class="tutorial-dialog__step">
+                        <MudText Typo="Typo.h6" Class="fw-bold">Logs durchsuchen</MudText>
+                        <MudText Typo="Typo.body2">Suche nach Begriffen oder filtere nach Log-Level.</MudText>
+                        <MudPaper Elevation="0" Class="tutorial-dialog__panel">
+                            <MudTextField T="string" Label="Suche" Variant="Variant.Outlined" Immediate="true" Value="_demoSearch" ValueChanged="OnDemoSearchChanged" />
+                            <div class="tutorial-dialog__chip-row">
+                                @foreach (var level in _demoLevels)
+                                {
+                                    <MudChip T="string" OnClick="() => ToggleDemoLevel(level)" Variant="@(IsDemoLevelActive(level) ? Variant.Filled : Variant.Outlined)" Color="@GetDemoLevelColor(level)" Class="tutorial-dialog__chip">
+                                        @GetDemoLevelLabel(level)
+                                    </MudChip>
+                                }
+                            </div>
+                            <div class="tutorial-dialog__log-list">
+                                @foreach (var log in FilteredDemoLogs)
+                                {
+                                    <div class="tutorial-dialog__log-row @(log == _selectedDemoLog ? "tutorial-dialog__log-row--active" : string.Empty)" @onclick="() => SelectDemoLog(log)">
+                                        <MudChip T="string" Variant="Variant.Filled" Color="@GetDemoLevelColor(log.Level)">@GetDemoLevelLabel(log.Level)</MudChip>
+                                        <MudText Typo="Typo.body2">@log.Message</MudText>
+                                        <MudText Typo="Typo.caption" Class="tutorial-dialog__log-time">@log.Time</MudText>
+                                    </div>
+                                }
+                                @if (!FilteredDemoLogs.Any())
+                                {
+                                    <MudText Typo="Typo.body2" Class="tutorial-dialog__empty">Keine Treffer in der Demo.</MudText>
+                                }
+                            </div>
+                        </MudPaper>
+                        @if (_selectedDemoLog != null)
+                        {
+                            <MudPaper Elevation="0" Class="tutorial-dialog__detail">
+                                <div class="tutorial-dialog__detail-header">
+                                    <MudText Typo="Typo.subtitle2" Class="fw-bold">Logdetails</MudText>
+                                    <MudChip T="string" Variant="Variant.Outlined" Color="@GetDemoLevelColor(_selectedDemoLog.Level)">@GetDemoLevelLabel(_selectedDemoLog.Level)</MudChip>
+                                </div>
+                                <MudText Typo="Typo.body2">@_selectedDemoLog.Details</MudText>
+                            </MudPaper>
+                        }
+                    </div>
+                    break;
+                case 3:
+                    <div class="tutorial-dialog__step">
+                        <MudText Typo="Typo.h6" Class="fw-bold">Navigation & Hilfe</MudText>
+                        <MudText Typo="Typo.body2">Wechsle zwischen Bereichen und schalte optional den Win95-Modus.</MudText>
+                        <MudPaper Elevation="0" Class="tutorial-dialog__panel tutorial-dialog__nav-panel">
+                            <div class="tutorial-dialog__nav-list">
+                                @foreach (var item in _navItems)
+                                {
+                                    <MudButton Variant="@(item == _selectedNavItem ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" Class="tutorial-dialog__nav-button" OnClick="() => SelectNavItem(item)">
+                                        <MudIcon Icon="@item.Icon" Class="tutorial-dialog__nav-icon" />
+                                        @item.Title
+                                    </MudButton>
+                                }
+                            </div>
+                            <div class="tutorial-dialog__nav-detail">
+                                <MudText Typo="Typo.subtitle1" Class="fw-bold">@_selectedNavItem.Title</MudText>
+                                <MudText Typo="Typo.body2">@_selectedNavItem.Description</MudText>
+                            </div>
+                        </MudPaper>
+                    </div>
+                    break;
+                    break;
+                default:
+                    <div class="tutorial-dialog__step">
+                        <MudText Typo="Typo.h6" Class="fw-bold">Alles bereit</MudText>
+                        <MudText Typo="Typo.body2">Du hast die Basics gesehen. Wenn du magst, kannst du jederzeit die Einstellungen anpassen.</MudText>
+                        <MudPaper Elevation="0" Class="tutorial-dialog__finish">
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="tutorial-dialog__finish-icon" />
+                            <div>
+                                <MudText Typo="Typo.subtitle1" Class="fw-bold">Viel Erfolg!</MudText>
+                                <MudText Typo="Typo.body2">Nutze die Suche, Filter und Navigation wie in der Demo gezeigt.</MudText>
+                            </div>
+                        </MudPaper>
+                    </div>
+                    break;
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="Skip">Tutorial ueberspringen</MudButton>
+        <MudSpacer />
+        <MudButton Variant="Variant.Outlined" Disabled="@IsFirst" OnClick="Back">Zurueck</MudButton>
+        @if (IsLast)
+        {
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Finish">Fertig</MudButton>
+        }
+        else
+        {
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Next">Weiter</MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private int _stepIndex;
+    private readonly string[] _stepTitles =
+    {
+        "Willkommen",
+        "IIS App steuern",
+        "Logs durchsuchen",
+        "Navigation & Hilfe",
+        "Alles bereit"
+    };
+
+    private readonly List<string> _demoIisApps = new() { "Shop-Alpha", "Shop-Beta", "Shop-Gamma" };
+    private string _demoIisApp = "Shop-Alpha";
+    private bool _demoIisRunning = true;
+
+    private string _demoSearch = string.Empty;
+    private readonly HashSet<DemoLevel> _demoLevels = new() { DemoLevel.Info, DemoLevel.Warning, DemoLevel.Error };
+    private readonly List<DemoLog> _demoLogs = new()
+    {
+        new(DemoLevel.Info, "10:24", "Worker gestartet", "Der IIS Worker wurde erfolgreich gestartet."),
+        new(DemoLevel.Warning, "10:25", "Cache leer", "Der Cache wurde geloescht und initialisiert."),
+        new(DemoLevel.Error, "10:26", "DB Verbindung", "Die Datenbankantwort hat zu lange gedauert."),
+        new(DemoLevel.Info, "10:27", "Theme geladen", "Das Kunden-Theme wurde geladen."),
+        new(DemoLevel.Warning, "10:28", "Extension fehlt", "Eine Extension konnte nicht geladen werden."),
+        new(DemoLevel.Info, "10:29", "Health Check", "Alle Dienste laufen stabil.")
+    };
+    private DemoLog? _selectedDemoLog;
+
+    private readonly List<NavItem> _navItems = new()
+    {
+        new("Home", Icons.Material.Filled.Home, "Logs, Status und Schnellaktionen auf einen Blick."),
+        new("Themes", Icons.Material.Filled.Link, "Themes pruefen und aktualisieren."),
+        new("Extensions", Icons.Material.Filled.Extension, "Extensions verwalten und Versionen vergleichen."),
+        new("Shop", Icons.Material.Filled.Store, "Shopbezogene Einstellungen und Infos."),
+        new("IIS-Seiten", Icons.Material.Filled.Dns, "Sites und Bindings verwalten."),
+        new("Einstellungen", Icons.Material.Filled.Settings, "Globales Verhalten und Pfade anpassen.")
+    };
+    private NavItem _selectedNavItem = default!;
+    private bool _demoWin95;
+
+    protected override void OnInitialized()
+    {
+        _selectedNavItem = _navItems[0];
+        _selectedDemoLog = _demoLogs[0];
+    }
+
+    private int StepCount => _stepTitles.Length;
+    private double ProgressValue => (double)(_stepIndex + 1) / StepCount * 100.0;
+    private bool IsFirst => _stepIndex == 0;
+    private bool IsLast => _stepIndex >= StepCount - 1;
+
+    private Color DemoIisStatusColor => _demoIisRunning ? Color.Success : Color.Error;
+    private string DemoIisStatusText => _demoIisRunning ? "Laeuft" : "Gestoppt";
+
+    private IEnumerable<DemoLog> FilteredDemoLogs => _demoLogs
+        .Where(l => _demoLevels.Contains(l.Level))
+        .Where(l => string.IsNullOrWhiteSpace(_demoSearch) || l.Message.Contains(_demoSearch, StringComparison.OrdinalIgnoreCase));
+
+    private void Next()
+    {
+        if (!IsLast)
+        {
+            _stepIndex++;
+        }
+    }
+
+    private void Back()
+    {
+        if (!IsFirst)
+        {
+            _stepIndex--;
+        }
+    }
+
+    private void Finish() => MudDialog.Close(DialogResult.Ok(true));
+
+    private void Skip() => MudDialog.Close(DialogResult.Ok(false));
+
+    private void DemoStart() => _demoIisRunning = true;
+
+    private void DemoStop() => _demoIisRunning = false;
+
+    private void DemoRestart()
+    {
+        _demoIisRunning = true;
+    }
+
+    private void OnDemoIisAppChanged(string value)
+    {
+        _demoIisApp = value;
+        _demoIisRunning = true;
+    }
+
+    private void OnDemoSearchChanged(string value)
+    {
+        _demoSearch = value;
+        _selectedDemoLog = FilteredDemoLogs.FirstOrDefault();
+    }
+
+    private void ToggleDemoLevel(DemoLevel level)
+    {
+        if (_demoLevels.Contains(level))
+        {
+            _demoLevels.Remove(level);
+        }
+        else
+        {
+            _demoLevels.Add(level);
+        }
+
+        _selectedDemoLog = FilteredDemoLogs.FirstOrDefault();
+    }
+
+    private bool IsDemoLevelActive(DemoLevel level) => _demoLevels.Contains(level);
+
+    private string GetDemoLevelLabel(DemoLevel level) => level switch
+    {
+        DemoLevel.Info => "Info",
+        DemoLevel.Warning => "Warnung",
+        DemoLevel.Error => "Fehler",
+        _ => level.ToString()
+    };
+
+    private Color GetDemoLevelColor(DemoLevel level) => level switch
+    {
+        DemoLevel.Info => Color.Info,
+        DemoLevel.Warning => Color.Warning,
+        DemoLevel.Error => Color.Error,
+        _ => Color.Default
+    };
+
+    private void SelectDemoLog(DemoLog log) => _selectedDemoLog = log;
+
+    private void SelectNavItem(NavItem item) => _selectedNavItem = item;
+
+    private enum DemoLevel
+    {
+        Info,
+        Warning,
+        Error
+    }
+
+    private sealed record DemoLog(DemoLevel Level, string Time, string Message, string Details);
+
+    private sealed record NavItem(string Title, string Icon, string Description);
+}

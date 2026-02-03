@@ -1,0 +1,98 @@
+﻿@use "../vars" as *;
+
+.tutorial-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1400;
+    pointer-events: none;
+}
+
+.tutorial-overlay__shade {
+    position: fixed;
+    background: rgba(9, 11, 20, 0.6);
+    pointer-events: auto;
+    z-index: 1400;
+}
+
+.tutorial-overlay__shade--full {
+    inset: 0;
+}
+
+.tutorial-overlay__card {
+    position: fixed;
+    width: min(360px, 90vw);
+    background: $color-white;
+    border-radius: $radius-8;
+    padding: $space-16;
+    display: flex;
+    flex-direction: column;
+    gap: $space-12;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+    pointer-events: auto;
+    z-index: 1403;
+}
+
+.tutorial-overlay__card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $space-12;
+}
+
+.tutorial-overlay__description {
+    color: rgba(0, 0, 0, 0.7);
+}
+
+.tutorial-overlay__list {
+    margin: 0;
+    padding-left: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.tutorial-overlay__task {
+    padding: $space-12;
+    border-radius: $radius-8;
+    background: $color-surface-muted;
+    border: 1px solid $color-border-subtle;
+    display: flex;
+    flex-direction: column;
+    gap: $space-8;
+}
+
+.tutorial-overlay__task-status {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+}
+
+.tutorial-overlay__status-icon {
+    font-size: 22px;
+}
+
+.tutorial-overlay__missing {
+    color: $color-error;
+}
+
+.tutorial-overlay__actions {
+    display: flex;
+    align-items: center;
+    gap: $space-12;
+}
+
+.tutorial-highlight-target {
+    z-index: 1402;
+    pointer-events: auto;
+}
+
+.tutorial-popover {
+    z-index: 1410 !important;
+    pointer-events: auto;
+}
+
+@media (max-width: 700px) {
+    .tutorial-overlay__card {
+        width: min(320px, 92vw);
+    }
+}

@@ -1,0 +1,281 @@
+﻿@using MudBlazor
+@inject TutorialService TutorialService
+@inject IJSRuntime JsRuntime
+@implements IDisposable
+
+@if (TutorialService.IsActive)
+{
+    <div class="tutorial-overlay">
+        @if (_targetRect != null)
+        {
+            <div class="tutorial-overlay__shade tutorial-overlay__shade--top" style="@TopShadeStyle"></div>
+            <div class="tutorial-overlay__shade tutorial-overlay__shade--left" style="@LeftShadeStyle"></div>
+            <div class="tutorial-overlay__shade tutorial-overlay__shade--right" style="@RightShadeStyle"></div>
+            <div class="tutorial-overlay__shade tutorial-overlay__shade--bottom" style="@BottomShadeStyle"></div>
+        }
+        else
+        {
+            <div class="tutorial-overlay__shade tutorial-overlay__shade--full"></div>
+        }
+
+        <div class="tutorial-overlay__card" style="@CardStyle">
+            <div class="tutorial-overlay__card-header">
+                <div>
+                    <MudText Typo="Typo.h6" Class="fw-bold">@TutorialService.CurrentStep.Title</MudText>
+                    <MudText Typo="Typo.body2">Schritt @(TutorialService.StepIndex + 1) von @TutorialService.Steps.Count</MudText>
+                </div>
+                <MudChip T="string" Variant="Variant.Outlined" Color="Color.Primary">@ProgressLabel</MudChip>
+            </div>
+            <MudProgressLinear Value="@TutorialService.Progress" Color="Color.Primary" Rounded="true" Size="Size.Small" />
+
+            <MudText Typo="Typo.body2" Class="tutorial-overlay__description">@TutorialService.CurrentStep.Description</MudText>
+
+            @if (TutorialService.CurrentStep.Highlights != null && TutorialService.CurrentStep.Highlights.Count > 0)
+            {
+                <ul class="tutorial-overlay__list">
+                    @foreach (var item in TutorialService.CurrentStep.Highlights)
+                    {
+                        <li>@item</li>
+                    }
+                </ul>
+            }
+
+            @if (TutorialService.CurrentStep.Task.Type != TutorialTaskType.None)
+            {
+                <div class="tutorial-overlay__task">
+                    <MudText Typo="Typo.subtitle2" Class="fw-bold">Aufgabe</MudText>
+                    <MudText Typo="Typo.body2">@TutorialService.CurrentStep.Task.Instruction</MudText>
+                    @if (_targetMissing)
+                    {
+                        <MudText Typo="Typo.caption" Class="tutorial-overlay__missing">Ziel nicht gefunden. Bitte warte kurz oder prüfe die Seite.</MudText>
+                    }
+                    <div class="tutorial-overlay__task-status">
+                        <MudIcon Icon="@(TutorialService.IsCurrentTaskCompleted ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
+                                 Color="@(TutorialService.IsCurrentTaskCompleted ? Color.Success : Color.Error)"
+                                 Class="tutorial-overlay__status-icon" />
+                    </div>
+                </div>
+            }
+
+            <div class="tutorial-overlay__actions">
+                <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="Skip">Tutorial überspringen</MudButton>
+                <MudSpacer />
+                <MudButton Variant="Variant.Outlined" Disabled="@TutorialService.IsFirst" OnClick="Back">Zurück</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!TutorialService.IsCurrentTaskCompleted)" OnClick="Next">
+                    @(TutorialService.IsLast ? "Fertig" : "Weiter")
+                </MudButton>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private TutorialTargetRect? _targetRect;
+    private bool _targetMissing;
+    private string? _lastStepId;
+    private string? _listeningStepId;
+    private DotNetObjectReference<TutorialOverlay>? _dotNetRef;
+    private System.Timers.Timer? _refreshTimer;
+    private DateTime _taskArmedAt;
+
+    private string ProgressLabel => $"{TutorialService.StepIndex + 1}/{TutorialService.Steps.Count}";
+
+    private string TopShadeStyle => _targetRect == null ? string.Empty
+        : $"height:{_targetRect.Value.Top}px; width:100%; top:0; left:0;";
+    private string LeftShadeStyle => _targetRect == null ? string.Empty
+        : $"top:{_targetRect.Value.Top}px; left:0; width:{_targetRect.Value.Left}px; height:{_targetRect.Value.Height}px;";
+    private string RightShadeStyle => _targetRect == null ? string.Empty
+        : $"top:{_targetRect.Value.Top}px; left:{_targetRect.Value.Right}px; width:calc(100% - {_targetRect.Value.Right}px); height:{_targetRect.Value.Height}px;";
+    private string BottomShadeStyle => _targetRect == null ? string.Empty
+        : $"top:{_targetRect.Value.Bottom}px; left:0; width:100%; height:calc(100% - {_targetRect.Value.Bottom}px);";
+
+    private string CardStyle
+    {
+        get
+        {
+            if (_targetRect == null)
+            {
+                return "top:50%; left:50%; transform:translate(-50%, -50%);";
+            }
+
+            var rect = _targetRect.Value;
+            var cardWidth = Math.Min(360, rect.ViewportWidth - 32);
+            var cardHeight = 260;
+            var centerX = rect.Left + rect.Width / 2.0;
+            var centerY = rect.Top + rect.Height / 2.0;
+
+            var placeLeft = centerX > rect.ViewportWidth / 2.0;
+            var placeTop = centerY > rect.ViewportHeight / 2.0;
+
+            var left = placeLeft ? 16 : rect.ViewportWidth - cardWidth - 16;
+            var top = placeTop ? 16 : rect.ViewportHeight - (cardHeight * 2) - 16;
+
+            left = Math.Clamp(left, 16, Math.Max(16, rect.ViewportWidth - cardWidth - 16));
+            top = Math.Clamp(top, 16, Math.Max(16, rect.ViewportHeight - cardHeight - 16));
+            return $"top:{top}px; left:{left}px; width:{cardWidth}px;";
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        TutorialService.StateChanged += OnTutorialStateChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!TutorialService.IsActive)
+        {
+            return;
+        }
+
+        if (_dotNetRef == null)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+        }
+
+        var stepId = TutorialService.CurrentStep.Id;
+        if (_lastStepId != stepId)
+        {
+            _lastStepId = stepId;
+            _taskArmedAt = DateTime.UtcNow;
+            if (TutorialService.CurrentStep.Task.Type != TutorialTaskType.None)
+            {
+                TutorialService.ResetTaskCompletion(stepId);
+            }
+            await UpdateTargetAsync(true);
+            await RegisterTaskListenerAsync();
+        }
+    }
+
+    private void OnTutorialStateChanged()
+    {
+        if (TutorialService.IsActive)
+        {
+            StartRefreshTimer();
+        }
+        else
+        {
+            StopRefreshTimer();
+            _targetRect = null;
+            _targetMissing = false;
+            _ = JsRuntime.InvokeVoidAsync("toolboxTutorialClearHighlightTarget");
+        }
+
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private async Task UpdateTargetAsync(bool scrollIntoView)
+    {
+        var selector = TutorialService.CurrentStep.TargetSelector;
+        if (string.IsNullOrWhiteSpace(selector))
+        {
+            _targetRect = null;
+            _targetMissing = false;
+            return;
+        }
+
+        _targetRect = await JsRuntime.InvokeAsync<TutorialTargetRect?>("toolboxTutorialGetRect", selector);
+        _targetMissing = _targetRect == null;
+        await JsRuntime.InvokeAsync<bool>("toolboxTutorialSetHighlightTarget", selector);
+        if (_targetRect != null && scrollIntoView)
+        {
+            await JsRuntime.InvokeVoidAsync("toolboxTutorialScrollIntoView", selector);
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task RegisterTaskListenerAsync()
+    {
+        if (_dotNetRef == null)
+        {
+            return;
+        }
+
+        var step = TutorialService.CurrentStep;
+        if (step.Task.Type != TutorialTaskType.ClickTarget || string.IsNullOrWhiteSpace(step.TargetSelector))
+        {
+            _listeningStepId = null;
+            return;
+        }
+
+        _listeningStepId = step.Id;
+        await JsRuntime.InvokeAsync<bool>("toolboxTutorialRegisterClick", step.TargetSelector, _dotNetRef);
+    }
+
+    [JSInvokable]
+    public void OnTutorialTargetClicked()
+    {
+        if (_listeningStepId == TutorialService.CurrentStep.Id)
+        {
+            if (_targetMissing)
+            {
+                return;
+            }
+
+            if ((DateTime.UtcNow - _taskArmedAt).TotalMilliseconds < 200)
+            {
+                return;
+            }
+
+            TutorialService.MarkTaskCompleted(_listeningStepId);
+        }
+    }
+
+    private void Next() => TutorialService.Next();
+    private void Back() => TutorialService.Back();
+    private void Skip() => TutorialService.Skip();
+
+    private void StartRefreshTimer()
+    {
+        if (_refreshTimer != null)
+        {
+            return;
+        }
+
+        _refreshTimer = new System.Timers.Timer(250);
+        _refreshTimer.Elapsed += async (_, _) =>
+        {
+            if (!TutorialService.IsActive)
+            {
+                return;
+            }
+
+            await InvokeAsync(() => UpdateTargetAsync(false));
+        };
+        _refreshTimer.AutoReset = true;
+        _refreshTimer.Start();
+    }
+
+    private void StopRefreshTimer()
+    {
+        if (_refreshTimer == null)
+        {
+            return;
+        }
+
+        _refreshTimer.Stop();
+        _refreshTimer.Dispose();
+        _refreshTimer = null;
+    }
+
+    public void Dispose()
+    {
+        TutorialService.StateChanged -= OnTutorialStateChanged;
+        StopRefreshTimer();
+        _ = JsRuntime.InvokeVoidAsync("toolboxTutorialClearHighlightTarget");
+        _dotNetRef?.Dispose();
+    }
+
+    private readonly struct TutorialTargetRect
+    {
+        public double Top { get; init; }
+        public double Left { get; init; }
+        public double Width { get; init; }
+        public double Height { get; init; }
+        public double Right { get; init; }
+        public double Bottom { get; init; }
+        public double ViewportWidth { get; init; }
+        public double ViewportHeight { get; init; }
+    }
+}

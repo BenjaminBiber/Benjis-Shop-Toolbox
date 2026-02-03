@@ -80,6 +80,7 @@ public class AppInfoService : IAppInfoService
             existing.CurrentVersion = appInfo.CurrentVersion;
             existing.LastInstalledVersion = appInfo.LastInstalledVersion;
             existing.LastShownChangelogForVersion = appInfo.LastShownChangelogForVersion;
+            existing.HasCompletedTutorial = appInfo.HasCompletedTutorial;
             existing.CreatedAt = appInfo.CreatedAt;
             existing.UpdatedAt = appInfo.UpdatedAt;
             set.Update(existing);

@@ -9,6 +9,7 @@ public class AppInfo
     public string? CurrentVersion { get; set; }
     public string? LastInstalledVersion { get; set; }
     public string? LastShownChangelogForVersion { get; set; }
+    public bool HasCompletedTutorial { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
@@ -18,5 +19,6 @@ public class AppInfo
         StartTime = new DateTime(2020, 1, 1);
         CreatedAt = new DateTime(2020, 1, 1);
         UpdatedAt = new DateTime(2020, 1, 1);
+        HasCompletedTutorial = false;
     }
 }

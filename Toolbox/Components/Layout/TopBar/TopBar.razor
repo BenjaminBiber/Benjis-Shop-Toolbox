@@ -1,8 +1,9 @@
 @using Toolbox.Data.Services
 @using Toolbox.Services
 @inject UiThemeState ThemeState
+@inject TutorialService TutorialService
 
-<MudDrawer Color="Color.Primary" @bind-Open="IsOpen" Class="d-flex align-items-center justify-content-center flex-column" Overlay="false" Variant="DrawerVariant.Mini" Breakpoint="Breakpoint.None" ClipMode="DrawerClipMode.Never" Anchor="Anchor.Start" Elevation="3">
+<MudDrawer Color="Color.Primary" @bind-Open="IsOpen" Class="d-flex align-items-center justify-content-center flex-column tutorial-nav" Overlay="false" Variant="DrawerVariant.Mini" Breakpoint="Breakpoint.None" ClipMode="DrawerClipMode.Never" Anchor="Anchor.Start" Elevation="3">
     <MudNavMenu Color="Color.Primary" Class="w-100">
         <MudNavLink Class="w-100" IconColor="Color.Secondary" Href="" Icon="@Icons.Material.Filled.Home" Match="NavLinkMatch.All">Home</MudNavLink>
         <MudDivider Class="topbar-divider"></MudDivider>
@@ -29,6 +30,7 @@
                     <MudIconButton Icon="@Icons.Material.Filled.Help" Color="Color.Inherit" Size="Size.Medium" Href="https://4sellers.atlassian.net/wiki/x/HADPCg"></MudIconButton>
                 </ActivatorContent>
                 <ChildContent>
+                    <MudMenuItem Icon="@Icons.Material.Filled.School" OnClick="() => TutorialService.Start(true)" Label="Tutorial starten"/>
                     <MudMenuItem Icon="@(ThemeState.IsWin95Mode ? @Icons.Material.Filled.FormatPaint : win95Icon)" OnClick="() => OnWin95ModeChanged(!ThemeState.IsWin95Mode)" Label="@(ThemeState.IsWin95Mode ? "Standard" : "Win95")"/>
                 </ChildContent>
             </MudMenu>

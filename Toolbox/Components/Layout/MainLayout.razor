@@ -2,6 +2,7 @@
 @using Toolbox.Themes
 @using Toolbox.Components.Layout.TopBar
 @using Toolbox.Components.Dialogs
+@using Toolbox.Components.Tutorial
 @using Toolbox.Services
 @using Toolbox.Data.Models.Interfaces
 @inherits LayoutComponentBase
@@ -11,6 +12,7 @@
 @inject IChangelogService ChangelogService
 @inject IAppInfoService AppInfoService
 @inject IVersionService VersionService
+@inject TutorialService TutorialService
 
 <MudThemeProvider Theme="@CurrentTheme" />
 <MudPopoverProvider />
@@ -24,28 +26,29 @@
             @Body
         </div>
     </MudMainContent>
-    
-    
+    <TutorialOverlay />
 </MudLayout>
 
 @code {
     private MudTheme CurrentTheme => ThemeState.IsWin95Mode ? Windows95Theme.Theme : ModernTheme.Yetitheme;
     private string LayoutClass => ThemeState.IsWin95Mode ? "win95-mode" : string.Empty;
-    private bool _changelogChecked;
+    private bool _startupChecked;
+    private bool _tutorialStarted;
 
     protected override void OnInitialized()
     {
         ThemeState.StateChanged += OnThemeChanged;
+        TutorialService.Completed += OnTutorialCompleted;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender || _changelogChecked)
+        if (!firstRender || _startupChecked)
         {
             return;
         }
 
-        _changelogChecked = true;
+        _startupChecked = true;
 
         try
         {
@@ -83,6 +86,12 @@
 
             appInfo.LastInstalledVersion = currentVersion;
             await AppInfoService.UpdateAsync(appInfo);
+
+            if (!appInfo.HasCompletedTutorial && !_tutorialStarted)
+            {
+                _tutorialStarted = true;
+                TutorialService.Start();
+            }
         }
         catch
         {
@@ -98,5 +107,28 @@
     public void Dispose()
     {
         ThemeState.StateChanged -= OnThemeChanged;
+        TutorialService.Completed -= OnTutorialCompleted;
+    }
+
+    private void OnTutorialCompleted(bool skipped)
+    {
+        _ = PersistTutorialCompletionAsync();
+    }
+
+    private async Task PersistTutorialCompletionAsync()
+    {
+        try
+        {
+            var appInfo = await AppInfoService.GetOrCreateAsync();
+            if (!appInfo.HasCompletedTutorial)
+            {
+                appInfo.HasCompletedTutorial = true;
+                await AppInfoService.UpdateAsync(appInfo);
+            }
+        }
+        catch
+        {
+            // ignore
+        }
     }
 }
