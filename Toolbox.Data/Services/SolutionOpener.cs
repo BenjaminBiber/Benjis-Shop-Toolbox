@@ -47,7 +47,9 @@ public class SolutionOpener
             };
 
             foreach (System.Collections.DictionaryEntry kvp in Environment.GetEnvironmentVariables())
+            {
                 startInfo.EnvironmentVariables[kvp.Key.ToString()!] = kvp.Value?.ToString() ?? string.Empty;
+            }
 
             startInfo.EnvironmentVariables["JAVA_HOME"] = "";
 
