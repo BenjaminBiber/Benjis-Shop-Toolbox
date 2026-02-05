@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Toolbox.Data.Models.Interfaces;
 using Toolbox.Data.Models.ShopYaml;
 
-namespace Toolbox.Services;
+namespace Toolbox.Data.Services;
 
 public sealed class ExtensionInventoryService
 {
@@ -82,3 +82,4 @@ public sealed class ExtensionInventoryService
         return result.ToList();
     }
 }
+

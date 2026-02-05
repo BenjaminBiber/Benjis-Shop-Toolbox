@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace Toolbox.Services;
+namespace Toolbox.Data.Services;
 
 public sealed record ExtensionReportResult(
     IReadOnlyDictionary<string, List<string>> MatchingExtensions,
@@ -211,3 +211,4 @@ public sealed class TfsExtensionReportService
         return path.Replace('\\', '/').TrimEnd('/');
     }
 }
+

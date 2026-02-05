@@ -3,7 +3,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
-namespace Toolbox.Services;
+namespace Toolbox.Data.Services;
 
 public enum ExtensionSemanticVersion
 {
@@ -643,3 +643,4 @@ internal static class ExtensionTagHelper
         tagToRemove?.Remove();
     }
 }
+

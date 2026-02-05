@@ -1,7 +1,7 @@
 using System;
 using System.Linq;
 
-namespace Toolbox.Services;
+namespace Toolbox.Data.Services;
 
 internal static class Versioning
 {
@@ -168,3 +168,4 @@ internal static class Versioning
     private static string[] SplitPreRelease(string value)
         => value.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 }
+

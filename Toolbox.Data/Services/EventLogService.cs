@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace Toolbox.Services;
+namespace Toolbox.Data.Services;
 
 public class EventLogService
 {
@@ -41,3 +41,4 @@ public class EventLogService
         }
     }
 }
+

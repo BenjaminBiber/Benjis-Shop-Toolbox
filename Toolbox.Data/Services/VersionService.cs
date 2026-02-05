@@ -1,7 +1,7 @@
 using System;
 using System.Linq;
 
-namespace Toolbox.Services;
+namespace Toolbox.Data.Services;
 
 public interface IVersionService
 {
@@ -53,3 +53,4 @@ public sealed class VersionService : IVersionService
         }
     }
 }
+

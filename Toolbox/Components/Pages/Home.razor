@@ -1,8 +1,8 @@
 @page "/"
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
-@inject Toolbox.Services.SettingsService SettingsService
-@inject Toolbox.Services.AppInfoService AppInfoService
+@inject Toolbox.Data.Services.SettingsService SettingsService
+@inject Toolbox.Data.Services.AppInfoService AppInfoService
 @using Toolbox.Data.Models
 @using Toolbox.Data.Models.Logs
 @using Toolbox.Data.Common
@@ -985,3 +985,4 @@
         return full.ToLowerInvariant();
     }
 }
+

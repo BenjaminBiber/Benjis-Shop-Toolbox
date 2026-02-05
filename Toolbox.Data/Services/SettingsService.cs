@@ -7,9 +7,8 @@ using Toolbox.Data.DataContexts;
 using Toolbox.Data.Models;
 using Toolbox.Data.Models.Extensions;
 using Toolbox.Data.Models.Interfaces;
-using Toolbox.Data.Models.Interfaces;
 
-namespace Toolbox.Services;
+namespace Toolbox.Data.Services;
 
 public class SettingsService : ISettingsService
 {
@@ -86,7 +85,7 @@ public class SettingsService : ISettingsService
         }
     }
 
-    public void SaveSettingChanges(Action<ToolboxSettings> change, NotificationService notificationService)
+    public void SaveSettingChanges(Action<ToolboxSettings> change, INotificationService notificationService)
     {
         if (change == null)
         {
@@ -373,3 +372,4 @@ public class SettingsService : ISettingsService
         }
     }
 }
+

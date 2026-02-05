@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.IO;
 using Toolbox.Data.Models;
 
-namespace Toolbox.Services;
+namespace Toolbox.Data.Services;
 
 /// <summary>
 /// Simple in-memory cache for expensive theme/extension lookups.
@@ -125,3 +125,4 @@ public class CacheService
         public bool IsExpired => Lifetime > TimeSpan.Zero && (DateTimeOffset.UtcNow - CreatedAt) > Lifetime;
     }
 }
+

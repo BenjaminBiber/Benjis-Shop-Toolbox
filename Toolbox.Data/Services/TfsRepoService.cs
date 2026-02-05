@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Toolbox.Data.Models;
 
-namespace Toolbox.Services;
+namespace Toolbox.Data.Services;
 
 public sealed record TfsRepoInfo(string Name, string RemoteUrl, string Project, string SourceUrl)
 {
@@ -570,3 +570,4 @@ public class TfsRepoService
         public bool? IsFolder { get; set; }
     }
 }
+

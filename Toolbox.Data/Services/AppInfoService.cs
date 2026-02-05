@@ -3,7 +3,7 @@ using Toolbox.Data.Common;
 using Toolbox.Data.DataContexts;
 using Toolbox.Data.Models.Interfaces;
 
-namespace Toolbox.Services;
+namespace Toolbox.Data.Services;
 
 public class AppInfoService : IAppInfoService
 {
@@ -138,3 +138,4 @@ public class AppInfoService : IAppInfoService
         await _db.SaveChangesAsync(cancellationToken);
     }
 }
+

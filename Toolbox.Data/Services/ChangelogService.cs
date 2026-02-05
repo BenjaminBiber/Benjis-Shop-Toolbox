@@ -7,7 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace Toolbox.Services;
+namespace Toolbox.Data.Services;
 
 public interface IChangelogService
 {
@@ -163,3 +163,4 @@ public sealed class ChangelogService : IChangelogService
         }
     }
 }
+
