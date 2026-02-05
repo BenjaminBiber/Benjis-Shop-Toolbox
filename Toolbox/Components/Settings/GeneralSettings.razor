@@ -98,6 +98,14 @@
         <MudDivider Class="w-auto"></MudDivider>
     </div>
     <div class="col-12 d-flex flex-column gap-2">
+        <div class="settings-field-with-help">
+            <MudTextField ValueChanged="(string v) => SettingsService.SaveSettingChanges(x => x.TfsCollectionUrl = v, NotificationService)"
+                          Value="Setting.TfsCollectionUrl"
+                          Label="TFS Collection URL"
+                          Variant="Variant.Text"
+                          Class="pl-4 settings-field-grow" />
+            <SettingsHelp PropertyName="@nameof(ToolboxSettings.TfsCollectionUrl)" />
+        </div>
         <div class="pl-4 d-flex flex-column gap-2">
             <MudText Typo="Typo.caption" Class="fw-bold">
                 Projekt-Links

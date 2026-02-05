@@ -50,7 +50,7 @@
                 }
             </MudSelect>
         </div>
-        <div class="col-5">
+        <div class="col-4">
             <MudTextField Variant="Variant.Outlined"
                           Value="_searchText"
                           ValueChanged="(string s) => SearchChanged(s)"
@@ -61,9 +61,12 @@
                           IconSize="Size.Medium"
                           Class="mt-0" />
         </div>
-        <div class="col-1 d-flex align-items-center justify-content-center">
+        <div class="col-2 d-flex align-items-center justify-content-center gap-1">
+            <MudTooltip Text="Object Extensions prüfen">
+                <MudIconButton Icon="@Icons.Material.Filled.Assessment" Size="Size.Medium" Color="Color.Primary" OnClick="OpenObjectExtensionCheckDialog" />
+            </MudTooltip>
             <MudTooltip Text="Extension klonen">
-                <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="OpenCloneDialog" />
+                <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Medium" Color="Color.Primary" OnClick="OpenCloneDialog" />
             </MudTooltip>
         </div>
     </div>
@@ -596,6 +599,22 @@ else
             await LoadAsync();
         }
     }
+
+    private async Task OpenObjectExtensionCheckDialog()
+    {
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            CloseButton = true,
+            BackdropClick = true
+        };
+
+        await DialogService.ShowAsync<ObjectExtensionCheckDialog>(
+            "Object Extensions prüfen",
+            options: options);
+    }
+
 
     private async Task<bool> InstallExtension(string dir)
     {

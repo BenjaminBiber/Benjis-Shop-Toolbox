@@ -66,6 +66,8 @@ builder.Services.AddScoped<SettingsService>();
 builder.Services.AddScoped<ISettingsService, SettingsService>();
 builder.Services.AddScoped<EventLogService>();
 builder.Services.AddScoped<TfsRepoService>();
+builder.Services.AddScoped<ExtensionInventoryService>();
+builder.Services.AddScoped<TfsExtensionReportService>();
 builder.Services.AddScoped<UiThemeState>();
 builder.Services.AddScoped<ThemeLinkService>();
 builder.Services.AddScoped<ExtensionsService>();

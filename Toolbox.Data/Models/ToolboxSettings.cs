@@ -14,6 +14,8 @@ public class ToolboxSettings
     public string? LogName { get; set; }
     [Description("Liste der TFS/Azure-DevOps Projekt-URLs (Trennung per Semikolon).")]
     public string? TfsProjectUrls { get; set; }
+    [Description("TFS/Azure-DevOps Collection-URL (z.B. https://tfs.server/tfs/Collection).")]
+    public string? TfsCollectionUrl { get; set; }
     [Description("TFS/Azure-DevOps API Key (PAT) für die Repository-Abfrage.")]
     public string? TfsApiKey { get; set; }
     [Description("Liste der Theme-Repository-Wurzelordner (mehrere Pfade sind möglich). Wird zum Finden/Verwalten von Themes genutzt.")]
@@ -53,6 +55,7 @@ public class ToolboxSettings
         IisAppName = null;
         LogName = "4SELLERS";
         TfsProjectUrls = string.Empty;
+        TfsCollectionUrl = "https://tfs.4sellers.de/tfs/ERP-Kunden/";
         TfsApiKey = string.Empty;
         AutoRefreshSeconds = 60;
         ThemeRepositoryPath = "C:\\Dev_Git\\KundenThemes";
@@ -131,3 +134,4 @@ public class ToolboxSettings
         return string.Join(";", normalized);
     }
 }
+
