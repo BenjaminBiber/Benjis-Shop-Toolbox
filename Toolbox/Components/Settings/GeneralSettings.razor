@@ -149,16 +149,8 @@
                           Adornment="Adornment.End"
                           AdornmentIcon="@_tfsApiKeyAdornment"
                           OnAdornmentClick="@(() => _showTfsApiKey = !_showTfsApiKey)" />
-            <SettingsHelp PropertyName="@nameof(ToolboxSettings.TfsApiKey)" />
+            <SettingsHelp MarkdownPath="Help/TFSPATGet.md" MarkdownTitle="Personal-Access-Token erstellen" PropertyName="@nameof(ToolboxSettings.TfsApiKey)" />
         </div>
-        <MudText Typo="Typo.caption" Class="pl-4 text-secondary">
-            PAT erstellen:
-            <MudLink Href="https://docs.storiesonboard.com/en/articles/9104467-how-to-create-tfs-personal-access-token"
-                     Target="_blank"
-                     Rel="noopener noreferrer">
-                Anleitung öffnen
-            </MudLink>
-        </MudText>
     </div>
 
     <div class="col-12 mt-3 d-flex gap-1 align-items-center justify-content-center">
