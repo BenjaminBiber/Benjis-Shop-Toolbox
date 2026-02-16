@@ -5,7 +5,6 @@
 @using Microsoft.Web.Administration
 @using System.IO
 @using Toolbox.Components.Settings
-@using Toolbox.Components.MiniGames
 @inject EasterEggService EasterEggService
 @implements IDisposable
 
@@ -19,7 +18,7 @@
       <MudListItem Class="m-0" T="object" Selected="@(_section==SettingsSection.IIS)" Icon="@Icons.Material.Filled.Computer" OnClick="@(()=>Select(SettingsSection.IIS))">IIS</MudListItem>
       @if (EasterEggService.IsSecretUnlocked)
       {
-          <MudListItem Class="m-0" T="object" Selected="@(_section==SettingsSection.Pong)" Icon="@Icons.Material.Filled.SportsEsports" OnClick="@(()=>Select(SettingsSection.Pong))">Pong</MudListItem>
+          <MudListItem Class="m-0" T="object" Selected="@(_section==SettingsSection.SlotMachine)" Icon="@Icons.Material.Filled.Casino" OnClick="@(()=>Select(SettingsSection.SlotMachine))">Slotmaschine</MudListItem>
       }
     </MudList>
   </aside>
@@ -39,15 +38,15 @@
         case SettingsSection.IIS:
             <IisSettings />
             break;
-        case SettingsSection.Pong:
-            <Pong />
+        case SettingsSection.SlotMachine:
+            <SlotMachineSettings />
             break;
     }
   </section>
 </div>
 
 @code {
-    private enum SettingsSection {General, Logs, Shops, IIS, Pong }
+    private enum SettingsSection {General, Logs, Shops, IIS, SlotMachine }
     private SettingsSection _section = SettingsSection.General;
     protected override void OnInitialized()
     {
@@ -56,7 +55,7 @@
 
     private void Select(SettingsSection s)
     {
-        if (s == SettingsSection.Pong && !EasterEggService.IsSecretUnlocked)
+        if (s == SettingsSection.SlotMachine && !EasterEggService.IsSecretUnlocked)
         {
             return;
         }
@@ -68,13 +67,13 @@
         SettingsSection.IIS => "IIS",
         SettingsSection.Logs => "Logs",
         SettingsSection.Shops => "Shop",
-        SettingsSection.Pong => "Pong",
+        SettingsSection.SlotMachine => "Slotmaschine",
         _ => "Einstellungen"
     };
 
     private void HandleSecretStateChanged()
     {
-        if (_section == SettingsSection.Pong && !EasterEggService.IsSecretUnlocked)
+        if (_section == SettingsSection.SlotMachine && !EasterEggService.IsSecretUnlocked)
         {
             _section = SettingsSection.General;
         }

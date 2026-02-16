@@ -1,13 +1,11 @@
 @page "/"
 @inject ISnackbar Snackbar
-@inject IDialogService DialogService
 @inject Toolbox.Data.Services.SettingsService SettingsService
 @inject Toolbox.Data.Services.AppInfoService AppInfoService
 @using Toolbox.Data.Models
 @using Toolbox.Data.Models.Logs
 @using Toolbox.Data.Common
 @using Toolbox.Data.Services
-@using Toolbox.Components.Dialogs
 @using Microsoft.Web.Administration
 @using Toolbox.Services
 @using Toolbox.Data.Models.Extensions
@@ -377,17 +375,6 @@
         }
     }
 
-    private async Task ShowDialogEasterEgg()
-    {
-        var options = new DialogOptions()
-        {
-            FullWidth = true,
-            MaxWidth = MaxWidth.Medium
-        };
-        await DialogService.ShowAsync<EasterEggDialog>("Gluecksrad", options);
-        EasterEggService.MarkEasterEggCompleted();
-    }
-    
     private MarkupString Highlight(string message)
     {
         if (string.IsNullOrWhiteSpace(_searchText))
