@@ -278,7 +278,9 @@ else
                              ?? visibleGroups[0].FirstOrDefault();
   
             if (firstMatch is not null)
+            {
                 await _table.ScrollToItemAsync(firstMatch);
+            }
         }
         else
         {
@@ -291,7 +293,9 @@ else
         _pinnedExtensionGroups.Clear();
         var raw = Settings.PinnedExtensionGroups;
         if (string.IsNullOrWhiteSpace(raw))
+        {
             return;
+        }
 
         foreach (var part in raw.Split(';', StringSplitOptions.RemoveEmptyEntries))
         {
