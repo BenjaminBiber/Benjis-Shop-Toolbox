@@ -206,6 +206,61 @@ public class TfsRepoService
         }
     }
 
+    /// <summary>
+    /// Updates a file in the repo by pushing a single commit to the default branch.
+    /// Returns the new commit ID.
+    /// </summary>
+    public async Task<string> PushFileUpdateAsync(
+        TfsRepoInfo repo,
+        string filePath,
+        string newContent,
+        string commitMessage,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(repo.Id))
+            throw new InvalidOperationException("Repo-ID fehlt.");
+
+        var git    = await GetGitClientAsync();
+        var branch = NormalizeBranchName(repo.DefaultBranch);
+
+        // Get current branch HEAD to provide oldObjectId
+        var refs   = await git.GetRefsAsync(repo.Id, filter: $"heads/{branch}",
+                                            cancellationToken: cancellationToken);
+        var headRef = refs.FirstOrDefault()
+            ?? throw new InvalidOperationException($"Branch '{branch}' nicht gefunden.");
+
+        var push = new GitPush
+        {
+            RefUpdates = new List<GitRefUpdate>
+            {
+                new() { Name = $"refs/heads/{branch}", OldObjectId = headRef.ObjectId }
+            },
+            Commits = new List<GitCommitRef>
+            {
+                new()
+                {
+                    Comment = commitMessage,
+                    Changes = new List<GitChange>
+                    {
+                        new()
+                        {
+                            ChangeType = VersionControlChangeType.Edit,
+                            Item       = new GitItem { Path = filePath },
+                            NewContent = new ItemContent
+                            {
+                                Content     = newContent,
+                                ContentType = ItemContentType.RawText
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var result = await git.CreatePushAsync(push, repo.Id, cancellationToken: cancellationToken);
+        return result.Commits.FirstOrDefault()?.CommitId ?? "";
+    }
+
     /// <summary>Returns the raw content of a file at a specific commit.</summary>
     public async Task<string?> GetFileContentAtCommitAsync(
         TfsRepoInfo repo,

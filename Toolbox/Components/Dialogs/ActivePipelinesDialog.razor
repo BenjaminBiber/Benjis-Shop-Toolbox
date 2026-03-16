@@ -1,0 +1,195 @@
+@using Toolbox.Data.Services
+@inject PipelineTrackingService Tracker
+@implements IDisposable
+
+<style>
+    .apd-row {
+        display: grid;
+        grid-template-columns: 8px 1fr auto;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--mud-palette-divider);
+    }
+
+    .apd-row:last-child { border-bottom: none; }
+
+    .apd-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .apd-dot.running  { background: #60a5fa; animation: apd-pulse 1.2s infinite; }
+    .apd-dot.success  { background: #4ade80; }
+    .apd-dot.failed   { background: #f87171; }
+    .apd-dot.canceled { background: var(--mud-palette-text-disabled); }
+    .apd-dot.pending  { background: var(--mud-palette-divider); }
+
+    @@keyframes apd-pulse {
+        0%, 100% { opacity: 1; box-shadow: 0 0 0 0 #60a5fa44; }
+        50%       { opacity: 0.6; box-shadow: 0 0 0 4px #60a5fa22; }
+    }
+
+    .apd-main { min-width: 0; }
+    .apd-vmname { font-size: 0.83rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .apd-meta   { font-size: 0.71rem; color: var(--mud-palette-text-secondary); margin-top: 1px; }
+    .apd-mono   { font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 0.69rem; color: var(--mud-palette-text-disabled); }
+
+    .apd-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+
+    .apd-empty {
+        padding: 36px;
+        text-align: center;
+        color: var(--mud-palette-text-disabled);
+        font-size: 0.82rem;
+    }
+
+    .apd-scroll {
+        max-height: 420px;
+        overflow-y: auto;
+    }
+</style>
+
+<MudDialog Style="min-width: 520px;">
+    <TitleContent>
+        <div class="d-flex align-items-center gap-2">
+            <MudIcon Icon="@Icons.Material.Outlined.List" Size="Size.Small" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Laufende Pipelines</MudText>
+            @if (Tracker.RunningCount > 0)
+            {
+                <MudBadge Content="@Tracker.RunningCount" Color="Color.Primary" Overlap="false">
+                    <span style="width:4px;display:inline-block;"></span>
+                </MudBadge>
+            }
+        </div>
+    </TitleContent>
+
+    <DialogContent>
+        @if (!Tracker.Pipelines.Any())
+        {
+            <div class="apd-empty">
+                Keine Pipelines gestartet.
+            </div>
+        }
+        else
+        {
+            <div class="apd-scroll">
+                @foreach (var p in Tracker.Pipelines)
+                {
+                    var dotCls  = GetDotClass(p);
+                    var label   = GetStatusLabel(p);
+                    var isRunning = p.Status == null || p.Status.IsRunning;
+
+                    <div class="apd-row">
+                        <span class="apd-dot @dotCls"></span>
+
+                        <div class="apd-main">
+                            <div class="apd-vmname">@p.VmName</div>
+                            <div class="apd-meta">
+                                @p.ProjectName
+                                &nbsp;·&nbsp;
+                                @label
+                                @if (p.Status != null)
+                                {
+                                    <span> &nbsp;·&nbsp; Build #@p.Status.Id</span>
+                                }
+                            </div>
+                            <div class="apd-mono">
+                                @p.StartedAt.ToString("dd.MM. HH:mm")
+                                @if (p.Status?.Started != null)
+                                {
+                                    <span> → @p.Status.Started.Value.ToString("HH:mm:ss")</span>
+                                }
+                                @if (p.Status?.Finished != null)
+                                {
+                                    <span> – @p.Status.Finished.Value.ToString("HH:mm:ss")</span>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="apd-actions">
+                            @if (isRunning)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true"
+                                                     Color="Color.Info"
+                                                     Style="width:16px;height:16px;" />
+                            }
+                            else if (p.Status?.Succeeded == true)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle"
+                                         Color="Color.Success" Size="Size.Small" />
+                            }
+                            else if (p.Status?.Failed == true)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Error"
+                                         Color="Color.Error" Size="Size.Small" />
+                            }
+
+                            @if (!string.IsNullOrEmpty(p.Status?.WebUrl))
+                            {
+                                <MudTooltip Text="Im Browser öffnen">
+                                    <MudIconButton Size="Size.Small"
+                                                   Icon="@Icons.Material.Outlined.OpenInBrowser"
+                                                   OnClick="() => OpenInBrowser(p.Status!.WebUrl)" />
+                                </MudTooltip>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="() => MudDialog.Cancel()" Variant="Variant.Text">Schließen</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        Tracker.Changed += OnTrackerChanged;
+    }
+
+    private void OnTrackerChanged() => InvokeAsync(StateHasChanged);
+
+    private static string GetDotClass(TrackedPipeline p) => p.Status switch
+    {
+        null                    => "running",
+        { IsRunning: true }     => "running",
+        { Succeeded: true }     => "success",
+        { Failed: true }        => "failed",
+        { Canceled: true }      => "canceled",
+        _                       => "pending"
+    };
+
+    private static string GetStatusLabel(TrackedPipeline p) => p.Status switch
+    {
+        null                                       => "Wartet…",
+        { IsRunning: true, Status: "NotStarted" }  => "Wartet auf Agent…",
+        { IsRunning: true }                        => "Läuft…",
+        { Succeeded: true }                        => "Erfolgreich",
+        { Failed: true }                           => "Fehlgeschlagen",
+        { Canceled: true }                         => "Abgebrochen",
+        _                                          => p.Status.Status
+    };
+
+    private static void OpenInBrowser(string url)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch { }
+    }
+
+    public void Dispose()
+    {
+        Tracker.Changed -= OnTrackerChanged;
+    }
+}

@@ -85,6 +85,9 @@ builder.Services.AddScoped<EasterEggService>();
 builder.Services.AddScoped<TutorialService>();
 builder.Services.AddScoped<VmwareService>();
 builder.Services.AddScoped<StagingSystemSyncService>();
+builder.Services.AddScoped<TfsBuildService>();
+builder.Services.AddSingleton<PipelineTrackingService>();
+builder.Services.AddSingleton<WindowsNotificationService>();
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -121,6 +124,9 @@ try
     app.Services.GetService<UpdaterService>()?.LaunchInBackgroundAsync(allowBeta);
 }
 catch { }
+
+// Eagerly instantiate so it subscribes to PipelineTrackingService immediately
+app.Services.GetRequiredService<WindowsNotificationService>();
 
 TryStartTrayIconProcess(branchName);
 

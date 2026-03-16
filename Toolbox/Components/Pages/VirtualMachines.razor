@@ -3,295 +3,15 @@
 @using Toolbox.Data.Models
 @using Toolbox.Data.Models.Interfaces
 @using Toolbox.Components.Dialogs
+@implements IDisposable
 @inject VmwareService VmwareService
 @inject StagingSystemSyncService SyncService
+@inject TfsBuildService BuildService
+@inject PipelineTrackingService PipelineTracker
 @inject ISettingsService SettingsService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
-<style>
-    /* ── Page shell ─────────────────────────────────── */
-    .vmp {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        padding: 16px 20px 16px;
-        gap: 12px;
-        position: relative;
-    }
-
-    /* ── Top bar ────────────────────────────────────── */
-    .vmp-bar {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        flex-shrink: 0;
-        flex-wrap: wrap;
-    }
-
-    .vmp-bar-sep {
-        width: 1px;
-        height: 18px;
-        background: var(--mud-palette-divider);
-        margin: 0 2px;
-        flex-shrink: 0;
-    }
-
-    .vmp-status-badge {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        padding: 3px 10px 3px 8px;
-        border-radius: 20px;
-        border: 1px solid var(--mud-palette-divider);
-        font-size: 0.75rem;
-        font-weight: 600;
-        letter-spacing: 0.03em;
-        color: var(--mud-palette-text-secondary);
-        flex-shrink: 0;
-        margin-right: 4px;
-    }
-
-    .vmp-conn-dot {
-        width: 7px;
-        height: 7px;
-        border-radius: 50%;
-        background: var(--mud-palette-text-disabled);
-        flex-shrink: 0;
-    }
-
-    .vmp-conn-dot.on {
-        background: #4ade80;
-        box-shadow: 0 0 0 2px #4ade8022;
-    }
-
-    .vmp-spacer { flex: 1; }
-
-    .vmp-count {
-        font-size: 0.75rem;
-        color: var(--mud-palette-text-disabled);
-        white-space: nowrap;
-        padding: 0 4px;
-    }
-
-    /* ── Filter bar ─────────────────────────────────── */
-    .vmp-filters {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-shrink: 0;
-        flex-wrap: wrap;
-    }
-
-    .vmp-filter-chip {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        padding: 4px 12px;
-        border-radius: 20px;
-        border: 1px solid var(--mud-palette-divider);
-        font-size: 0.75rem;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all 0.12s;
-        color: var(--mud-palette-text-secondary);
-        background: transparent;
-        user-select: none;
-        white-space: nowrap;
-    }
-
-    .vmp-filter-chip:hover {
-        border-color: var(--mud-palette-primary);
-        color: var(--mud-palette-primary);
-    }
-
-    .vmp-filter-chip.active {
-        background: var(--mud-palette-primary);
-        border-color: var(--mud-palette-primary);
-        color: #fff;
-    }
-
-    .vmp-filter-dot {
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-    }
-
-    /* ── Card grid ──────────────────────────────────── */
-    .vmp-grid {
-        flex: 1;
-        overflow-y: auto;
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-        gap: 10px;
-        align-content: start;
-        padding: 2px 1px 4px;
-    }
-
-    /* ── VM card ────────────────────────────────────── */
-    .vmc {
-        border: 1px solid var(--mud-palette-divider);
-        border-radius: 10px;
-        background: var(--mud-palette-surface);
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        transition: box-shadow 0.14s, border-color 0.14s;
-    }
-
-    .vmc:hover {
-        box-shadow: 0 2px 12px rgba(0,0,0,0.09);
-        border-color: var(--mud-palette-primary-lighten);
-    }
-
-    .vmc.busy {
-        opacity: 0.65;
-        pointer-events: none;
-    }
-
-    /* Card header */
-    .vmc-head {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        padding: 13px 15px 9px;
-        gap: 8px;
-    }
-
-    .vmc-name {
-        font-size: 0.88rem;
-        font-weight: 600;
-        line-height: 1.35;
-        word-break: break-word;
-        color: var(--mud-palette-text-primary);
-    }
-
-    .vmc-customer {
-        font-size: 0.73rem;
-        color: var(--mud-palette-text-secondary);
-        margin-top: 1px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .vmc-status {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        flex-shrink: 0;
-        padding-top: 2px;
-    }
-
-    .vmc-status-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        flex-shrink: 0;
-    }
-
-    .vmc-status-dot.on  { background: #4ade80; box-shadow: 0 0 0 2px #4ade8020; }
-    .vmc-status-dot.off { background: var(--mud-palette-text-disabled); }
-    .vmc-status-dot.sus { background: #fbbf24; box-shadow: 0 0 0 2px #fbbf2420; }
-
-    .vmc-status-text {
-        font-size: 0.7rem;
-        font-weight: 600;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-    }
-
-    .vmc-status-text.on  { color: #4ade80; }
-    .vmc-status-text.off { color: var(--mud-palette-text-disabled); }
-    .vmc-status-text.sus { color: #fbbf24; }
-
-    /* Card specs */
-    .vmc-specs {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 5px 8px;
-        padding: 6px 15px 12px;
-        border-top: 1px solid var(--mud-palette-divider);
-    }
-
-    .vmc-spec {
-        display: flex;
-        flex-direction: column;
-        gap: 1px;
-    }
-
-    .vmc-spec-label {
-        font-size: 0.64rem;
-        font-weight: 700;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        color: var(--mud-palette-text-disabled);
-    }
-
-    .vmc-spec-value {
-        font-size: 0.78rem;
-        color: var(--mud-palette-text-primary);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .vmc-spec-value.mono {
-        font-family: 'Cascadia Code', 'Consolas', monospace;
-        font-size: 0.76rem;
-    }
-
-    .vmc-spec-value.dim {
-        color: var(--mud-palette-text-disabled);
-    }
-
-    /* Card actions */
-    .vmc-actions {
-        display: flex;
-        align-items: center;
-        padding: 4px 6px 5px;
-        gap: 0;
-        border-top: 1px solid var(--mud-palette-divider);
-        background: var(--mud-palette-background);
-    }
-
-    .vmc-actions-sep {
-        flex: 1;
-    }
-
-    /* ── Loading overlay ────────────────────────────── */
-    .vmp-overlay {
-        position: absolute;
-        inset: 0;
-        background: var(--mud-palette-background-grey);
-        opacity: 0.82;
-        z-index: 10;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 12px;
-        border-radius: 4px;
-    }
-
-    .vmp-overlay-label {
-        font-size: 0.8rem;
-        color: var(--mud-palette-text-secondary);
-        max-width: 280px;
-        text-align: center;
-    }
-
-    /* ── Empty state ────────────────────────────────── */
-    .vmp-empty {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        flex: 1;
-        gap: 10px;
-        text-align: center;
-    }
-</style>
 
 <div class="vmp">
 
@@ -304,13 +24,21 @@
         </div>
     }
 
+    <!-- ── Sync overlay ── -->
+    @if (_syncing)
+    {
+        <div class="vmp-overlay">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Medium" />
+            <span class="vmp-overlay-label" style="font-weight:600;">Mapping synchronisieren</span>
+            @if (!string.IsNullOrEmpty(_syncMessage))
+            {
+                <span class="vmp-overlay-label" style="font-size:0.72rem;opacity:0.75;">@_syncMessage</span>
+            }
+        </div>
+    }
+
     <!-- ── Top bar ── -->
     <div class="vmp-bar">
-
-        <div class="vmp-status-badge">
-            <span class="vmp-conn-dot @(VmwareService.IsConnected ? "on" : "")"></span>
-            @(VmwareService.IsConnected ? "Verbunden" : "Getrennt")
-        </div>
 
         @if (VmwareService.IsConnected)
         {
@@ -319,30 +47,57 @@
                                Size="Size.Small" OnClick="RefreshAsync" Disabled="_loading" />
             </MudTooltip>
 
-            <MudTooltip Text="Verbindung trennen">
-                <MudIconButton Icon="@Icons.Material.Outlined.CloudOff"
-                               Size="Size.Small" OnClick="DisconnectAsync" Disabled="_loading" />
-            </MudTooltip>
+            <div class="vmp-bar-sep"></div>
 
             <div class="vmp-bar-sep"></div>
 
-            <MudTooltip Text="Lädt IP, Hostname und OS für jede VM nach">
-                <MudCheckBox T="bool" @bind-Value="_autoLoadDetails"
-                             Color="Color.Primary" Size="Size.Small"
-                             Style="margin:0">Details</MudCheckBox>
-            </MudTooltip>
-
-            <div class="vmp-bar-sep"></div>
-
-            <MudTooltip Text="@(_syncing ? _syncMessage : "VM → Kunde Mapping aus TFS synchronisieren")">
-                <MudIconButton Icon="@Icons.Material.Outlined.Sync"
+            <MudTooltip Text="TFS Pipeline ausführen (neues Staging erstellen)">
+                <MudIconButton Icon="@Icons.Material.Outlined.PlayCircle"
                                Size="Size.Small"
-                               Color="@(_syncing ? Color.Primary : Color.Default)"
-                               OnClick="SyncCustomerMappingsAsync"
-                               Disabled="_syncing" />
+                               Color="Color.Primary"
+                               OnClick="OpenRunPipelineDialogAsync" />
+            </MudTooltip>
+
+            <MudTooltip Text="Laufende Pipelines anzeigen">
+                <MudBadge Content="@PipelineTracker.RunningCount"
+                          Color="Color.Warning"
+                          Visible="@(PipelineTracker.RunningCount > 0)"
+                          Overlap="true" Dot="false">
+                    <MudIconButton Icon="@Icons.Material.Outlined.List"
+                                   Size="Size.Small"
+                                   Color="@(PipelineTracker.RunningCount > 0 ? Color.Warning : Color.Default)"
+                                   OnClick="OpenActivePipelinesDialogAsync" />
+                </MudBadge>
             </MudTooltip>
 
             <div class="vmp-spacer"></div>
+
+            <MudSelect T="string"
+                       @bind-Value="_powerFilter"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       Style="font-size:0.82rem;"
+                       Dense="true">
+                <MudSelectItem Value='"ALL"'>Alle</MudSelectItem>
+                <MudSelectItem Value='"POWERED_ON"'>
+                    <div class="d-flex align-items-center gap-2">
+                        <span style="width:7px;height:7px;border-radius:50%;background:#4ade80;display:inline-block;flex-shrink:0;"></span>
+                        Eingeschaltet
+                    </div>
+                </MudSelectItem>
+                <MudSelectItem Value='"POWERED_OFF"'>
+                    <div class="d-flex align-items-center gap-2">
+                        <span style="width:7px;height:7px;border-radius:50%;background:var(--mud-palette-text-disabled);display:inline-block;flex-shrink:0;"></span>
+                        Ausgeschaltet
+                    </div>
+                </MudSelectItem>
+                <MudSelectItem Value='"SUSPENDED"'>
+                    <div class="d-flex align-items-center gap-2">
+                        <span style="width:7px;height:7px;border-radius:50%;background:#fbbf24;display:inline-block;flex-shrink:0;"></span>
+                        Suspendiert
+                    </div>
+                </MudSelectItem>
+            </MudSelect>
 
             <MudTextField T="string"
                           @bind-Value="_searchText"
@@ -352,7 +107,7 @@
                           Adornment="Adornment.Start"
                           AdornmentIcon="@Icons.Material.Outlined.Search"
                           Clearable="true"
-                          Style="max-width:220px;font-size:0.82rem;" />
+                          Style="font-size:0.82rem;" />
 
             <span class="vmp-count">@FilteredVms.Count() / @_vms.Count</span>
         }
@@ -377,32 +132,6 @@
                   Style="flex-shrink:0;">
             @_lastError
         </MudAlert>
-    }
-
-    <!-- ── Filter chips (only when connected) ── -->
-    @if (VmwareService.IsConnected)
-    {
-        <div class="vmp-filters">
-            <span @onclick='() => _powerFilter = "ALL"'
-                  class="vmp-filter-chip @(_powerFilter == "ALL" ? "active" : "")">
-                Alle
-            </span>
-            <span @onclick='() => _powerFilter = "POWERED_ON"'
-                  class="vmp-filter-chip @(_powerFilter == "POWERED_ON" ? "active" : "")">
-                <span class="vmp-filter-dot" style="background:#4ade80;"></span>
-                Eingeschaltet
-            </span>
-            <span @onclick='() => _powerFilter = "POWERED_OFF"'
-                  class="vmp-filter-chip @(_powerFilter == "POWERED_OFF" ? "active" : "")">
-                <span class="vmp-filter-dot" style="background:var(--mud-palette-text-disabled);"></span>
-                Ausgeschaltet
-            </span>
-            <span @onclick='() => _powerFilter = "SUSPENDED"'
-                  class="vmp-filter-chip @(_powerFilter == "SUSPENDED" ? "active" : "")">
-                <span class="vmp-filter-dot" style="background:#fbbf24;"></span>
-                Suspendiert
-            </span>
-        </div>
     }
 
     <!-- ── Disconnected state ── -->
@@ -606,6 +335,18 @@
     private bool _syncing;
     private string _syncMessage = "";
 
+    protected override void OnInitialized()
+    {
+        PipelineTracker.Changed += OnTrackerChanged;
+    }
+
+    private void OnTrackerChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        PipelineTracker.Changed -= OnTrackerChanged;
+    }
+
     private IEnumerable<VmwareVm> FilteredVms => _vms
         .Where(v =>
             string.IsNullOrEmpty(_searchText) ||
@@ -770,18 +511,51 @@
         StateHasChanged();
     }
 
-    private Task PowerOnVmAsync(VmwareVm vm) =>
-        ExecuteVmActionAsync(vm, () => VmwareService.PowerOnAsync(vm.Id), "Einschalten");
-    private Task PowerOffVmAsync(VmwareVm vm) =>
-        ExecuteVmActionAsync(vm, () => VmwareService.PowerOffAsync(vm.Id), "Ausschalten");
-    private Task ShutdownGuestVmAsync(VmwareVm vm) =>
-        ExecuteVmActionAsync(vm, () => VmwareService.ShutdownGuestAsync(vm.Id), "Herunterfahren");
-    private Task RebootGuestVmAsync(VmwareVm vm) =>
-        ExecuteVmActionAsync(vm, () => VmwareService.RebootGuestAsync(vm.Id), "Neustart");
-    private Task ResetVmAsync(VmwareVm vm) =>
-        ExecuteVmActionAsync(vm, () => VmwareService.ResetAsync(vm.Id), "Zurücksetzen");
-    private Task SuspendVmAsync(VmwareVm vm) =>
-        ExecuteVmActionAsync(vm, () => VmwareService.SuspendAsync(vm.Id), "Suspendieren");
+    private async Task PowerOnVmAsync(VmwareVm vm)
+    {
+        if (!await ConfirmAsync("VM einschalten", $"'{vm.Name}' einschalten?", "Einschalten")) return;
+        await ExecuteVmActionAsync(vm, () => VmwareService.PowerOnAsync(vm.Id), "Einschalten");
+    }
+
+    private async Task PowerOffVmAsync(VmwareVm vm)
+    {
+        if (!await ConfirmAsync("VM ausschalten (erzwingen)", $"'{vm.Name}' sofort ausschalten? Nicht gespeicherte Daten gehen verloren.", "Ausschalten")) return;
+        await ExecuteVmActionAsync(vm, () => VmwareService.PowerOffAsync(vm.Id), "Ausschalten");
+    }
+
+    private async Task ShutdownGuestVmAsync(VmwareVm vm)
+    {
+        if (!await ConfirmAsync("VM herunterfahren", $"'{vm.Name}' herunterfahren?", "Herunterfahren")) return;
+        await ExecuteVmActionAsync(vm, () => VmwareService.ShutdownGuestAsync(vm.Id), "Herunterfahren");
+    }
+
+    private async Task RebootGuestVmAsync(VmwareVm vm)
+    {
+        if (!await ConfirmAsync("VM neu starten", $"'{vm.Name}' neu starten?", "Neu starten")) return;
+        await ExecuteVmActionAsync(vm, () => VmwareService.RebootGuestAsync(vm.Id), "Neustart");
+    }
+
+    private async Task ResetVmAsync(VmwareVm vm)
+    {
+        if (!await ConfirmAsync("VM zurücksetzen (erzwingen)", $"'{vm.Name}' sofort zurücksetzen? Nicht gespeicherte Daten gehen verloren.", "Zurücksetzen")) return;
+        await ExecuteVmActionAsync(vm, () => VmwareService.ResetAsync(vm.Id), "Zurücksetzen");
+    }
+
+    private async Task SuspendVmAsync(VmwareVm vm)
+    {
+        if (!await ConfirmAsync("VM suspendieren", $"'{vm.Name}' suspendieren?", "Suspendieren")) return;
+        await ExecuteVmActionAsync(vm, () => VmwareService.SuspendAsync(vm.Id), "Suspendieren");
+    }
+
+    private async Task<bool> ConfirmAsync(string title, string message, string confirmText)
+    {
+        var result = await DialogService.ShowMessageBox(
+            title, message,
+            yesText: confirmText,
+            cancelText: "Abbrechen",
+            options: new DialogOptions { MaxWidth = MaxWidth.ExtraSmall });
+        return result == true;
+    }
 
     private async Task ExecuteVmActionAsync(VmwareVm vm, Func<Task<bool>> action, string actionName)
     {
@@ -850,6 +624,18 @@
         };
         var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
         await DialogService.ShowAsync<VmSnapshotDialog>($"Snapshots – {vm.Name}", parameters, options);
+    }
+
+    private async Task OpenRunPipelineDialogAsync()
+    {
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
+        await DialogService.ShowAsync<RunPipelineDialog>("Pipeline ausführen", options);
+    }
+
+    private async Task OpenActivePipelinesDialogAsync()
+    {
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
+        await DialogService.ShowAsync<ActivePipelinesDialog>("Laufende Pipelines", options);
     }
 
     private static string FormatRam(int mib) =>

@@ -1,0 +1,599 @@
+@using System.Text.RegularExpressions
+@using Toolbox.Data.Services
+@using Toolbox.Data.Models.Interfaces
+@inject TfsBuildService BuildService
+@inject TfsRepoService TfsRepoService
+@inject SettingsService SettingsService
+@inject PipelineTrackingService Tracker
+@implements IDisposable
+
+<style>
+    .rpd-section {
+        font-size: 0.69rem;
+        font-weight: 700;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: var(--mud-palette-text-disabled);
+        padding: 14px 0 5px;
+        border-top: 1px solid var(--mud-palette-divider);
+        margin-top: 6px;
+    }
+
+    .rpd-section:first-of-type { border-top: none; padding-top: 4px; }
+
+    .rpd-step {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 6px 0;
+        font-size: 0.8rem;
+    }
+
+    .rpd-step-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .rpd-step-dot.pending  { background: var(--mud-palette-divider); }
+    .rpd-step-dot.running  { background: #60a5fa; animation: rpd-pulse 1s infinite; }
+    .rpd-step-dot.done     { background: #4ade80; }
+    .rpd-step-dot.error    { background: #f87171; }
+
+    @@keyframes rpd-pulse {
+        0%, 100% { opacity: 1; box-shadow: 0 0 0 0 #60a5fa44; }
+        50%       { opacity: 0.5; box-shadow: 0 0 0 4px #60a5fa22; }
+    }
+
+    .rpd-build-status {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--mud-palette-divider);
+        margin-top: 10px;
+    }
+
+    .rpd-build-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .rpd-build-dot.running  { background: #60a5fa; animation: rpd-pulse 1.2s infinite; }
+    .rpd-build-dot.success  { background: #4ade80; }
+    .rpd-build-dot.failed   { background: #f87171; }
+    .rpd-build-dot.canceled { background: var(--mud-palette-text-disabled); }
+
+    .rpd-mono {
+        font-family: 'Cascadia Code', 'Consolas', monospace;
+        font-size: 0.72rem;
+        color: var(--mud-palette-text-secondary);
+    }
+</style>
+
+<MudDialog Style="min-width: 480px;">
+    <TitleContent>
+        <div class="d-flex align-items-center gap-2">
+            <MudIcon Icon="@Icons.Material.Outlined.PlayCircle" Size="Size.Small" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Neues Staging erstellen</MudText>
+        </div>
+    </TitleContent>
+
+    <DialogContent>
+
+        <!-- ── Projekt ── -->
+        <div class="rpd-section" style="border-top:none;padding-top:0;">Projekt</div>
+
+        @if (_loadingProjects)
+        {
+            <div class="d-flex align-items-center gap-2 mt-1 mb-2">
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">Lade Projekte…</MudText>
+            </div>
+        }
+        else
+        {
+            <MudAutocomplete T="TfsProjectInfo"
+                             Label="Kundenprojekt"
+                             @bind-Value="_selectedProject"
+                             @bind-Value:after="OnProjectSelectionChanged"
+                             SearchFunc="SearchProjectsAsync"
+                             ToStringFunc="@(p => p?.Name ?? "")"
+                             Variant="Variant.Outlined"
+                             Margin="Margin.Dense"
+                             FullWidth="true"
+                             Disabled="_executing"
+                             ResetValueOnEmptyText="true"
+                             CoerceText="false"
+                             Placeholder="Projekt suchen…" />
+        }
+
+        @if (_loadingProject)
+        {
+            <div class="d-flex align-items-center gap-2 mt-2">
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">Lade YAML und Pipeline…</MudText>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(_loadError))
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">@_loadError</MudAlert>
+        }
+
+        <!-- ── VM-Konfiguration ── -->
+        <div class="rpd-section">VM-Konfiguration</div>
+
+        <MudTextField @bind-Value="_varVmName"
+                      Label="VM-Name (ESXNewVmName)"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
+                      FullWidth="true"
+                      Disabled="_executing"
+                      HelperText="z.B. VM-10441-19245" />
+
+        <!-- ── SQL-Konfiguration ── -->
+        <div class="rpd-section">SQL-Konfiguration</div>
+
+        <div class="d-flex gap-2">
+            <MudTextField @bind-Value="_varSqlServer"
+                          Label="SQL-Server"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          FullWidth="true"
+                          Disabled="_executing" />
+            <MudTextField @bind-Value="_varSqlDatabase"
+                          Label="Datenbank"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          FullWidth="true"
+                          Disabled="_executing" />
+        </div>
+        <div class="d-flex gap-2 mt-2">
+            <MudTextField @bind-Value="_varSqlUser"
+                          Label="Benutzer"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          FullWidth="true"
+                          Disabled="_executing" />
+            <MudTextField @bind-Value="_varSqlPassword"
+                          Label="Passwort"
+                          InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          FullWidth="true"
+                          Disabled="_executing"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                          OnAdornmentClick="() => _showPassword = !_showPassword" />
+        </div>
+
+        <!-- ── Ausführung ── -->
+        @if (_executing || _buildStatus != null)
+        {
+            <div class="rpd-section">Ausführung</div>
+
+            <div class="rpd-step">
+                <span class="rpd-step-dot @GetStepClass(ExecutionStep.UpdateYaml)"></span>
+                <span>YAML aktualisieren</span>
+                @if (_currentStep == ExecutionStep.UpdateYaml)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Style="width:14px;height:14px;" />
+                }
+                @if (_yamlSkipped && (int)_currentStep > (int)ExecutionStep.UpdateYaml)
+                {
+                    <span class="rpd-mono" style="color:var(--mud-palette-text-disabled);">übersprungen</span>
+                }
+            </div>
+            <div class="rpd-step">
+                <span class="rpd-step-dot @GetStepClass(ExecutionStep.Push)"></span>
+                <span>Änderungen pushen</span>
+                @if (_currentStep == ExecutionStep.Push && !_yamlSkipped)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Style="width:14px;height:14px;" />
+                }
+                @if (!string.IsNullOrEmpty(_commitId))
+                {
+                    <span class="rpd-mono">@_commitId[..Math.Min(8, _commitId.Length)]</span>
+                }
+                @if (_yamlSkipped && (int)_currentStep > (int)ExecutionStep.Push)
+                {
+                    <span class="rpd-mono" style="color:var(--mud-palette-text-disabled);">übersprungen</span>
+                }
+            </div>
+            <div class="rpd-step">
+                <span class="rpd-step-dot @GetStepClass(ExecutionStep.Queue)"></span>
+                <span>Pipeline starten</span>
+                @if (_currentStep == ExecutionStep.Queue)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Style="width:14px;height:14px;" />
+                }
+            </div>
+
+            @if (!string.IsNullOrEmpty(_executeError))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_executeError</MudAlert>
+            }
+
+            @if (_buildStatus != null)
+            {
+                <div class="rpd-build-status">
+                    <span class="rpd-build-dot @GetBuildDotClass()"></span>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:0.8rem;font-weight:500;">@GetBuildLabel()</div>
+                        @if (_buildStatus.Started.HasValue)
+                        {
+                            <div class="rpd-mono">
+                                Build #@_buildStatus.Id
+                                · @_buildStatus.Started.Value.ToString("HH:mm:ss")
+                                @if (_buildStatus.Finished.HasValue)
+                                {
+                                    <span> → @_buildStatus.Finished.Value.ToString("HH:mm:ss")</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                    @if (_buildStatus.IsRunning)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Info" />
+                    }
+                    else if (_buildStatus.Succeeded)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                    }
+                    else if (_buildStatus.Failed)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Size="Size.Small" />
+                    }
+                </div>
+
+                @if (!string.IsNullOrEmpty(_buildStatus.WebUrl))
+                {
+                    <MudButton StartIcon="@Icons.Material.Outlined.OpenInBrowser"
+                               Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                               Class="mt-1" OnClick="OpenInBrowser">
+                        Im Browser öffnen
+                    </MudButton>
+                }
+            }
+        }
+
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Schließen</MudButton>
+        <MudButton OnClick="ExecuteAsync"
+                   Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Outlined.PlayArrow"
+                   Disabled="@(!CanExecute)">
+            Ausführen
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private enum ExecutionStep { None, UpdateYaml, Push, Queue, Done, Error }
+
+    private List<TfsProjectInfo> _projects = new();
+    private bool            _loadingProjects;
+    private TfsProjectInfo? _selectedProject;
+    private string          _selectedProjectUrl = "";
+    private bool            _loadingProject;
+    private string          _loadError = "";
+
+    // Loaded from repo
+    private TfsRepoInfo? _stagingRepo;
+    private string       _currentYaml = "";
+    private int          _pipelineDefinitionId;
+
+    // Variables (pre-filled from YAML)
+    private bool   _showPassword;
+    private string _varVmName      = "";
+    private string _varSqlServer   = "";
+    private string _varSqlDatabase = "";
+    private string _varSqlUser     = "";
+    private string _varSqlPassword = "";
+
+    // Original values loaded from YAML (to detect changes)
+    private string _origVmName      = "";
+    private string _origSqlServer   = "";
+    private string _origSqlDatabase = "";
+    private string _origSqlUser     = "";
+    private string _origSqlPassword = "";
+
+    private bool ValuesChanged =>
+        _varVmName      != _origVmName      ||
+        _varSqlServer   != _origSqlServer   ||
+        _varSqlDatabase != _origSqlDatabase ||
+        _varSqlUser     != _origSqlUser     ||
+        _varSqlPassword != _origSqlPassword;
+
+    // Execution
+    private bool            _executing;
+    private ExecutionStep   _currentStep = ExecutionStep.None;
+    private bool            _yamlSkipped;
+    private string          _executeError = "";
+    private string          _commitId = "";
+    private PipelineBuildStatus? _buildStatus;
+    private CancellationTokenSource _cts = new();
+
+    private bool CanExecute => !_executing
+        && !_loadingProject
+        && _stagingRepo != null
+        && _pipelineDefinitionId > 0
+        && !string.IsNullOrWhiteSpace(_varVmName);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loadingProjects = true;
+        try
+        {
+            _projects = (await TfsRepoService.GetProjectsAsync(cancellationToken: _cts.Token)).ToList();
+        }
+        catch (Exception ex)
+        {
+            _loadError = $"Projekte konnten nicht geladen werden: {ex.Message}";
+        }
+        finally
+        {
+            _loadingProjects = false;
+        }
+    }
+
+    private Task<IEnumerable<TfsProjectInfo>> SearchProjectsAsync(string text, CancellationToken ct) =>
+        Task.FromResult(_projects
+            .Where(p => string.IsNullOrEmpty(text) ||
+                        p.Name.Contains(text, StringComparison.OrdinalIgnoreCase))
+            .AsEnumerable());
+
+    private Task OnProjectSelectionChanged() => OnProjectChangedAsync(_selectedProject);
+
+    private async Task OnProjectChangedAsync(TfsProjectInfo? project)
+    {
+        var url = project?.Url ?? "";
+        _selectedProjectUrl  = url;
+        _stagingRepo         = null;
+        _currentYaml         = "";
+        _pipelineDefinitionId = 0;
+        _loadError           = "";
+        _origVmName = _origSqlServer = _origSqlDatabase = _origSqlUser = _origSqlPassword = "";
+        _varVmName  = _varSqlServer  = _varSqlDatabase  = _varSqlUser  = _varSqlPassword  = "";
+
+        if (string.IsNullOrEmpty(url)) return;
+
+        _loadingProject = true;
+        StateHasChanged();
+
+        try
+        {
+            // Find Shopsystem.StagingSystem repo in the project
+            var repos = await TfsRepoService.GetRepositoriesForProjectAsync(url, _cts.Token);
+            _stagingRepo = repos
+                .Select(r => new TfsRepoInfo(r.Name, r.RemoteUrl, r.Project, r.SourceUrl)
+                    { Id = r.Id, DefaultBranch = r.DefaultBranch })
+                .FirstOrDefault(r => r.Name.Equals("Shopsystem.StagingSystem",
+                    StringComparison.OrdinalIgnoreCase));
+
+            if (_stagingRepo == null)
+            {
+                _loadError = "Kein 'Shopsystem.StagingSystem' Repo im Projekt gefunden.";
+                return;
+            }
+
+            // Load current YAML
+            _currentYaml = await TfsRepoService.GetFileContentAsync(
+                _stagingRepo, "/StagingSystem.yml", cancellationToken: _cts.Token) ?? "";
+
+            if (!string.IsNullOrEmpty(_currentYaml))
+            {
+                _varVmName      = ExtractYamlValue(_currentYaml, "ESXNewVmName") ?? "";
+                _varSqlServer   = ExtractYamlValue(_currentYaml, "SQLServer")    ?? "";
+                _varSqlDatabase = ExtractYamlValue(_currentYaml, "SQLDatabase")  ?? "";
+                _varSqlUser     = ExtractYamlValue(_currentYaml, "SQLUser")      ?? "";
+                _varSqlPassword = ExtractYamlValue(_currentYaml, "SQLPassword")  ?? "";
+
+                _origVmName      = _varVmName;
+                _origSqlServer   = _varSqlServer;
+                _origSqlDatabase = _varSqlDatabase;
+                _origSqlUser     = _varSqlUser;
+                _origSqlPassword = _varSqlPassword;
+            }
+
+            // Find pipeline definition
+            var pipelines = await BuildService.GetPipelineDefinitionsAsync(url, ct: _cts.Token);
+            var pipeline  = pipelines.FirstOrDefault(p =>
+                p.Name.Equals("Shopsystem.StagingSystem", StringComparison.OrdinalIgnoreCase))
+                ?? pipelines.FirstOrDefault(p =>
+                    p.Name.Contains("StagingSystem", StringComparison.OrdinalIgnoreCase));
+
+            if (pipeline == null)
+                _loadError = "Pipeline 'Shopsystem.StagingSystem' nicht gefunden.";
+            else
+                _pipelineDefinitionId = pipeline.Id;
+        }
+        catch (Exception ex)
+        {
+            _loadError = ex.Message;
+        }
+        finally
+        {
+            _loadingProject = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ExecuteAsync()
+    {
+        _executing    = true;
+        _yamlSkipped  = false;
+        _executeError = "";
+        _commitId     = "";
+        _buildStatus  = null;
+        StateHasChanged();
+
+        try
+        {
+            if (ValuesChanged)
+            {
+                // Step 1: Update YAML
+                _currentStep = ExecutionStep.UpdateYaml;
+                StateHasChanged();
+
+                var updatedYaml = _currentYaml;
+                updatedYaml = SetYamlValue(updatedYaml, "ESXNewVmName", _varVmName);
+                if (!string.IsNullOrWhiteSpace(_varSqlServer))
+                    updatedYaml = SetYamlValue(updatedYaml, "SQLServer", _varSqlServer);
+                if (!string.IsNullOrWhiteSpace(_varSqlDatabase))
+                    updatedYaml = SetYamlValue(updatedYaml, "SQLDatabase", _varSqlDatabase);
+                if (!string.IsNullOrWhiteSpace(_varSqlUser))
+                    updatedYaml = SetYamlValue(updatedYaml, "SQLUser", _varSqlUser);
+                if (!string.IsNullOrWhiteSpace(_varSqlPassword))
+                    updatedYaml = SetYamlValue(updatedYaml, "SQLPassword", _varSqlPassword);
+
+                // Step 2: Push
+                _currentStep = ExecutionStep.Push;
+                StateHasChanged();
+
+                var project   = ExtractProjectName(_selectedProjectUrl);
+                var commitMsg = $"Automated: Create staging {_varVmName} [{project}]";
+                _commitId = await TfsRepoService.PushFileUpdateAsync(
+                    _stagingRepo!, "/StagingSystem.yml", updatedYaml, commitMsg, _cts.Token);
+            }
+            else
+            {
+                // Skip YAML update and push — nothing changed
+                _yamlSkipped = true;
+                _currentStep = ExecutionStep.Push;
+                StateHasChanged();
+            }
+
+            // Step 3: Queue build
+            _currentStep = ExecutionStep.Queue;
+            StateHasChanged();
+
+            _buildStatus = await BuildService.QueueBuildAsync(
+                _selectedProjectUrl, _pipelineDefinitionId,
+                new Dictionary<string, string>(), _cts.Token);
+
+            _currentStep = ExecutionStep.Done;
+
+            // Register in global tracker
+            Tracker.Add(new TrackedPipeline
+            {
+                BuildId     = _buildStatus.Id,
+                ProjectUrl  = _selectedProjectUrl,
+                ProjectName = ExtractProjectName(_selectedProjectUrl),
+                VmName      = _varVmName,
+                StartedAt   = DateTime.Now,
+                Status      = _buildStatus
+            });
+
+            // Polling is handled by PipelineTrackingService — just subscribe to updates
+            Tracker.Changed += OnTrackerChanged;
+        }
+        catch (Exception ex)
+        {
+            _currentStep  = ExecutionStep.Error;
+            _executeError = ex.Message;
+            _executing    = false;
+        }
+
+        StateHasChanged();
+    }
+
+    private void OnTrackerChanged()
+    {
+        if (_buildStatus == null) return;
+        var tracked = Tracker.Pipelines.FirstOrDefault(p => p.BuildId == _buildStatus.Id);
+        if (tracked?.Status == null) return;
+
+        _buildStatus = tracked.Status;
+
+        if (_buildStatus.IsCompleted)
+        {
+            _executing = false;
+            Tracker.Changed -= OnTrackerChanged;
+        }
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private string GetStepClass(ExecutionStep step)
+    {
+        if (_currentStep == ExecutionStep.Error && step == _currentStep) return "error";
+        if ((int)_currentStep > (int)step) return "done";
+        if (_currentStep == step)          return "running";
+        return "pending";
+    }
+
+    private string GetBuildDotClass() => _buildStatus switch
+    {
+        { IsRunning: true }  => "running",
+        { Succeeded: true }  => "success",
+        { Failed: true }     => "failed",
+        { Canceled: true }   => "canceled",
+        _                    => "running"
+    };
+
+    private string GetBuildLabel() => _buildStatus switch
+    {
+        { IsRunning: true, Status: "NotStarted" } => "Wartet auf Agent…",
+        { IsRunning: true }                        => "Pipeline läuft…",
+        { Succeeded: true }                        => "Erfolgreich abgeschlossen",
+        { Failed: true }                           => "Fehlgeschlagen",
+        { Canceled: true }                         => "Abgebrochen",
+        _                                          => _buildStatus?.Status ?? ""
+    };
+
+    private void OpenInBrowser()
+    {
+        if (string.IsNullOrEmpty(_buildStatus?.WebUrl)) return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                _buildStatus.WebUrl) { UseShellExecute = true });
+        }
+        catch { }
+    }
+
+    private static string ExtractProjectName(string url)
+    {
+        var trimmed = url.TrimEnd('/');
+        return Uri.UnescapeDataString(trimmed[(trimmed.LastIndexOf('/') + 1)..]);
+    }
+
+    private static string? ExtractYamlValue(string yaml, string key)
+    {
+        var m = Regex.Match(yaml,
+            @"^\s+" + Regex.Escape(key) + @"\s*:\s*['""]?(.*?)['""]?\s*$",
+            RegexOptions.Multiline);
+        return m.Success ? m.Groups[1].Value.Trim('\'', '"', ' ') : null;
+    }
+
+    private static string SetYamlValue(string yaml, string key, string value)
+    {
+        return Regex.Replace(
+            yaml,
+            @"^(\s+" + Regex.Escape(key) + @"\s*:\s*)['""]?.*?['""]?\s*$",
+            $"$1'{value}'",
+            RegexOptions.Multiline);
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    public void Dispose()
+    {
+        Tracker.Changed -= OnTrackerChanged;
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+}
