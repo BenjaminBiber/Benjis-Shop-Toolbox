@@ -9,296 +9,587 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
-<div class="d-flex flex-column h-100 gap-2 p-3">
+<style>
+    /* ── Page shell ─────────────────────────────────── */
+    .vmp {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        padding: 16px 20px 16px;
+        gap: 12px;
+        position: relative;
+    }
 
-    <!-- Toolbar -->
-    <div class="d-flex align-items-center gap-2 flex-wrap">
+    /* ── Top bar ────────────────────────────────────── */
+    .vmp-bar {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+        flex-wrap: wrap;
+    }
+
+    .vmp-bar-sep {
+        width: 1px;
+        height: 18px;
+        background: var(--mud-palette-divider);
+        margin: 0 2px;
+        flex-shrink: 0;
+    }
+
+    .vmp-status-badge {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 10px 3px 8px;
+        border-radius: 20px;
+        border: 1px solid var(--mud-palette-divider);
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        color: var(--mud-palette-text-secondary);
+        flex-shrink: 0;
+        margin-right: 4px;
+    }
+
+    .vmp-conn-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--mud-palette-text-disabled);
+        flex-shrink: 0;
+    }
+
+    .vmp-conn-dot.on {
+        background: #4ade80;
+        box-shadow: 0 0 0 2px #4ade8022;
+    }
+
+    .vmp-spacer { flex: 1; }
+
+    .vmp-count {
+        font-size: 0.75rem;
+        color: var(--mud-palette-text-disabled);
+        white-space: nowrap;
+        padding: 0 4px;
+    }
+
+    /* ── Filter bar ─────────────────────────────────── */
+    .vmp-filters {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+        flex-wrap: wrap;
+    }
+
+    .vmp-filter-chip {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 12px;
+        border-radius: 20px;
+        border: 1px solid var(--mud-palette-divider);
+        font-size: 0.75rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.12s;
+        color: var(--mud-palette-text-secondary);
+        background: transparent;
+        user-select: none;
+        white-space: nowrap;
+    }
+
+    .vmp-filter-chip:hover {
+        border-color: var(--mud-palette-primary);
+        color: var(--mud-palette-primary);
+    }
+
+    .vmp-filter-chip.active {
+        background: var(--mud-palette-primary);
+        border-color: var(--mud-palette-primary);
+        color: #fff;
+    }
+
+    .vmp-filter-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+    }
+
+    /* ── Card grid ──────────────────────────────────── */
+    .vmp-grid {
+        flex: 1;
+        overflow-y: auto;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 10px;
+        align-content: start;
+        padding: 2px 1px 4px;
+    }
+
+    /* ── VM card ────────────────────────────────────── */
+    .vmc {
+        border: 1px solid var(--mud-palette-divider);
+        border-radius: 10px;
+        background: var(--mud-palette-surface);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        transition: box-shadow 0.14s, border-color 0.14s;
+    }
+
+    .vmc:hover {
+        box-shadow: 0 2px 12px rgba(0,0,0,0.09);
+        border-color: var(--mud-palette-primary-lighten);
+    }
+
+    .vmc.busy {
+        opacity: 0.65;
+        pointer-events: none;
+    }
+
+    /* Card header */
+    .vmc-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        padding: 13px 15px 9px;
+        gap: 8px;
+    }
+
+    .vmc-name {
+        font-size: 0.88rem;
+        font-weight: 600;
+        line-height: 1.35;
+        word-break: break-word;
+        color: var(--mud-palette-text-primary);
+    }
+
+    .vmc-customer {
+        font-size: 0.73rem;
+        color: var(--mud-palette-text-secondary);
+        margin-top: 1px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .vmc-status {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        flex-shrink: 0;
+        padding-top: 2px;
+    }
+
+    .vmc-status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .vmc-status-dot.on  { background: #4ade80; box-shadow: 0 0 0 2px #4ade8020; }
+    .vmc-status-dot.off { background: var(--mud-palette-text-disabled); }
+    .vmc-status-dot.sus { background: #fbbf24; box-shadow: 0 0 0 2px #fbbf2420; }
+
+    .vmc-status-text {
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    .vmc-status-text.on  { color: #4ade80; }
+    .vmc-status-text.off { color: var(--mud-palette-text-disabled); }
+    .vmc-status-text.sus { color: #fbbf24; }
+
+    /* Card specs */
+    .vmc-specs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 5px 8px;
+        padding: 6px 15px 12px;
+        border-top: 1px solid var(--mud-palette-divider);
+    }
+
+    .vmc-spec {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+    }
+
+    .vmc-spec-label {
+        font-size: 0.64rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--mud-palette-text-disabled);
+    }
+
+    .vmc-spec-value {
+        font-size: 0.78rem;
+        color: var(--mud-palette-text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .vmc-spec-value.mono {
+        font-family: 'Cascadia Code', 'Consolas', monospace;
+        font-size: 0.76rem;
+    }
+
+    .vmc-spec-value.dim {
+        color: var(--mud-palette-text-disabled);
+    }
+
+    /* Card actions */
+    .vmc-actions {
+        display: flex;
+        align-items: center;
+        padding: 4px 6px 5px;
+        gap: 0;
+        border-top: 1px solid var(--mud-palette-divider);
+        background: var(--mud-palette-background);
+    }
+
+    .vmc-actions-sep {
+        flex: 1;
+    }
+
+    /* ── Loading overlay ────────────────────────────── */
+    .vmp-overlay {
+        position: absolute;
+        inset: 0;
+        background: var(--mud-palette-background-grey);
+        opacity: 0.82;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        border-radius: 4px;
+    }
+
+    .vmp-overlay-label {
+        font-size: 0.8rem;
+        color: var(--mud-palette-text-secondary);
+        max-width: 280px;
+        text-align: center;
+    }
+
+    /* ── Empty state ────────────────────────────────── */
+    .vmp-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        flex: 1;
+        gap: 10px;
+        text-align: center;
+    }
+</style>
+
+<div class="vmp">
+
+    <!-- ── Loading overlay ── -->
+    @if (_loading)
+    {
+        <div class="vmp-overlay">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Medium" />
+            <span class="vmp-overlay-label">@_loadingMessage</span>
+        </div>
+    }
+
+    <!-- ── Top bar ── -->
+    <div class="vmp-bar">
+
+        <div class="vmp-status-badge">
+            <span class="vmp-conn-dot @(VmwareService.IsConnected ? "on" : "")"></span>
+            @(VmwareService.IsConnected ? "Verbunden" : "Getrennt")
+        </div>
+
         @if (VmwareService.IsConnected)
         {
-            <MudChip T="string" Color="Color.Success" Icon="@Icons.Material.Filled.Cloud" Size="Size.Small">
-                Verbunden
-            </MudChip>
-            <MudButton StartIcon="@Icons.Material.Filled.Refresh"
-                       Variant="Variant.Text"
-                       Color="Color.Primary"
-                       OnClick="RefreshAsync"
-                       Disabled="_loading">
-                Aktualisieren
-            </MudButton>
-            <MudButton StartIcon="@Icons.Material.Filled.CloudOff"
-                       Variant="Variant.Text"
-                       Color="Color.Default"
-                       OnClick="DisconnectAsync"
-                       Disabled="_loading">
-                Trennen
-            </MudButton>
-            <MudDivider Vertical="true" FlexItem="true" />
-            <MudTooltip Text="Lädt IP-Adresse, Hostname und Betriebssystem nach (eine Anfrage pro VM)">
-                <MudCheckBox T="bool" @bind-Value="_autoLoadDetails" Color="Color.Primary" Size="Size.Small">
-                    Details laden
-                </MudCheckBox>
+            <MudTooltip Text="Aktualisieren">
+                <MudIconButton Icon="@Icons.Material.Outlined.Refresh"
+                               Size="Size.Small" OnClick="RefreshAsync" Disabled="_loading" />
             </MudTooltip>
-            <MudDivider Vertical="true" FlexItem="true" />
-            <MudButton StartIcon="@Icons.Material.Filled.Sync"
-                       Variant="Variant.Text"
-                       Color="Color.Secondary"
-                       OnClick="SyncCustomerMappingsAsync"
-                       Disabled="_syncing">
-                VM-Kunden sync
-            </MudButton>
-            @if (_syncing)
-            {
-                <MudText Typo="Typo.caption" Class="mud-text-secondary">@_syncMessage</MudText>
-            }
+
+            <MudTooltip Text="Verbindung trennen">
+                <MudIconButton Icon="@Icons.Material.Outlined.CloudOff"
+                               Size="Size.Small" OnClick="DisconnectAsync" Disabled="_loading" />
+            </MudTooltip>
+
+            <div class="vmp-bar-sep"></div>
+
+            <MudTooltip Text="Lädt IP, Hostname und OS für jede VM nach">
+                <MudCheckBox T="bool" @bind-Value="_autoLoadDetails"
+                             Color="Color.Primary" Size="Size.Small"
+                             Style="margin:0">Details</MudCheckBox>
+            </MudTooltip>
+
+            <div class="vmp-bar-sep"></div>
+
+            <MudTooltip Text="@(_syncing ? _syncMessage : "VM → Kunde Mapping aus TFS synchronisieren")">
+                <MudIconButton Icon="@Icons.Material.Outlined.Sync"
+                               Size="Size.Small"
+                               Color="@(_syncing ? Color.Primary : Color.Default)"
+                               OnClick="SyncCustomerMappingsAsync"
+                               Disabled="_syncing" />
+            </MudTooltip>
+
+            <div class="vmp-spacer"></div>
+
+            <MudTextField T="string"
+                          @bind-Value="_searchText"
+                          Placeholder="Suchen…"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Outlined.Search"
+                          Clearable="true"
+                          Style="max-width:220px;font-size:0.82rem;" />
+
+            <span class="vmp-count">@FilteredVms.Count() / @_vms.Count</span>
         }
         else
         {
-            <MudChip T="string" Color="Color.Default" Icon="@Icons.Material.Filled.CloudOff" Size="Size.Small">
-                Nicht verbunden
-            </MudChip>
-            <MudButton StartIcon="@Icons.Material.Filled.CloudSync"
+            <MudButton StartIcon="@Icons.Material.Outlined.CloudSync"
                        Variant="Variant.Filled"
                        Color="Color.Primary"
+                       Size="Size.Small"
                        OnClick="ConnectAsync"
                        Disabled="_loading">
                 Verbinden
             </MudButton>
         }
-
-        @if (_loading)
-        {
-            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" />
-            <MudText Typo="Typo.caption" Class="mud-text-secondary">@_loadingMessage</MudText>
-        }
     </div>
 
+    <!-- ── Error ── -->
     @if (!string.IsNullOrEmpty(_lastError))
     {
-        <MudAlert Severity="Severity.Error" Dense="true" ShowCloseIcon="true" CloseIconClicked="() => _lastError = string.Empty">
+        <MudAlert Severity="Severity.Error" Dense="true" ShowCloseIcon="true"
+                  CloseIconClicked="() => _lastError = string.Empty"
+                  Style="flex-shrink:0;">
             @_lastError
         </MudAlert>
     }
 
+    <!-- ── Filter chips (only when connected) ── -->
+    @if (VmwareService.IsConnected)
+    {
+        <div class="vmp-filters">
+            <span @onclick='() => _powerFilter = "ALL"'
+                  class="vmp-filter-chip @(_powerFilter == "ALL" ? "active" : "")">
+                Alle
+            </span>
+            <span @onclick='() => _powerFilter = "POWERED_ON"'
+                  class="vmp-filter-chip @(_powerFilter == "POWERED_ON" ? "active" : "")">
+                <span class="vmp-filter-dot" style="background:#4ade80;"></span>
+                Eingeschaltet
+            </span>
+            <span @onclick='() => _powerFilter = "POWERED_OFF"'
+                  class="vmp-filter-chip @(_powerFilter == "POWERED_OFF" ? "active" : "")">
+                <span class="vmp-filter-dot" style="background:var(--mud-palette-text-disabled);"></span>
+                Ausgeschaltet
+            </span>
+            <span @onclick='() => _powerFilter = "SUSPENDED"'
+                  class="vmp-filter-chip @(_powerFilter == "SUSPENDED" ? "active" : "")">
+                <span class="vmp-filter-dot" style="background:#fbbf24;"></span>
+                Suspendiert
+            </span>
+        </div>
+    }
+
+    <!-- ── Disconnected state ── -->
     @if (!VmwareService.IsConnected && !_loading)
     {
-        <div class="d-flex flex-column align-items-center justify-content-center flex-grow-1 gap-3 text-center">
-            <MudIcon Icon="@Icons.Material.Filled.Cloud" Style="font-size: 96px; opacity: 0.2;" />
-            <MudText Typo="Typo.h5" Class="mud-text-secondary">Nicht mit vCenter verbunden</MudText>
+        <div class="vmp-empty">
+            <MudIcon Icon="@Icons.Material.Outlined.Cloud" Style="font-size:56px;opacity:0.15;" />
+            <MudText Typo="Typo.body1" Class="mud-text-secondary">Nicht mit vCenter verbunden</MudText>
             @if (string.IsNullOrWhiteSpace(SettingsService.Settings?.VCenterUrl))
             {
-                <MudText Class="mud-text-secondary">
-                    Bitte vCenter-Zugangsdaten in den Einstellungen konfigurieren.
-                </MudText>
-                <MudButton Variant="Variant.Outlined"
-                           Href="settings"
-                           StartIcon="@Icons.Material.Filled.Settings">
+                <MudText Typo="Typo.body2" Class="mud-text-disabled">vCenter-URL in den Einstellungen konfigurieren.</MudText>
+                <MudButton Variant="Variant.Text" Href="settings"
+                           StartIcon="@Icons.Material.Outlined.Settings" Size="Size.Small">
                     Einstellungen öffnen
                 </MudButton>
             }
-            else
-            {
-                <MudButton StartIcon="@Icons.Material.Filled.CloudSync"
-                           Variant="Variant.Filled"
-                           Color="Color.Primary"
-                           OnClick="ConnectAsync">
-                    Verbinden
-                </MudButton>
-            }
         </div>
     }
-    else if (VmwareService.IsConnected)
+
+    <!-- ── VM card grid ── -->
+    @if (VmwareService.IsConnected)
     {
-        <!-- Filter bar -->
-        <div class="d-flex gap-2 align-items-center flex-wrap">
-            <MudTextField T="string"
-                          @bind-Value="_searchText"
-                          Label="Suche"
-                          Variant="Variant.Outlined"
-                          Margin="Margin.Dense"
-                          Adornment="Adornment.Start"
-                          AdornmentIcon="@Icons.Material.Filled.Search"
-                          Clearable="true"
-                          Style="max-width: 350px;" />
-            <MudSelect T="string"
-                       @bind-Value="_powerFilter"
-                       Label="Status"
-                       Variant="Variant.Outlined"
-                       Margin="Margin.Dense"
-                       Style="min-width: 170px">
-                <MudSelectItem Value="@("ALL")">Alle</MudSelectItem>
-                <MudSelectItem Value="@("POWERED_ON")">Eingeschaltet</MudSelectItem>
-                <MudSelectItem Value="@("POWERED_OFF")">Ausgeschaltet</MudSelectItem>
-                <MudSelectItem Value="@("SUSPENDED")">Suspendiert</MudSelectItem>
-            </MudSelect>
-            <MudText Typo="Typo.caption" Class="mud-text-secondary">
-                @FilteredVms.Count() von @_vms.Count VM(s)
-            </MudText>
-        </div>
+        <div class="vmp-grid">
+            @foreach (var vm in FilteredVms)
+            {
+                var ps     = vm.PowerState;
+                var isOn   = ps == "POWERED_ON";
+                var isOff  = ps == "POWERED_OFF";
+                var isSus  = ps == "SUSPENDED";
+                var busy   = _busyVms.Contains(vm.Id);
+                var dotCls = isOn ? "on" : isSus ? "sus" : "off";
+                var stLbl  = isOn ? "Ein" : isOff ? "Aus" : isSus ? "Susp." : ps;
+                var customer = GetCustomerName(vm.Name);
 
-        <!-- VM Table -->
-        <MudDataGrid T="VmwareVm"
-                     Items="FilteredVms"
-                     Dense="true"
-                     Hover="true"
-                     Striped="true"
-                     SortMode="SortMode.Single"
-                     Filterable="false"
-                     FixedHeader="true"
-                     Height="calc(100vh - 280px)">
-            <Columns>
-                <PropertyColumn Property="x => x.Name" Title="Name" />
+                <div class="vmc @(busy ? "busy" : "")">
 
-                <TemplateColumn Title="Kunde" SortBy="x => GetCustomerName(x.Name)">
-                    <CellTemplate>
-                        @{
-                            var customer = GetCustomerName(context.Item.Name);
-                        }
-                        @if (!string.IsNullOrEmpty(customer))
+                    <!-- Header -->
+                    <div class="vmc-head">
+                        <div style="min-width:0;">
+                            <div class="vmc-name">@vm.Name</div>
+                            @if (!string.IsNullOrEmpty(customer))
+                            {
+                                <div class="vmc-customer">@customer</div>
+                            }
+                        </div>
+                        <div class="vmc-status">
+                            <span class="vmc-status-dot @dotCls"></span>
+                            <span class="vmc-status-text @dotCls">@stLbl</span>
+                        </div>
+                    </div>
+
+                    <!-- Specs -->
+                    <div class="vmc-specs">
+                        <div class="vmc-spec">
+                            <span class="vmc-spec-label">CPU / RAM</span>
+                            <span class="vmc-spec-value">
+                                @(vm.CpuCount > 0 ? $"{vm.CpuCount}C" : "–") / @FormatRam(vm.MemoryMib)
+                            </span>
+                        </div>
+                        <div class="vmc-spec">
+                            <span class="vmc-spec-label">IP</span>
+                            @if (!string.IsNullOrEmpty(vm.IpAddress))
+                            {
+                                <span class="vmc-spec-value mono">@vm.IpAddress</span>
+                            }
+                            else if (!vm.DetailsLoaded && _autoLoadDetails)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true"
+                                                     Style="width:12px;height:12px;margin-top:2px;" />
+                            }
+                            else
+                            {
+                                <span class="vmc-spec-value dim">–</span>
+                            }
+                        </div>
+                        <div class="vmc-spec">
+                            <span class="vmc-spec-label">Hostname</span>
+                            @if (!string.IsNullOrEmpty(vm.HostName))
+                            {
+                                <span class="vmc-spec-value mono" title="@vm.HostName">@vm.HostName</span>
+                            }
+                            else
+                            {
+                                <span class="vmc-spec-value dim">–</span>
+                            }
+                        </div>
+                        <div class="vmc-spec">
+                            <span class="vmc-spec-label">OS</span>
+                            <span class="vmc-spec-value @(string.IsNullOrEmpty(vm.GuestOs) ? "dim" : "")"
+                                  title="@vm.GuestOs">
+                                @(string.IsNullOrEmpty(vm.GuestOs) ? "–" : vm.GuestOs)
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="vmc-actions">
+                        @if (busy)
                         {
-                            <MudText Typo="Typo.body2">@customer</MudText>
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true"
+                                                 Style="width:18px;height:18px;margin:0 6px;" />
                         }
                         else
                         {
-                            <MudText Typo="Typo.body2" Class="mud-text-disabled">–</MudText>
-                        }
-                    </CellTemplate>
-                </TemplateColumn>
-
-                <TemplateColumn Title="Status" SortBy="x => x.PowerState">
-                    <CellTemplate>
-                        @{
-                            var (color, label, icon) = GetPowerDisplay(context.Item.PowerState);
-                        }
-                        <MudChip T="string" Color="color" Size="Size.Small" Icon="@icon" Class="ma-0">
-                            @label
-                        </MudChip>
-                    </CellTemplate>
-                </TemplateColumn>
-
-                <TemplateColumn Title="CPU" SortBy="x => x.CpuCount">
-                    <CellTemplate>
-                        <MudText Typo="Typo.body2">
-                            @(context.Item.CpuCount > 0 ? context.Item.CpuCount.ToString() : "–")
-                        </MudText>
-                    </CellTemplate>
-                </TemplateColumn>
-
-                <TemplateColumn Title="RAM" SortBy="x => x.MemoryMib">
-                    <CellTemplate>
-                        <MudText Typo="Typo.body2">@FormatRam(context.Item.MemoryMib)</MudText>
-                    </CellTemplate>
-                </TemplateColumn>
-
-                <TemplateColumn Title="IP-Adresse" SortBy="x => x.IpAddress">
-                    <CellTemplate>
-                        @if (!string.IsNullOrEmpty(context.Item.IpAddress))
-                        {
-                            <MudText Typo="Typo.body2">@context.Item.IpAddress</MudText>
-                        }
-                        else if (!context.Item.DetailsLoaded && _autoLoadDetails)
-                        {
-                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
-                        }
-                        else
-                        {
-                            <MudText Typo="Typo.body2" Class="mud-text-disabled">–</MudText>
-                        }
-                    </CellTemplate>
-                </TemplateColumn>
-
-                <TemplateColumn Title="Hostname" SortBy="x => x.HostName">
-                    <CellTemplate>
-                        <MudText Typo="Typo.body2">
-                            @(string.IsNullOrEmpty(context.Item.HostName) ? "–" : context.Item.HostName)
-                        </MudText>
-                    </CellTemplate>
-                </TemplateColumn>
-
-                <TemplateColumn Title="Betriebssystem" SortBy="x => x.GuestOs">
-                    <CellTemplate>
-                        <MudText Typo="Typo.body2">
-                            @(string.IsNullOrEmpty(context.Item.GuestOs) ? "–" : context.Item.GuestOs)
-                        </MudText>
-                    </CellTemplate>
-                </TemplateColumn>
-
-                <TemplateColumn Title="Aktionen" CellClass="pa-0">
-                    <CellTemplate>
-                        @{
-                            var vm = context.Item;
-                            var on = vm.PowerState == "POWERED_ON";
-                            var off = vm.PowerState == "POWERED_OFF";
-                            var sus = vm.PowerState == "SUSPENDED";
-                            var busy = _busyVms.Contains(vm.Id);
-                        }
-                        <div class="d-flex align-items-center">
-                            @if (off || sus)
+                            @if (isOff || isSus)
                             {
                                 <MudTooltip Text="Einschalten">
                                     <MudIconButton Size="Size.Small"
-                                                   Icon="@Icons.Material.Filled.PlayArrow"
+                                                   Icon="@Icons.Material.Outlined.PlayArrow"
                                                    Color="Color.Success"
-                                                   OnClick="() => PowerOnVmAsync(vm)"
-                                                   Disabled="busy" />
+                                                   OnClick="() => PowerOnVmAsync(vm)" />
                                 </MudTooltip>
                             }
-                            @if (on)
+                            @if (isOn)
                             {
-                                <MudTooltip Text="Herunterfahren (Gast-Betriebssystem)">
+                                <MudTooltip Text="Herunterfahren (Gast)">
                                     <MudIconButton Size="Size.Small"
-                                                   Icon="@Icons.Material.Filled.PowerSettingsNew"
+                                                   Icon="@Icons.Material.Outlined.PowerSettingsNew"
                                                    Color="Color.Warning"
-                                                   OnClick="() => ShutdownGuestVmAsync(vm)"
-                                                   Disabled="busy" />
+                                                   OnClick="() => ShutdownGuestVmAsync(vm)" />
                                 </MudTooltip>
                                 <MudTooltip Text="Ausschalten (erzwingen)">
                                     <MudIconButton Size="Size.Small"
-                                                   Icon="@Icons.Material.Filled.Stop"
+                                                   Icon="@Icons.Material.Outlined.Stop"
                                                    Color="Color.Error"
-                                                   OnClick="() => PowerOffVmAsync(vm)"
-                                                   Disabled="busy" />
+                                                   OnClick="() => PowerOffVmAsync(vm)" />
                                 </MudTooltip>
-                                <MudTooltip Text="Neustart (Gast-Betriebssystem)">
+                                <MudTooltip Text="Neustart (Gast)">
                                     <MudIconButton Size="Size.Small"
-                                                   Icon="@Icons.Material.Filled.RestartAlt"
-                                                   Color="Color.Info"
-                                                   OnClick="() => RebootGuestVmAsync(vm)"
-                                                   Disabled="busy" />
+                                                   Icon="@Icons.Material.Outlined.RestartAlt"
+                                                   OnClick="() => RebootGuestVmAsync(vm)" />
                                 </MudTooltip>
                                 <MudTooltip Text="Zurücksetzen (erzwingen)">
                                     <MudIconButton Size="Size.Small"
-                                                   Icon="@Icons.Material.Filled.Replay"
-                                                   Color="Color.Warning"
-                                                   OnClick="() => ResetVmAsync(vm)"
-                                                   Disabled="busy" />
+                                                   Icon="@Icons.Material.Outlined.Replay"
+                                                   OnClick="() => ResetVmAsync(vm)" />
                                 </MudTooltip>
                                 <MudTooltip Text="Suspendieren">
                                     <MudIconButton Size="Size.Small"
-                                                   Icon="@Icons.Material.Filled.Pause"
-                                                   Color="Color.Default"
-                                                   OnClick="() => SuspendVmAsync(vm)"
-                                                   Disabled="busy" />
+                                                   Icon="@Icons.Material.Outlined.Pause"
+                                                   OnClick="() => SuspendVmAsync(vm)" />
                                 </MudTooltip>
                             }
-                            <MudTooltip Text="Snapshots verwalten">
+                        }
+                        <span class="vmc-actions-sep"></span>
+                        @{
+                            var mapping = GetMapping(vm.Name);
+                            var canRdp  = isOn && !string.IsNullOrEmpty(vm.IpAddress) && mapping != null;
+                            var rdpTip  = canRdp
+                                ? $"RDP: {mapping!.RdpUsername ?? "Administrator"} @ {vm.IpAddress}"
+                                : !isOn ? "VM muss eingeschaltet sein" : string.IsNullOrEmpty(vm.IpAddress) ? "IP nicht bekannt" : "Keine Zugangsdaten (Sync ausführen)";
+                        }
+                        <MudTooltip Text="@rdpTip">
+                            <MudIconButton Size="Size.Small"
+                                           Icon="@Icons.Material.Outlined.DesktopWindows"
+                                           Color="@(canRdp ? Color.Primary : Color.Default)"
+                                           Disabled="!canRdp"
+                                           OnClick="() => OpenRdpAsync(vm, mapping!)" />
+                        </MudTooltip>
+                        <MudTooltip Text="Snapshots verwalten">
+                            <MudIconButton Size="Size.Small"
+                                           Icon="@Icons.Material.Outlined.PhotoCamera"
+                                           OnClick="() => OpenSnapshotsAsync(vm)" />
+                        </MudTooltip>
+                        @if (isOff)
+                        {
+                            <MudTooltip Text="VM löschen (unwiderruflich)">
                                 <MudIconButton Size="Size.Small"
-                                               Icon="@Icons.Material.Filled.PhotoCamera"
-                                               Color="Color.Primary"
-                                               OnClick="() => OpenSnapshotsAsync(vm)" />
+                                               Icon="@Icons.Material.Outlined.DeleteForever"
+                                               Color="Color.Error"
+                                               OnClick="() => ConfirmDeleteVmAsync(vm)" />
                             </MudTooltip>
-                            @if (busy)
-                            {
-                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="ml-1" />
-                            }
-                        </div>
-                    </CellTemplate>
-                </TemplateColumn>
-            </Columns>
-            <NoRecordsContent>
-                <MudText Class="mud-text-secondary pa-4">Keine VMs gefunden.</MudText>
-            </NoRecordsContent>
-        </MudDataGrid>
+                        }
+                    </div>
+
+                </div>
+            }
+
+            @if (!FilteredVms.Any() && !_loading)
+            {
+                <div style="grid-column:1/-1;padding:40px;text-align:center;color:var(--mud-palette-text-disabled);font-size:0.82rem;">
+                    Keine VMs gefunden.
+                </div>
+            }
+        </div>
     }
+
 </div>
 
 @code {
@@ -321,7 +612,8 @@
             v.Name.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
             (v.IpAddress ?? "").Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
             (v.HostName ?? "").Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
-            (v.GuestOs ?? "").Contains(_searchText, StringComparison.OrdinalIgnoreCase))
+            (v.GuestOs ?? "").Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+            (GetCustomerName(v.Name) ?? "").Contains(_searchText, StringComparison.OrdinalIgnoreCase))
         .Where(v => _powerFilter == "ALL" || v.PowerState == _powerFilter);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -335,9 +627,45 @@
             await ConnectAsync();
     }
 
-    private string? GetCustomerName(string vmName) =>
+    private VmCustomerMapping? GetMapping(string vmName) =>
         _customerMappings.FirstOrDefault(m =>
-            string.Equals(m.VmName, vmName, StringComparison.OrdinalIgnoreCase))?.CustomerName;
+            string.Equals(m.VmName, vmName, StringComparison.OrdinalIgnoreCase));
+
+    private string? GetCustomerName(string vmName) => GetMapping(vmName)?.CustomerName;
+
+    private Task OpenRdpAsync(VmwareVm vm, VmCustomerMapping mapping)
+    {
+        if (string.IsNullOrEmpty(vm.IpAddress)) return Task.CompletedTask;
+
+        try
+        {
+            // Store credential in Windows Credential Manager for this session
+            if (!string.IsNullOrEmpty(mapping.RdpPassword))
+            {
+                var user = string.IsNullOrEmpty(mapping.RdpUsername) ? "Administrator" : mapping.RdpUsername;
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "cmdkey",
+                    Arguments = $"/generic:TERMSRV/{vm.IpAddress} /user:{user} /pass:{mapping.RdpPassword}",
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                })?.WaitForExit();
+            }
+
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "mstsc",
+                Arguments = $"/v:{vm.IpAddress}",
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"RDP konnte nicht gestartet werden: {ex.Message}", Severity.Error);
+        }
+
+        return Task.CompletedTask;
+    }
 
     private async Task SyncCustomerMappingsAsync()
     {
@@ -358,7 +686,7 @@
             if (result.Errors.Any())
                 Snackbar.Add($"Sync abgeschlossen mit Fehlern: {string.Join(", ", result.Errors)}", Severity.Warning);
             else
-                Snackbar.Add($"Sync abgeschlossen: {result.Added} neu, {result.Updated} aktualisiert ({result.ProjectsScanned} Projekte gescannt).", Severity.Success);
+                Snackbar.Add($"Sync: {result.Added} neu, {result.Updated} aktualisiert ({result.ProjectsScanned} Projekte).", Severity.Success);
 
             _customerMappings = await SyncService.GetMappingsAsync();
         }
@@ -413,10 +741,7 @@
                         await VmwareService.LoadVmDetailsAsync(vm);
                         await InvokeAsync(StateHasChanged);
                     }
-                    finally
-                    {
-                        semaphore.Release();
-                    }
+                    finally { semaphore.Release(); }
                 }).ToList();
 
                 await Task.WhenAll(tasks);
@@ -431,6 +756,7 @@
     private async Task RefreshAsync()
     {
         _loading = true;
+        _loadingMessage = "Aktualisiere...";
         _lastError = "";
         await LoadVmsAsync();
         _loading = false;
@@ -482,6 +808,39 @@
         }
     }
 
+    private async Task ConfirmDeleteVmAsync(VmwareVm vm)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "VM löschen",
+            $"'{vm.Name}' unwiderruflich löschen? Die VM muss ausgeschaltet sein.",
+            yesText: "Löschen",
+            cancelText: "Abbrechen",
+            options: new DialogOptions { MaxWidth = MaxWidth.ExtraSmall });
+
+        if (result != true) return;
+
+        _busyVms.Add(vm.Id);
+        StateHasChanged();
+        try
+        {
+            var ok = await VmwareService.DeleteVmAsync(vm.Id);
+            if (ok)
+            {
+                Snackbar.Add($"'{vm.Name}' wurde gelöscht.", Severity.Success);
+                _vms.Remove(vm);
+            }
+            else
+            {
+                Snackbar.Add(VmwareService.LastError ?? "Fehler beim Löschen.", Severity.Error);
+            }
+        }
+        finally
+        {
+            _busyVms.Remove(vm.Id);
+            StateHasChanged();
+        }
+    }
+
     private async Task OpenSnapshotsAsync(VmwareVm vm)
     {
         var parameters = new DialogParameters
@@ -492,15 +851,6 @@
         var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
         await DialogService.ShowAsync<VmSnapshotDialog>($"Snapshots – {vm.Name}", parameters, options);
     }
-
-    private static (Color color, string label, string icon) GetPowerDisplay(string powerState) =>
-        powerState switch
-        {
-            "POWERED_ON" => (Color.Success, "Eingeschaltet", Icons.Material.Filled.Circle),
-            "POWERED_OFF" => (Color.Default, "Ausgeschaltet", Icons.Material.Outlined.Circle),
-            "SUSPENDED" => (Color.Warning, "Suspendiert", Icons.Material.Filled.PauseCircleFilled),
-            _ => (Color.Default, powerState, Icons.Material.Outlined.Circle)
-        };
 
     private static string FormatRam(int mib) =>
         mib <= 0 ? "–" : mib >= 1024 ? $"{mib / 1024} GB" : $"{mib} MB";

@@ -86,7 +86,9 @@ public class StagingSystemSyncService
                 seenVmNames.Add(vmName);
 
                 var customerName = ExtractYamlValue(content, "TFSProject") ?? stagingRepo.Project;
-                var customerId = ExtractYamlValue(content, "CustomerId");
+                var customerId   = ExtractYamlValue(content, "CustomerId");
+                var rdpPassword  = ExtractYamlValue(content, "GuestPassword");
+                var rdpUsername  = ExtractYamlValue(content, "GuestUser") ?? "Administrator";
 
                 var existing = await _db.VmCustomerMappings
                     .FirstOrDefaultAsync(m => m.VmName == vmName, ct);
@@ -99,16 +101,20 @@ public class StagingSystemSyncService
                         CustomerName = customerName,
                         TfsProjectName = stagingRepo.Project,
                         CustomerId = customerId,
+                        RdpUsername = rdpUsername,
+                        RdpPassword = rdpPassword,
                         LastSynced = now
                     });
                     result.Added++;
                 }
                 else
                 {
-                    existing.CustomerName = customerName;
+                    existing.CustomerName   = customerName;
                     existing.TfsProjectName = stagingRepo.Project;
-                    existing.CustomerId = customerId;
-                    existing.LastSynced = now;
+                    existing.CustomerId     = customerId;
+                    existing.RdpUsername    = rdpUsername;
+                    existing.RdpPassword    = rdpPassword;
+                    existing.LastSynced     = now;
                     result.Updated++;
                 }
             }

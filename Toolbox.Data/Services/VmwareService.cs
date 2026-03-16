@@ -281,6 +281,28 @@ public class VmwareService
     public Task<bool> ShutdownGuestAsync(string vmId) => GuestPowerActionAsync(vmId, "shutdown");
     public Task<bool> RebootGuestAsync(string vmId) => GuestPowerActionAsync(vmId, "reboot");
 
+    public async Task<bool> DeleteVmAsync(string vmId)
+    {
+        if (!IsConnected || _client == null) return false;
+        try
+        {
+            LastError = null;
+            var response = await _client.SendAsync(
+                CreateRequest(HttpMethod.Delete, $"/rest/vcenter/vm/{vmId}"));
+            if (!response.IsSuccessStatusCode)
+            {
+                LastError = $"Fehler beim Löschen: HTTP {(int)response.StatusCode} – VM muss ausgeschaltet sein.";
+                return false;
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            LastError = ex.Message;
+            return false;
+        }
+    }
+
     public async Task<List<VmwareSnapshot>> GetSnapshotsAsync(string vmId)
     {
         if (!IsConnected || _client == null) return new();
