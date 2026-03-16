@@ -128,13 +128,22 @@
         <!-- ── VM-Konfiguration ── -->
         <div class="rpd-section">VM-Konfiguration</div>
 
-        <MudTextField @bind-Value="_varVmName"
-                      Label="VM-Name (ESXNewVmName)"
-                      Variant="Variant.Outlined"
-                      Margin="Margin.Dense"
-                      FullWidth="true"
-                      Disabled="_executing"
-                      HelperText="z.B. VM-10441-19245" />
+        <div class="d-flex gap-2">
+            <MudTextField @bind-Value="_varVmName"
+                          Label="VM-Name (ESXNewVmName)"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          FullWidth="true"
+                          Disabled="_executing"
+                          HelperText="z.B. VM-10441-19245" />
+            <MudTextField @bind-Value="_varShopId"
+                          Label="Shop-ID (ShopId)"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Style="max-width:160px;"
+                          Disabled="_executing"
+                          HelperText="z.B. 10441" />
+        </div>
 
         <!-- ── SQL-Konfiguration ── -->
         <div class="rpd-section">SQL-Konfiguration</div>
@@ -296,6 +305,7 @@
     // Variables (pre-filled from YAML)
     private bool   _showPassword;
     private string _varVmName      = "";
+    private string _varShopId      = "";
     private string _varSqlServer   = "";
     private string _varSqlDatabase = "";
     private string _varSqlUser     = "";
@@ -303,6 +313,7 @@
 
     // Original values loaded from YAML (to detect changes)
     private string _origVmName      = "";
+    private string _origShopId      = "";
     private string _origSqlServer   = "";
     private string _origSqlDatabase = "";
     private string _origSqlUser     = "";
@@ -310,6 +321,7 @@
 
     private bool ValuesChanged =>
         _varVmName      != _origVmName      ||
+        _varShopId      != _origShopId      ||
         _varSqlServer   != _origSqlServer   ||
         _varSqlDatabase != _origSqlDatabase ||
         _varSqlUser     != _origSqlUser     ||

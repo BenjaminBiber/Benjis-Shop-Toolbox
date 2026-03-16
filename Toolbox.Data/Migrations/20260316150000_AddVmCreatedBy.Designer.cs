@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Toolbox.Data.DataContexts;
 
@@ -10,9 +11,11 @@ using Toolbox.Data.DataContexts;
 namespace Toolbox.Data.Migrations
 {
     [DbContext(typeof(InternalAppDbContext))]
-    partial class InternalAppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260316150000_AddVmCreatedBy")]
+    partial class AddVmCreatedBy
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.10");
@@ -239,8 +242,7 @@ namespace Toolbox.Data.Migrations
                             RestartShopOnThemeChange = true,
                             ThemeRepositoryPath = "C:\\Dev_Git\\KundenThemes",
                             TrayIconIisSite = -9223372036854775808L,
-                            VCenterIgnoreSslErrors = false,
-                            VCenterUrl = "https://staging-vc-1.logic-base.local"
+                            VCenterIgnoreSslErrors = false
                         });
                 });
 
@@ -278,9 +280,6 @@ namespace Toolbox.Data.Migrations
                     b.Property<string>("CreatedBy")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("CreatedByEmail")
-                        .HasColumnType("TEXT");
-
                     b.Property<DateTime?>("CreatedAt")
                         .HasColumnType("TEXT");
 
@@ -310,4 +309,3 @@ namespace Toolbox.Data.Migrations
         }
     }
 }
-

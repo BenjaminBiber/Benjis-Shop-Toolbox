@@ -81,6 +81,7 @@ public class ToolboxSettings
         TrayIconIisSite = long.MinValue;
         PinnedExtensionGroups = null;
         PinnedThemeGroups = null;
+        VCenterUrl = "https://staging-vc-1.logic-base.local";
     }
 
     public IEnumerable<string> GetExtensionRoots() => SplitPaths(ExtensionsRepositoryPath);

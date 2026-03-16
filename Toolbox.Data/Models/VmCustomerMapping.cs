@@ -9,5 +9,8 @@ public class VmCustomerMapping
     public string? CustomerId { get; set; }
     public string? RdpUsername { get; set; }
     public string? RdpPassword { get; set; }
+    public string? CreatedBy { get; set; }
+    public string? CreatedByEmail { get; set; }
+    public DateTime? CreatedAt { get; set; }
     public DateTime LastSynced { get; set; }
 }

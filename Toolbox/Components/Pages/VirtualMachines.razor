@@ -3,6 +3,7 @@
 @using Toolbox.Data.Models
 @using Toolbox.Data.Models.Interfaces
 @using Toolbox.Components.Dialogs
+@using Toolbox.Services
 @implements IDisposable
 @inject VmwareService VmwareService
 @inject StagingSystemSyncService SyncService
@@ -11,6 +12,7 @@
 @inject ISettingsService SettingsService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject CustomerLogoService CustomerLogoService
 
 
 <div class="vmp">
@@ -46,9 +48,7 @@
                 <MudIconButton Icon="@Icons.Material.Outlined.Refresh"
                                Size="Size.Small" OnClick="RefreshAsync" Disabled="_loading" />
             </MudTooltip>
-
-            <div class="vmp-bar-sep"></div>
-
+            
             <div class="vmp-bar-sep"></div>
 
             <MudTooltip Text="TFS Pipeline ausführen (neues Staging erstellen)">
@@ -56,6 +56,13 @@
                                Size="Size.Small"
                                Color="Color.Primary"
                                OnClick="OpenRunPipelineDialogAsync" />
+            </MudTooltip>
+
+            <MudTooltip Text="Kunden-Mapping synchronisieren">
+                <MudIconButton Icon="@Icons.Material.Outlined.Sync"
+                               Size="Size.Small"
+                               Disabled="_syncing"
+                               OnClick="SyncCustomerMappingsAsync" />
             </MudTooltip>
 
             <MudTooltip Text="Laufende Pipelines anzeigen">
@@ -97,6 +104,25 @@
                         Suspendiert
                     </div>
                 </MudSelectItem>
+            </MudSelect>
+
+            <MudSelect T="string"
+                       MultiSelection="true"
+                       @bind-SelectedValues="_sortCriteria"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       Style="font-size:0.82rem; min-width:200px;"
+                       Dense="true"
+                       AdornmentIcon="@Icons.Material.Outlined.Sort"
+                       Adornment="Adornment.Start"
+                       Placeholder="Sortierung…">
+                <MudSelectItem Value='"NAME_ASC"'>Name (A–Z)</MudSelectItem>
+                <MudSelectItem Value='"NAME_DESC"'>Name (Z–A)</MudSelectItem>
+                <MudSelectItem Value='"STATUS_ON_FIRST"'>Status (Ein zuerst)</MudSelectItem>
+                <MudSelectItem Value='"STATUS_OFF_FIRST"'>Status (Aus zuerst)</MudSelectItem>
+                <MudSelectItem Value='"CUSTOMER_ASC"'>Kunde (A–Z)</MudSelectItem>
+                <MudSelectItem Value='"CUSTOMER_DESC"'>Kunde (Z–A)</MudSelectItem>
+                <MudSelectItem Value='"SYNCED_DESC"'>Zuletzt synchronisiert</MudSelectItem>
             </MudSelect>
 
             <MudTextField T="string"
@@ -164,19 +190,40 @@
                 var busy   = _busyVms.Contains(vm.Id);
                 var dotCls = isOn ? "on" : isSus ? "sus" : "off";
                 var stLbl  = isOn ? "Ein" : isOff ? "Aus" : isSus ? "Susp." : ps;
-                var customer = GetCustomerName(vm.Name);
+                var customer     = GetCustomerName(vm.Name);
+                var mapping2     = GetMapping(vm.Name);
+                var creatorName  = mapping2?.CreatedBy;
+                var creatorMail  = mapping2?.CreatedByEmail;
+                var initials     = GetInitials(creatorName);
+                var avatarTip    = creatorName != null
+                    ? (creatorMail != null ? $"{creatorName}\n{creatorMail}" : creatorName)
+                    : null;
+                var logoUrl      = CustomerLogoService.GetLogoUrl(mapping2?.CustomerId);
 
-                <div class="vmc @(busy ? "busy" : "")">
+                <div class="vmc @(busy ? "busy" : "") @(isOn ? "powered-on" : "")">
 
                     <!-- Header -->
                     <div class="vmc-head">
-                        <div style="min-width:0;">
-                            <div class="vmc-name">@vm.Name</div>
-                            @if (!string.IsNullOrEmpty(customer))
+                        <div class="d-flex justify-content-start gap-2" style="min-width:0;flex:1;">
+                            @if (logoUrl != null)
                             {
-                                <div class="vmc-customer">@customer</div>
+                                <MudTooltip Text="@customer" Placement="Placement.Left">
+                                    <img src="@logoUrl" alt="@customer"
+                                         style="height:22px;max-width:60px;object-fit:contain;flex-shrink:0;opacity:0.85;" />
+                                </MudTooltip>
                             }
+                            <div class="vmc-name">@vm.Name @(!string.IsNullOrEmpty(customer) ? $"| {customer}" : "")</div>
                         </div>
+                        
+                        @if (creatorName != null)
+                        {
+                            <MudTooltip Text="@avatarTip" Placement="Placement.Left">
+                                <MudAvatar Style="width:26px;height:26px;font-size:0.6rem;flex-shrink:0;cursor:default;"
+                                           Color="Color.Primary" Variant="Variant.Filled">
+                                    @initials
+                                </MudAvatar>
+                            </MudTooltip>
+                        }
                         <div class="vmc-status">
                             <span class="vmc-status-dot @dotCls"></span>
                             <span class="vmc-status-text @dotCls">@stLbl</span>
@@ -330,6 +377,7 @@
     private string _lastError = "";
     private string _searchText = "";
     private string _powerFilter = "ALL";
+    private IEnumerable<string> _sortCriteria = ["NAME_ASC"];
     private bool _autoLoadDetails = true;
     private bool _initialized;
     private bool _syncing;
@@ -347,15 +395,65 @@
         PipelineTracker.Changed -= OnTrackerChanged;
     }
 
-    private IEnumerable<VmwareVm> FilteredVms => _vms
-        .Where(v =>
-            string.IsNullOrEmpty(_searchText) ||
-            v.Name.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
-            (v.IpAddress ?? "").Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
-            (v.HostName ?? "").Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
-            (v.GuestOs ?? "").Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
-            (GetCustomerName(v.Name) ?? "").Contains(_searchText, StringComparison.OrdinalIgnoreCase))
-        .Where(v => _powerFilter == "ALL" || v.PowerState == _powerFilter);
+    private static int PowerStateOrder(string ps) => ps switch
+    {
+        "POWERED_ON"  => 0,
+        "SUSPENDED"   => 1,
+        "POWERED_OFF" => 2,
+        _             => 3
+    };
+
+    private IEnumerable<VmwareVm> FilteredVms
+    {
+        get
+        {
+            var filtered = _vms
+                .Where(v =>
+                    string.IsNullOrEmpty(_searchText) ||
+                    v.Name.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+                    (v.IpAddress ?? "").Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+                    (v.HostName ?? "").Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+                    (v.GuestOs ?? "").Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+                    (GetCustomerName(v.Name) ?? "").Contains(_searchText, StringComparison.OrdinalIgnoreCase))
+                .Where(v => _powerFilter == "ALL" || v.PowerState == _powerFilter)
+                .ToList();
+
+            var criteria = _sortCriteria.ToList();
+            if (criteria.Count == 0) criteria = ["NAME_ASC"];
+
+            IOrderedEnumerable<VmwareVm>? sorted = null;
+            foreach (var criterion in criteria)
+            {
+                if (sorted == null)
+                {
+                    sorted = criterion switch
+                    {
+                        "NAME_DESC"        => filtered.OrderByDescending(v => v.Name, StringComparer.OrdinalIgnoreCase),
+                        "STATUS_ON_FIRST"  => filtered.OrderBy(v => PowerStateOrder(v.PowerState)),
+                        "STATUS_OFF_FIRST" => filtered.OrderByDescending(v => PowerStateOrder(v.PowerState)),
+                        "CUSTOMER_ASC"     => filtered.OrderBy(v => GetCustomerName(v.Name) ?? v.Name, StringComparer.OrdinalIgnoreCase),
+                        "CUSTOMER_DESC"    => filtered.OrderByDescending(v => GetCustomerName(v.Name) ?? v.Name, StringComparer.OrdinalIgnoreCase),
+                        "SYNCED_DESC"      => filtered.OrderByDescending(v => GetMapping(v.Name)?.LastSynced ?? DateTime.MinValue),
+                        _                  => filtered.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase),
+                    };
+                }
+                else
+                {
+                    sorted = criterion switch
+                    {
+                        "NAME_DESC"        => sorted.ThenByDescending(v => v.Name, StringComparer.OrdinalIgnoreCase),
+                        "STATUS_ON_FIRST"  => sorted.ThenBy(v => PowerStateOrder(v.PowerState)),
+                        "STATUS_OFF_FIRST" => sorted.ThenByDescending(v => PowerStateOrder(v.PowerState)),
+                        "CUSTOMER_ASC"     => sorted.ThenBy(v => GetCustomerName(v.Name) ?? v.Name, StringComparer.OrdinalIgnoreCase),
+                        "CUSTOMER_DESC"    => sorted.ThenByDescending(v => GetCustomerName(v.Name) ?? v.Name, StringComparer.OrdinalIgnoreCase),
+                        "SYNCED_DESC"      => sorted.ThenByDescending(v => GetMapping(v.Name)?.LastSynced ?? DateTime.MinValue),
+                        _                  => sorted.ThenBy(v => v.Name, StringComparer.OrdinalIgnoreCase),
+                    };
+                }
+            }
+            return sorted ?? filtered.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase);
+        }
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -413,6 +511,7 @@
         _syncing = true;
         _syncMessage = "Starte Sync...";
         StateHasChanged();
+        await Task.Yield(); // let Blazor render the overlay before starting
 
         try
         {
@@ -640,4 +739,17 @@
 
     private static string FormatRam(int mib) =>
         mib <= 0 ? "–" : mib >= 1024 ? $"{mib / 1024} GB" : $"{mib} MB";
+
+    private static string GetInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var parts = name.Trim()
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Where(p => char.IsLetter(p[0]))
+            .ToArray();
+        if (parts.Length == 0) return "?";
+        return parts.Length == 1
+            ? parts[0][..Math.Min(2, parts[0].Length)].ToUpper()
+            : $"{parts[0][0]}{parts[^1][0]}".ToUpper();
+    }
 }

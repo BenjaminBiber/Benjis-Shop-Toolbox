@@ -2,6 +2,7 @@
 @using Toolbox.Services
 @inject UiThemeState ThemeState
 @inject TutorialService TutorialService
+@inject SettingsService SettingsService
 
 <MudDrawer Color="Color.Primary" @bind-Open="IsOpen" Class="d-flex align-items-center justify-content-center flex-column tutorial-nav" Overlay="false" Variant="DrawerVariant.Mini" Breakpoint="Breakpoint.None" ClipMode="DrawerClipMode.Never" Anchor="Anchor.Start" Elevation="3">
     <MudNavMenu Color="Color.Primary" Class="w-100">
@@ -12,7 +13,10 @@
         <MudDivider Class="topbar-divider"></MudDivider>
         <MudNavLink Class="w-100" IconColor="Color.Secondary" Href="shop" Icon="@Icons.Material.Filled.Store">Shop</MudNavLink>
         <MudNavLink Class="w-100" IconColor="Color.Secondary" Href="sites" Icon="@Icons.Material.Filled.Dns">IIS-Seiten</MudNavLink>
-        <MudNavLink Class="w-100" IconColor="Color.Secondary" Href="virtualmachines" Icon="@Icons.Material.Filled.Cloud">VMs</MudNavLink>
+        @if (HasVmwareCredentials)
+        {
+            <MudNavLink Class="w-100" IconColor="Color.Secondary" Href="virtualmachines" Icon="@Icons.Material.Filled.Cloud">VMs</MudNavLink>
+        }
         <MudDivider Class="topbar-divider"></MudDivider>
         @* <MudNavLink IconColor="Color.Primary" Href="WidgetPage" Icon="@Icons.Material.Filled.Widgets">Widgets</MudNavLink> *@
         <MudNavLink IconColor="Color.Secondary" Href="settings" Icon="@Icons.Material.Filled.Settings">Einstellungen</MudNavLink>
@@ -41,6 +45,11 @@
 
 @code {
     public bool IsOpen { get; set; } = true;
+
+    private bool HasVmwareCredentials =>
+        !string.IsNullOrWhiteSpace(SettingsService.Settings.VCenterUrl) &&
+        !string.IsNullOrWhiteSpace(SettingsService.Settings.VCenterUsername) &&
+        !string.IsNullOrWhiteSpace(SettingsService.Settings.VCenterPassword);
 
     private void OnWin95ModeChanged(bool enabled) => ThemeState.SetWin95Mode(enabled);
 

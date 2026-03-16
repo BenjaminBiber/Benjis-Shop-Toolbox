@@ -88,6 +88,8 @@ builder.Services.AddScoped<StagingSystemSyncService>();
 builder.Services.AddScoped<TfsBuildService>();
 builder.Services.AddSingleton<PipelineTrackingService>();
 builder.Services.AddSingleton<WindowsNotificationService>();
+builder.Services.AddSingleton<StagingAutoSyncService>();
+builder.Services.AddSingleton<CustomerLogoService>();
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -125,8 +127,9 @@ try
 }
 catch { }
 
-// Eagerly instantiate so it subscribes to PipelineTrackingService immediately
+// Eagerly instantiate so they subscribe to PipelineTrackingService immediately
 app.Services.GetRequiredService<WindowsNotificationService>();
+app.Services.GetRequiredService<StagingAutoSyncService>();
 
 TryStartTrayIconProcess(branchName);
 

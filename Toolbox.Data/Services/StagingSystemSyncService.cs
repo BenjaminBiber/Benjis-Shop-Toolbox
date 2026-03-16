@@ -66,29 +66,49 @@ public class StagingSystemSyncService
 
             progress?.Report($"[{stagingRepo.Project}] Lade Git-History von {YamlPath}...");
 
-            // Get commit history for StagingSystem.yml
-            var commitIds = await _tfs.GetFileCommitIdsAsync(stagingRepo, YamlPath, 500, ct);
-            if (commitIds.Count == 0) continue;
+            // Get full commit details (includes author name/date and commit message)
+            var commits = await _tfs.GetFileCommitsWithDetailsAsync(stagingRepo, YamlPath, 500, ct);
+            if (commits.Count == 0) continue;
 
-            progress?.Report($"[{stagingRepo.Project}] {commitIds.Count} Commits gefunden, lese Versionen...");
+            progress?.Report($"[{stagingRepo.Project}] {commits.Count} Commits gefunden, lese Versionen...");
 
-            var seenVmNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var commitId in commitIds)
+            // Read all YAML content once (commits are newest-first)
+            var commitContents = new List<(TfsCommitInfo Commit, string? VmName, string? Content)>(commits.Count);
+            foreach (var commit in commits)
             {
                 ct.ThrowIfCancellationRequested();
+                var content = await _tfs.GetFileContentAtCommitAsync(stagingRepo, YamlPath, commit.CommitId, ct);
+                var vmName  = string.IsNullOrWhiteSpace(content) ? null : ExtractYamlValue(content, "ESXNewVmName");
+                commitContents.Add((commit, vmName, content));
+            }
 
-                var content = await _tfs.GetFileContentAtCommitAsync(stagingRepo, YamlPath, commitId, ct);
-                if (string.IsNullOrWhiteSpace(content)) continue;
+            // Config map: most recent values per VM (newest-first → first occurrence wins)
+            var configMap = new Dictionary<string, (string CustomerName, string? CustomerId, string? RdpPassword, string RdpUsername)>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (_, vmName, content) in commitContents)
+            {
+                if (vmName == null || configMap.ContainsKey(vmName)) continue;
+                configMap[vmName] = (
+                    ExtractYamlValue(content!, "TFSProject") ?? stagingRepo.Project,
+                    ExtractYamlValue(content!, "CustomerId"),
+                    ExtractYamlValue(content!, "GuestPassword"),
+                    ExtractYamlValue(content!, "GuestUser") ?? "Administrator"
+                );
+            }
 
-                var vmName = ExtractYamlValue(content, "ESXNewVmName");
-                if (string.IsNullOrWhiteSpace(vmName) || seenVmNames.Contains(vmName)) continue;
-                seenVmNames.Add(vmName);
+            // Creator map: oldest commit where VM name first appeared (oldest-first → first occurrence wins)
+            // This works regardless of commit message format — any author who introduced the VM name is the creator.
+            var creatorMap = new Dictionary<string, (string Name, string Email, DateTime Date)>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (commit, vmName, _) in Enumerable.Reverse(commitContents))
+            {
+                if (vmName == null || creatorMap.ContainsKey(vmName) || string.IsNullOrWhiteSpace(commit.AuthorName)) continue;
+                creatorMap[vmName] = (commit.AuthorName, commit.AuthorEmail, commit.Date);
+            }
 
-                var customerName = ExtractYamlValue(content, "TFSProject") ?? stagingRepo.Project;
-                var customerId   = ExtractYamlValue(content, "CustomerId");
-                var rdpPassword  = ExtractYamlValue(content, "GuestPassword");
-                var rdpUsername  = ExtractYamlValue(content, "GuestUser") ?? "Administrator";
+            // Apply to database
+            foreach (var (vmName, config) in configMap)
+            {
+                ct.ThrowIfCancellationRequested();
+                creatorMap.TryGetValue(vmName, out var creator);
 
                 var existing = await _db.VmCustomerMappings
                     .FirstOrDefaultAsync(m => m.VmName == vmName, ct);
@@ -97,29 +117,39 @@ public class StagingSystemSyncService
                 {
                     _db.VmCustomerMappings.Add(new VmCustomerMapping
                     {
-                        VmName = vmName,
-                        CustomerName = customerName,
+                        VmName         = vmName,
+                        CustomerName   = config.CustomerName,
                         TfsProjectName = stagingRepo.Project,
-                        CustomerId = customerId,
-                        RdpUsername = rdpUsername,
-                        RdpPassword = rdpPassword,
-                        LastSynced = now
+                        CustomerId     = config.CustomerId,
+                        RdpUsername    = config.RdpUsername,
+                        RdpPassword    = config.RdpPassword,
+                        LastSynced     = now,
+                        CreatedBy      = creator.Name,
+                        CreatedByEmail = creator.Name != null ? creator.Email : null,
+                        CreatedAt      = creator.Name != null ? creator.Date : null
                     });
                     result.Added++;
                 }
                 else
                 {
-                    existing.CustomerName   = customerName;
+                    existing.CustomerName   = config.CustomerName;
                     existing.TfsProjectName = stagingRepo.Project;
-                    existing.CustomerId     = customerId;
-                    existing.RdpUsername    = rdpUsername;
-                    existing.RdpPassword    = rdpPassword;
+                    existing.CustomerId     = config.CustomerId;
+                    existing.RdpUsername    = config.RdpUsername;
+                    existing.RdpPassword    = config.RdpPassword;
                     existing.LastSynced     = now;
+                    // Always update creator — re-sync finds the true oldest author from full history
+                    if (creator.Name != null)
+                    {
+                        existing.CreatedBy      = creator.Name;
+                        existing.CreatedByEmail = creator.Email;
+                        existing.CreatedAt      = creator.Date;
+                    }
                     result.Updated++;
                 }
             }
 
-            progress?.Report($"[{stagingRepo.Project}] {seenVmNames.Count} VM(s) gefunden.");
+            progress?.Report($"[{stagingRepo.Project}] {configMap.Count} VM(s) gefunden.");
         }
 
         await _db.SaveChangesAsync(ct);

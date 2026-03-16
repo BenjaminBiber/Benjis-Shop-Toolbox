@@ -13,6 +13,7 @@ public sealed record TfsRepoInfo(string Name, string RemoteUrl, string Project, 
 
 public sealed record TfsRepoItemInfo(string Path, bool IsFolder);
 public sealed record TfsProjectInfo(string Name, string Url);
+public sealed record TfsCommitInfo(string CommitId, string AuthorName, string AuthorEmail, DateTime Date, string Comment);
 
 public class TfsRepoService
 {
@@ -175,6 +176,42 @@ public class TfsRepoService
         catch
         {
             return null;
+        }
+    }
+
+    /// <summary>Returns commits (with author info) that touched the given file, newest first.</summary>
+    public async Task<IReadOnlyList<TfsCommitInfo>> GetFileCommitsWithDetailsAsync(
+        TfsRepoInfo repo,
+        string filePath,
+        int maxCount = 500,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(repo.Id)) return Array.Empty<TfsCommitInfo>();
+
+        var git = await GetGitClientAsync();
+
+        try
+        {
+            var criteria = new GitQueryCommitsCriteria
+            {
+                ItemPath = filePath,
+                Top = maxCount
+            };
+
+            var commits = await git.GetCommitsAsync(repo.Id, criteria, cancellationToken: cancellationToken);
+            return commits
+                .Where(c => !string.IsNullOrWhiteSpace(c.CommitId))
+                .Select(c => new TfsCommitInfo(
+                    c.CommitId!,
+                    c.Author?.Name ?? "",
+                    c.Author?.Email ?? "",
+                    c.Author?.Date ?? DateTime.MinValue,
+                    c.Comment ?? ""))
+                .ToList();
+        }
+        catch
+        {
+            return Array.Empty<TfsCommitInfo>();
         }
     }
 

@@ -1388,6 +1388,18 @@ body {
     border-color: var(--mud-palette-primary-lighten);
 }
 
+.vmc.powered-on {
+    border-color: #22c55e99;
+    background-color: #22c55e18;
+    box-shadow: 0 0 0 1px #22c55e44;
+}
+
+.vmc.powered-on:hover {
+    border-color: #22c55ecc;
+    background-color: #22c55e22;
+    box-shadow: 0 2px 14px #22c55e40, 0 0 0 1px #22c55e66;
+}
+
 .vmc.busy {
     opacity: 0.65;
     pointer-events: none;
@@ -1509,23 +1521,29 @@ body {
 
 /* Loading / sync overlay */
 .vmp-overlay {
-    position: absolute;
+    position: fixed;
     inset: 0;
-    background: var(--mud-palette-background-grey);
-    opacity: 0.82;
-    z-index: 10;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    z-index: 9999;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 12px;
-    border-radius: 4px;
+    gap: 14px;
+    overflow: hidden;
+    pointer-events: all;
+}
+
+body:has(.vmp-overlay) {
+    overflow: hidden;
 }
 
 .vmp-overlay-label {
-    font-size: 0.8rem;
-    color: var(--mud-palette-text-secondary);
-    max-width: 280px;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.9);
+    max-width: 320px;
     text-align: center;
 }
 

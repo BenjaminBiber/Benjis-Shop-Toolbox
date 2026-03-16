@@ -3,7 +3,32 @@
     "allow": [
       "Bash(dotnet build:*)",
       "Bash(dotnet add:*)",
-      "Bash(dotnet remove:*)"
+      "Bash(dotnet remove:*)",
+      "Bash(sqlite3:*)",
+      "Bash(python3:*)",
+      "Bash(powershell:*)",
+      "Bash(powershell.exe:*)",
+      "Bash(dotnet run:*)",
+      "WebSearch",
+      "WebFetch(domain:www.apollo-autoteile.de)",
+      "WebFetch(domain:www.automation24.de)",
+      "WebFetch(domain:www.greems.de)",
+      "WebFetch(domain:www.gekko-computer.de)",
+      "WebFetch(domain:www.kolumbus24.com)",
+      "WebFetch(domain:www.coolgadget.de)",
+      "WebFetch(domain:www.uniquejewelry.de)",
+      "WebFetch(domain:apollo-autoteile.de)",
+      "WebFetch(domain:m.kolumbus24.com)",
+      "WebFetch(domain:www.automation24.com)",
+      "WebFetch(domain:www.flaschenland.de)",
+      "WebFetch(domain:www.noor.eu)",
+      "WebFetch(domain:www.smit-sport.de)",
+      "WebFetch(domain:www.kolumbus-gmbh.de)",
+      "WebFetch(domain:www.nebulus.biz)",
+      "WebFetch(domain:www.silberketten-store.de)",
+      "WebFetch(domain:www.grimmeissen.de)",
+      "WebFetch(domain:www.werny.de)",
+      "WebFetch(domain:www.zoominfo.com)"
     ]
   }
 }
