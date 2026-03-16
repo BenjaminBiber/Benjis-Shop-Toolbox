@@ -48,6 +48,15 @@ public class ToolboxSettings
     public string? PinnedThemeGroups { get; set; }
     public List<ShopSetting> ShopSettingsList { get; set; }
 
+    [Description("vCenter URL (z.B. https://vcenter.example.com)")]
+    public string? VCenterUrl { get; set; }
+    [Description("vCenter Benutzername (z.B. administrator@vsphere.local)")]
+    public string? VCenterUsername { get; set; }
+    [Description("vCenter Passwort")]
+    public string? VCenterPassword { get; set; }
+    [Description("SSL-Zertifikatsfehler ignorieren (für selbstsignierte Zertifikate)")]
+    public bool VCenterIgnoreSslErrors { get; set; }
+
 
     public ToolboxSettings()
     {

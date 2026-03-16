@@ -83,6 +83,8 @@ builder.Services.AddScoped<DatabaseConnectionService>();
 builder.Services.AddScoped<SqlBuilder>();
 builder.Services.AddScoped<EasterEggService>();
 builder.Services.AddScoped<TutorialService>();
+builder.Services.AddScoped<VmwareService>();
+builder.Services.AddScoped<StagingSystemSyncService>();
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())

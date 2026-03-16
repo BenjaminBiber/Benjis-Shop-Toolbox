@@ -1,7 +1,6 @@
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
+using Microsoft.TeamFoundation.SourceControl.WebApi;
+using Microsoft.VisualStudio.Services.Common;
+using Microsoft.VisualStudio.Services.WebApi;
 using Toolbox.Data.Models;
 
 namespace Toolbox.Data.Services;
@@ -18,292 +17,46 @@ public sealed record TfsProjectInfo(string Name, string Url);
 public class TfsRepoService
 {
     private readonly SettingsService _settings;
-    private HttpClient? _client;
-    private string? _clientPat;
+
+    private VssConnection? _connection;
+    private string? _connectionKey;
 
     public TfsRepoService(SettingsService settings)
     {
         _settings = settings;
     }
 
+    // -------------------------------------------------------------------------
+    // Public API
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Returns repos for the project URLs configured in settings (used by Extensions).
+    /// </summary>
     public async Task<IReadOnlyList<TfsRepoInfo>> GetRepositoriesAsync(CancellationToken cancellationToken = default)
     {
         var urls = _settings.Settings.GetTfsProjectUrls()
             .Select(NormalizeProjectUrl)
             .Where(u => !string.IsNullOrWhiteSpace(u))
             .ToList();
+
         if (urls.Count == 0)
-        {
             throw new InvalidOperationException("Keine TFS/Azure-DevOps Projekt-URLs konfiguriert.");
-        }
 
-        return await GetRepositoriesForUrlsAsync(urls, cancellationToken);
-    }
-
-    public async Task<IReadOnlyList<TfsProjectInfo>> GetProjectsAsync(
-        string? collectionUrl = null,
-        CancellationToken cancellationToken = default)
-    {
-        var normalized = NormalizeCollectionUrl(collectionUrl ?? _settings.Settings.TfsCollectionUrl);
-        if (string.IsNullOrWhiteSpace(normalized))
-        {
-            throw new InvalidOperationException("Keine TFS/Azure-DevOps Collection-URL konfiguriert.");
-        }
-
-        var client = GetClient();
-        var apiUrl = BuildProjectsUrl(normalized);
-        if (string.IsNullOrWhiteSpace(apiUrl))
-        {
-            return Array.Empty<TfsProjectInfo>();
-        }
-
-        using var response = await client.GetAsync(apiUrl, cancellationToken);
-        if (!response.IsSuccessStatusCode)
-        {
-            throw new InvalidOperationException("TFS-Projekte konnten nicht geladen werden.");
-        }
-
-        var content = await response.Content.ReadAsStringAsync(cancellationToken);
-        var data = JsonSerializer.Deserialize<TfsProjectsResponse>(content, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        });
-
-        if (data?.Value == null || data.Value.Count == 0)
-        {
-            return Array.Empty<TfsProjectInfo>();
-        }
-
-        return data.Value
-            .Where(p => !string.IsNullOrWhiteSpace(p.Name))
-            .Select(p => new TfsProjectInfo(
-                p.Name!,
-                BuildProjectUrl(normalized, p.Name!)))
-            .GroupBy(p => p.Url, StringComparer.OrdinalIgnoreCase)
-            .Select(g => g.First())
-            .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-    }
-
-    public async Task<IReadOnlyList<TfsRepoInfo>> GetRepositoriesForProjectAsync(
-        string projectUrl,
-        CancellationToken cancellationToken = default)
-    {
-        var normalized = NormalizeProjectUrl(projectUrl);
-        if (string.IsNullOrWhiteSpace(normalized))
-        {
-            throw new InvalidOperationException("TFS-Projekt-URL ist ungueltig.");
-        }
-
-        return await GetRepositoriesForUrlsAsync(new List<string> { normalized }, cancellationToken);
-    }
-
-    public async Task<IReadOnlyList<TfsRepoItemInfo>> GetRepositoryItemsAsync(
-        TfsRepoInfo repo,
-        string? scopePath = "/",
-        string? version = null,
-        CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(repo.SourceUrl) || string.IsNullOrWhiteSpace(repo.Id))
-        {
-            return Array.Empty<TfsRepoItemInfo>();
-        }
-
-        var client = GetClient();
-        var branch = NormalizeBranchName(version ?? repo.DefaultBranch);
-        var scope = string.IsNullOrWhiteSpace(scopePath) ? "/" : scopePath;
-        var url = BuildRepositoryItemsUrl(repo.SourceUrl, repo.Id, scope, branch);
-        if (string.IsNullOrWhiteSpace(url))
-        {
-            return Array.Empty<TfsRepoItemInfo>();
-        }
-
-        using var response = await client.GetAsync(url, cancellationToken);
-        if (!response.IsSuccessStatusCode)
-        {
-            return Array.Empty<TfsRepoItemInfo>();
-        }
-
-        var content = await response.Content.ReadAsStringAsync(cancellationToken);
-        var data = JsonSerializer.Deserialize<TfsItemsResponse>(content, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        });
-
-        if (data?.Value == null || data.Value.Count == 0)
-        {
-            return Array.Empty<TfsRepoItemInfo>();
-        }
-
-        return data.Value
-            .Where(i => !string.IsNullOrWhiteSpace(i.Path))
-            .Select(i => new TfsRepoItemInfo(i.Path!, i.IsFolder ?? false))
-            .ToList();
-    }
-
-    public async Task<string?> GetFileContentAsync(
-        TfsRepoInfo repo,
-        string path,
-        string? version = null,
-        CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(repo.SourceUrl) || string.IsNullOrWhiteSpace(repo.Id) || string.IsNullOrWhiteSpace(path))
-        {
-            return null;
-        }
-
-        var client = GetClient();
-        var branch = NormalizeBranchName(version ?? repo.DefaultBranch);
-        var url = BuildRepositoryItemContentUrl(repo.SourceUrl, repo.Id, path, branch);
-        if (string.IsNullOrWhiteSpace(url))
-        {
-            return null;
-        }
-
-        using var response = await client.GetAsync(url, cancellationToken);
-        if (!response.IsSuccessStatusCode)
-        {
-            return null;
-        }
-
-        var payload = await response.Content.ReadAsStringAsync(cancellationToken);
-        var mediaType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
-
-        if (mediaType.Contains("json", StringComparison.OrdinalIgnoreCase) || LooksLikeJson(payload))
-        {
-            if (TryExtractContentFromJson(payload, out var content))
-            {
-                return content;
-            }
-
-            if (TryExtractBlobUrlFromJson(payload, out var blobUrl))
-            {
-                var blobContent = await TryGetBlobContentAsync(client, blobUrl, cancellationToken);
-                if (!string.IsNullOrWhiteSpace(blobContent))
-                {
-                    return blobContent;
-                }
-            }
-        }
-
-        return payload;
-    }
-
-    public static string NormalizeProjectUrl(string? url)
-    {
-        if (string.IsNullOrWhiteSpace(url))
-        {
-            return string.Empty;
-        }
-
-        var trimmed = url.Trim().TrimEnd('/');
-        var idx = trimmed.IndexOf("/_apis", StringComparison.OrdinalIgnoreCase);
-        if (idx >= 0)
-        {
-            trimmed = trimmed.Substring(0, idx);
-        }
-
-        return trimmed.TrimEnd('/');
-    }
-
-    public static string NormalizeCollectionUrl(string? url)
-    {
-        if (string.IsNullOrWhiteSpace(url))
-        {
-            return string.Empty;
-        }
-
-        var trimmed = url.Trim().TrimEnd('/');
-        var idx = trimmed.IndexOf("/_apis", StringComparison.OrdinalIgnoreCase);
-        if (idx >= 0)
-        {
-            trimmed = trimmed.Substring(0, idx);
-        }
-
-        return trimmed.TrimEnd('/');
-    }
-
-    private HttpClient GetClient()
-    {
-        var pat = _settings.Settings.TfsApiKey ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(pat))
-        {
-            throw new InvalidOperationException("Kein TFS/Azure-DevOps API Key (PAT) konfiguriert.");
-        }
-
-        if (_client != null && string.Equals(_clientPat, pat, StringComparison.Ordinal))
-        {
-            return _client;
-        }
-
-        _client?.Dispose();
-        _clientPat = pat;
-
-        var token = Convert.ToBase64String(Encoding.ASCII.GetBytes($":{pat}"));
-        var client = new HttpClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", token);
-        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        _client = client;
-        return _client;
-    }
-
-    private async Task<IReadOnlyList<TfsRepoInfo>> GetRepositoriesForUrlsAsync(
-        IReadOnlyList<string> urls,
-        CancellationToken cancellationToken)
-    {
-        var client = GetClient();
+        var git = await GetGitClientAsync();
         var repos = new List<TfsRepoInfo>();
 
         foreach (var projectUrl in urls)
         {
-            var apiUrl = BuildRepositoriesUrl(projectUrl);
-            if (string.IsNullOrWhiteSpace(apiUrl))
-            {
-                continue;
-            }
+            var projectName = ExtractProjectName(projectUrl);
+            if (string.IsNullOrWhiteSpace(projectName)) continue;
 
             try
             {
-                using var response = await client.GetAsync(apiUrl, cancellationToken);
-                if (!response.IsSuccessStatusCode)
-                {
-                    continue;
-                }
-
-                var content = await response.Content.ReadAsStringAsync(cancellationToken);
-                var data = JsonSerializer.Deserialize<TfsRepoResponse>(content, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-
-                if (data?.Value == null)
-                {
-                    continue;
-                }
-
-                foreach (var repo in data.Value)
-                {
-                    var remoteUrl = repo.RemoteUrl ?? repo.WebUrl ?? string.Empty;
-                    if (string.IsNullOrWhiteSpace(remoteUrl))
-                    {
-                        continue;
-                    }
-
-                    repos.Add(new TfsRepoInfo(
-                        repo.Name ?? remoteUrl,
-                        remoteUrl,
-                        repo.Project?.Name ?? ExtractProjectName(projectUrl),
-                        projectUrl)
-                    {
-                        Id = repo.Id ?? string.Empty,
-                        DefaultBranch = repo.DefaultBranch ?? string.Empty
-                    });
-                }
+                var projectRepos = await git.GetRepositoriesAsync(projectName, cancellationToken: cancellationToken);
+                repos.AddRange(projectRepos.Select(r => MapRepo(r, projectName, projectUrl)));
             }
-            catch
-            {
-                // ignore per project failures
-            }
+            catch { /* skip inaccessible projects */ }
         }
 
         return repos
@@ -314,260 +67,262 @@ public class TfsRepoService
             .ToList();
     }
 
-    private static string BuildRepositoriesUrl(string projectUrl)
+    /// <summary>
+    /// Returns ALL Git repositories across all projects in the TFS collection.
+    /// </summary>
+    public async Task<IReadOnlyList<TfsRepoInfo>> GetAllRepositoriesInCollectionAsync(
+        string? collectionUrl = null,
+        CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(projectUrl))
-        {
-            return string.Empty;
-        }
+        var git = await GetGitClientAsync(collectionUrl);
+        var repos = await git.GetRepositoriesAsync(cancellationToken: cancellationToken);
 
-        var trimmed = NormalizeProjectUrl(projectUrl).TrimEnd('/');
-        if (string.IsNullOrWhiteSpace(trimmed))
-        {
-            return string.Empty;
-        }
-
-        return $"{trimmed}/_apis/git/repositories?api-version=6.0";
+        return repos
+            .Select(r => MapRepo(r, r.ProjectReference?.Name ?? string.Empty,
+                NormalizeProjectUrl(r.RemoteUrl ?? r.WebUrl?.ToString() ?? string.Empty)))
+            .OrderBy(r => r.Project, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
-    private static string BuildProjectsUrl(string collectionUrl)
+    public async Task<IReadOnlyList<TfsProjectInfo>> GetProjectsAsync(
+        string? collectionUrl = null,
+        CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(collectionUrl))
-        {
-            return string.Empty;
-        }
+        var normalized = NormalizeCollectionUrl(collectionUrl ?? _settings.Settings.TfsCollectionUrl);
+        if (string.IsNullOrWhiteSpace(normalized))
+            throw new InvalidOperationException("Keine TFS/Azure-DevOps Collection-URL konfiguriert.");
 
-        var trimmed = NormalizeCollectionUrl(collectionUrl);
-        if (string.IsNullOrWhiteSpace(trimmed))
-        {
-            return string.Empty;
-        }
+        var connection = GetConnection(normalized);
+        var projectClient = await connection.GetClientAsync<Microsoft.TeamFoundation.Core.WebApi.ProjectHttpClient>(cancellationToken);
+        var projects = await projectClient.GetProjects();
 
-        return $"{trimmed}/_apis/projects?api-version=6.0";
+        return projects
+            .Where(p => !string.IsNullOrWhiteSpace(p.Name))
+            .Select(p => new TfsProjectInfo(p.Name!, BuildProjectUrl(normalized, p.Name!)))
+            .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
+
+    public async Task<IReadOnlyList<TfsRepoInfo>> GetRepositoriesForProjectAsync(
+        string projectUrl,
+        CancellationToken cancellationToken = default)
+    {
+        var normalized = NormalizeProjectUrl(projectUrl);
+        var projectName = ExtractProjectName(normalized);
+        if (string.IsNullOrWhiteSpace(projectName))
+            throw new InvalidOperationException("TFS-Projekt-URL ist ungueltig.");
+
+        var git = await GetGitClientAsync();
+        var repos = await git.GetRepositoriesAsync(projectName, cancellationToken: cancellationToken);
+        return repos.Select(r => MapRepo(r, projectName, normalized)).ToList();
+    }
+
+    public async Task<IReadOnlyList<TfsRepoItemInfo>> GetRepositoryItemsAsync(
+        TfsRepoInfo repo,
+        string? scopePath = "/",
+        string? version = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(repo.Id)) return Array.Empty<TfsRepoItemInfo>();
+
+        var git = await GetGitClientAsync();
+        var branch = NormalizeBranchName(version ?? repo.DefaultBranch);
+        var scope = string.IsNullOrWhiteSpace(scopePath) ? "/" : scopePath;
+
+        try
+        {
+            var items = await git.GetItemsAsync(
+                repo.Id,
+                scopePath: scope,
+                recursionLevel: VersionControlRecursionType.Full,
+                versionDescriptor: new GitVersionDescriptor { Version = branch, VersionType = GitVersionType.Branch },
+                cancellationToken: cancellationToken);
+
+            return items
+                .Where(i => !string.IsNullOrWhiteSpace(i.Path))
+                .Select(i => new TfsRepoItemInfo(i.Path!, i.IsFolder))
+                .ToList();
+        }
+        catch
+        {
+            return Array.Empty<TfsRepoItemInfo>();
+        }
+    }
+
+    public async Task<string?> GetFileContentAsync(
+        TfsRepoInfo repo,
+        string path,
+        string? version = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(repo.Id) || string.IsNullOrWhiteSpace(path)) return null;
+
+        var git = await GetGitClientAsync();
+        var branch = NormalizeBranchName(version ?? repo.DefaultBranch);
+
+        try
+        {
+            using var stream = await git.GetItemContentAsync(
+                repo.Id,
+                path,
+                versionDescriptor: new GitVersionDescriptor { Version = branch, VersionType = GitVersionType.Branch },
+                cancellationToken: cancellationToken);
+
+            using var reader = new StreamReader(stream);
+            return await reader.ReadToEndAsync(cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Returns commit IDs that touched the given file, newest first.</summary>
+    public async Task<IReadOnlyList<string>> GetFileCommitIdsAsync(
+        TfsRepoInfo repo,
+        string filePath,
+        int maxCount = 200,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(repo.Id)) return Array.Empty<string>();
+
+        var git = await GetGitClientAsync();
+
+        try
+        {
+            var criteria = new GitQueryCommitsCriteria
+            {
+                ItemPath = filePath,
+                Top = maxCount
+            };
+
+            var commits = await git.GetCommitsAsync(repo.Id, criteria, cancellationToken: cancellationToken);
+            return commits.Select(c => c.CommitId).Where(id => !string.IsNullOrWhiteSpace(id)).ToList()!;
+        }
+        catch
+        {
+            return Array.Empty<string>();
+        }
+    }
+
+    /// <summary>Returns the raw content of a file at a specific commit.</summary>
+    public async Task<string?> GetFileContentAtCommitAsync(
+        TfsRepoInfo repo,
+        string filePath,
+        string commitId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(repo.Id)) return null;
+
+        var git = await GetGitClientAsync();
+
+        try
+        {
+            using var stream = await git.GetItemContentAsync(
+                repo.Id,
+                filePath,
+                versionDescriptor: new GitVersionDescriptor { Version = commitId, VersionType = GitVersionType.Commit },
+                cancellationToken: cancellationToken);
+
+            using var reader = new StreamReader(stream);
+            return await reader.ReadToEndAsync(cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // URL helpers (kept public for use in Blazor components)
+    // -------------------------------------------------------------------------
+
+    public static string NormalizeProjectUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return string.Empty;
+        var trimmed = url.Trim().TrimEnd('/');
+        var idx = trimmed.IndexOf("/_apis", StringComparison.OrdinalIgnoreCase);
+        if (idx >= 0) trimmed = trimmed[..idx];
+        return trimmed.TrimEnd('/');
+    }
+
+    public static string NormalizeCollectionUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return string.Empty;
+        var trimmed = url.Trim().TrimEnd('/');
+        var idx = trimmed.IndexOf("/_apis", StringComparison.OrdinalIgnoreCase);
+        if (idx >= 0) trimmed = trimmed[..idx];
+        return trimmed.TrimEnd('/');
+    }
+
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    private async Task<GitHttpClient> GetGitClientAsync(string? collectionUrl = null)
+    {
+        var connection = GetConnection(collectionUrl);
+        return await connection.GetClientAsync<GitHttpClient>();
+    }
+
+    private VssConnection GetConnection(string? collectionUrl = null)
+    {
+        var pat = _settings.Settings.TfsApiKey ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(pat))
+            throw new InvalidOperationException("Kein TFS/Azure-DevOps API Key (PAT) konfiguriert.");
+
+        var url = NormalizeCollectionUrl(collectionUrl ?? _settings.Settings.TfsCollectionUrl);
+        if (string.IsNullOrWhiteSpace(url))
+            throw new InvalidOperationException("Keine TFS/Azure-DevOps Collection-URL konfiguriert.");
+
+        var key = $"{url}|{pat}";
+        if (_connection != null && _connectionKey == key)
+            return _connection;
+
+        _connection?.Dispose();
+        _connectionKey = key;
+        _connection = new VssConnection(new Uri(url), new VssBasicCredential(string.Empty, pat));
+        return _connection;
+    }
+
+    private static TfsRepoInfo MapRepo(GitRepository r, string projectName, string sourceUrl) =>
+        new TfsRepoInfo(
+            r.Name ?? string.Empty,
+            r.RemoteUrl ?? r.WebUrl?.ToString() ?? string.Empty,
+            projectName,
+            sourceUrl)
+        {
+            Id = r.Id.ToString(),
+            DefaultBranch = r.DefaultBranch ?? string.Empty
+        };
 
     private static string BuildProjectUrl(string collectionUrl, string projectName)
     {
-        if (string.IsNullOrWhiteSpace(collectionUrl) || string.IsNullOrWhiteSpace(projectName))
-        {
-            return string.Empty;
-        }
-
         var trimmed = NormalizeCollectionUrl(collectionUrl);
-        if (string.IsNullOrWhiteSpace(trimmed))
-        {
+        if (string.IsNullOrWhiteSpace(trimmed) || string.IsNullOrWhiteSpace(projectName))
             return string.Empty;
-        }
-
-        var encoded = Uri.EscapeDataString(projectName);
-        return $"{trimmed}/{encoded}";
-    }
-
-    private static string BuildRepositoryItemsUrl(string projectUrl, string repoId, string scopePath, string branch)
-    {
-        if (string.IsNullOrWhiteSpace(projectUrl) || string.IsNullOrWhiteSpace(repoId))
-        {
-            return string.Empty;
-        }
-
-        var baseUrl = NormalizeProjectUrl(projectUrl);
-        if (string.IsNullOrWhiteSpace(baseUrl))
-        {
-            return string.Empty;
-        }
-
-        var scope = string.IsNullOrWhiteSpace(scopePath) ? "/" : scopePath;
-        var scopeEncoded = Uri.EscapeDataString(scope);
-        var branchEncoded = Uri.EscapeDataString(branch);
-
-        return $"{baseUrl}/_apis/git/repositories/{repoId}/items" +
-               $"?scopePath={scopeEncoded}&recursionLevel=Full&includeContentMetadata=false" +
-               $"&versionDescriptor.version={branchEncoded}&versionDescriptor.versionType=branch&api-version=6.0";
-    }
-
-    private static string BuildRepositoryItemContentUrl(string projectUrl, string repoId, string path, string branch)
-    {
-        if (string.IsNullOrWhiteSpace(projectUrl) || string.IsNullOrWhiteSpace(repoId))
-        {
-            return string.Empty;
-        }
-
-        var baseUrl = NormalizeProjectUrl(projectUrl);
-        if (string.IsNullOrWhiteSpace(baseUrl))
-        {
-            return string.Empty;
-        }
-
-        var pathEncoded = Uri.EscapeDataString(path);
-        var branchEncoded = Uri.EscapeDataString(branch);
-
-        return $"{baseUrl}/_apis/git/repositories/{repoId}/items" +
-               $"?path={pathEncoded}&versionDescriptor.version={branchEncoded}&versionDescriptor.versionType=branch" +
-               $"&includeContent=true&resolveLfs=true&api-version=6.0";
+        return $"{trimmed}/{Uri.EscapeDataString(projectName)}";
     }
 
     private static string ExtractProjectName(string url)
     {
-        if (string.IsNullOrWhiteSpace(url))
-        {
-            return string.Empty;
-        }
-
+        if (string.IsNullOrWhiteSpace(url)) return string.Empty;
         try
         {
-            var uri = new Uri(url);
-            var segments = uri.AbsolutePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+            var segments = new Uri(url).AbsolutePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
             return segments.LastOrDefault() ?? string.Empty;
         }
-        catch
-        {
-            return url;
-        }
+        catch { return url; }
     }
 
     private static string NormalizeBranchName(string? branch)
     {
-        if (string.IsNullOrWhiteSpace(branch))
-        {
-            return "master";
-        }
-
+        if (string.IsNullOrWhiteSpace(branch)) return "master";
         var trimmed = branch.Trim();
         const string prefix = "refs/heads/";
         if (trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-        {
-            trimmed = trimmed.Substring(prefix.Length);
-        }
-
+            trimmed = trimmed[prefix.Length..];
         return string.IsNullOrWhiteSpace(trimmed) ? "master" : trimmed;
     }
-
-    private static bool LooksLikeJson(string payload)
-    {
-        if (string.IsNullOrWhiteSpace(payload))
-        {
-            return false;
-        }
-
-        var trimmed = payload.TrimStart();
-        return trimmed.StartsWith("{") || trimmed.StartsWith("[");
-    }
-
-    private static bool TryExtractContentFromJson(string payload, out string content)
-    {
-        content = string.Empty;
-        try
-        {
-            using var doc = JsonDocument.Parse(payload);
-            if (doc.RootElement.ValueKind != JsonValueKind.Object)
-            {
-                return false;
-            }
-
-            if (doc.RootElement.TryGetProperty("content", out var contentProp) &&
-                contentProp.ValueKind == JsonValueKind.String)
-            {
-                content = contentProp.GetString() ?? string.Empty;
-                return !string.IsNullOrWhiteSpace(content);
-            }
-        }
-        catch
-        {
-            // ignore JSON parse errors
-        }
-
-        return false;
-    }
-
-    private static bool TryExtractBlobUrlFromJson(string payload, out string url)
-    {
-        url = string.Empty;
-        try
-        {
-            using var doc = JsonDocument.Parse(payload);
-            if (doc.RootElement.ValueKind != JsonValueKind.Object)
-            {
-                return false;
-            }
-
-            if (doc.RootElement.TryGetProperty("_links", out var links) &&
-                links.ValueKind == JsonValueKind.Object &&
-                links.TryGetProperty("blob", out var blob) &&
-                blob.ValueKind == JsonValueKind.Object &&
-                blob.TryGetProperty("href", out var href) &&
-                href.ValueKind == JsonValueKind.String)
-            {
-                url = href.GetString() ?? string.Empty;
-                return !string.IsNullOrWhiteSpace(url);
-            }
-        }
-        catch
-        {
-            // ignore
-        }
-
-        return false;
-    }
-
-    private static async Task<string?> TryGetBlobContentAsync(HttpClient client, string blobUrl, CancellationToken ct)
-    {
-        if (string.IsNullOrWhiteSpace(blobUrl))
-        {
-            return null;
-        }
-
-        using var req = new HttpRequestMessage(HttpMethod.Get, blobUrl);
-        req.Headers.Accept.Clear();
-        req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/octet-stream"));
-
-        using var response = await client.SendAsync(req, ct);
-        if (!response.IsSuccessStatusCode)
-        {
-            return null;
-        }
-
-        return await response.Content.ReadAsStringAsync(ct);
-    }
-
-    private sealed class TfsRepoResponse
-    {
-        public List<TfsRepoItem>? Value { get; set; }
-    }
-
-    private sealed class TfsRepoItem
-    {
-        public string? Id { get; set; }
-        public string? Name { get; set; }
-        public string? RemoteUrl { get; set; }
-        public string? WebUrl { get; set; }
-        public string? DefaultBranch { get; set; }
-        public TfsProject? Project { get; set; }
-    }
-
-    private sealed class TfsProject
-    {
-        public string? Name { get; set; }
-    }
-
-    private sealed class TfsItemsResponse
-    {
-        public List<TfsItem>? Value { get; set; }
-    }
-
-    private sealed class TfsProjectsResponse
-    {
-        public List<TfsProjectItem>? Value { get; set; }
-    }
-
-    private sealed class TfsProjectItem
-    {
-        public string? Name { get; set; }
-    }
-
-    private sealed class TfsItem
-    {
-        public string? Path { get; set; }
-        public bool? IsFolder { get; set; }
-    }
 }
-

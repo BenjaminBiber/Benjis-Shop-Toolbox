@@ -1,0 +1,169 @@
+@using Toolbox.Data.Services
+@inject VmwareService VmwareService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.PhotoCamera" Class="mr-2" />
+            Snapshots – @VmName
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Class="mb-3" />
+        }
+
+        <MudText Typo="Typo.subtitle1" Class="fw-bold mb-2">Vorhandene Snapshots</MudText>
+
+        @if (_snapshots.Any())
+        {
+            <MudTable Items="_snapshots" Dense="true" Hover="true" Class="mb-4">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Beschreibung</MudTh>
+                    <MudTh>Erstellt</MudTh>
+                    <MudTh>Aktionen</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Name">@context.Name</MudTd>
+                    <MudTd DataLabel="Beschreibung">
+                        @(string.IsNullOrEmpty(context.Description) ? "–" : context.Description)
+                    </MudTd>
+                    <MudTd DataLabel="Erstellt">@context.CreatedAt.ToString("dd.MM.yyyy HH:mm")</MudTd>
+                    <MudTd>
+                        <MudTooltip Text="Wiederherstellen">
+                            <MudIconButton Size="Size.Small"
+                                           Icon="@Icons.Material.Filled.RestoreFromTrash"
+                                           Color="Color.Warning"
+                                           OnClick="() => RevertAsync(context)"
+                                           Disabled="_loading" />
+                        </MudTooltip>
+                        <MudTooltip Text="Löschen">
+                            <MudIconButton Size="Size.Small"
+                                           Icon="@Icons.Material.Filled.Delete"
+                                           Color="Color.Error"
+                                           OnClick="() => DeleteAsync(context)"
+                                           Disabled="_loading" />
+                        </MudTooltip>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+        else if (!_loading)
+        {
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">Keine Snapshots vorhanden.</MudAlert>
+        }
+
+        <MudDivider Class="mb-3" />
+        <MudText Typo="Typo.subtitle1" Class="fw-bold mb-2">Neuer Snapshot</MudText>
+        <div class="d-flex flex-column gap-2">
+            <MudTextField T="string"
+                          @bind-Value="_newName"
+                          Label="Name"
+                          Variant="Variant.Text"
+                          Required="true" />
+            <MudTextField T="string"
+                          @bind-Value="_newDescription"
+                          Label="Beschreibung"
+                          Variant="Variant.Text"
+                          Lines="2" />
+            <div class="d-flex gap-3 flex-wrap">
+                <MudCheckBox T="bool" @bind-Value="_includeMemory" Color="Color.Primary">
+                    Arbeitsspeicher einschließen
+                </MudCheckBox>
+                <MudCheckBox T="bool" @bind-Value="_quiesce" Color="Color.Primary">
+                    Quiesce (Dateisystem einfrieren)
+                </MudCheckBox>
+            </div>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.AddAPhoto"
+                       OnClick="CreateAsync"
+                       Disabled="@(string.IsNullOrWhiteSpace(_newName) || _loading)">
+                Snapshot erstellen
+            </MudButton>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close" Variant="Variant.Text">Schließen</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public string VmId { get; set; } = "";
+    [Parameter] public string VmName { get; set; } = "";
+
+    private List<VmwareSnapshot> _snapshots = new();
+    private bool _loading;
+    private string _newName = "";
+    private string _newDescription = "";
+    private bool _includeMemory;
+    private bool _quiesce;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+        _snapshots = await VmwareService.GetSnapshotsAsync(VmId);
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private async Task CreateAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+        var ok = await VmwareService.CreateSnapshotAsync(VmId, _newName, _newDescription, _includeMemory, _quiesce);
+        if (ok)
+        {
+            Snackbar.Add($"Snapshot '{_newName}' erstellt.", Severity.Success);
+            _newName = "";
+            _newDescription = "";
+            await LoadAsync();
+        }
+        else
+        {
+            Snackbar.Add(VmwareService.LastError ?? "Fehler beim Erstellen des Snapshots.", Severity.Error);
+        }
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private async Task RevertAsync(VmwareSnapshot snapshot)
+    {
+        _loading = true;
+        StateHasChanged();
+        var ok = await VmwareService.RevertSnapshotAsync(VmId, snapshot.Id);
+        if (ok)
+            Snackbar.Add($"Snapshot '{snapshot.Name}' wiederhergestellt.", Severity.Success);
+        else
+            Snackbar.Add(VmwareService.LastError ?? "Fehler beim Wiederherstellen.", Severity.Error);
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private async Task DeleteAsync(VmwareSnapshot snapshot)
+    {
+        _loading = true;
+        StateHasChanged();
+        var ok = await VmwareService.DeleteSnapshotAsync(VmId, snapshot.Id);
+        if (ok)
+        {
+            Snackbar.Add($"Snapshot '{snapshot.Name}' gelöscht.", Severity.Success);
+            await LoadAsync();
+        }
+        else
+        {
+            Snackbar.Add(VmwareService.LastError ?? "Fehler beim Löschen.", Severity.Error);
+        }
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private void Close() => MudDialog.Close();
+}

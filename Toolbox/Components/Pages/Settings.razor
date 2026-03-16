@@ -5,6 +5,7 @@
 @using Microsoft.Web.Administration
 @using System.IO
 @using Toolbox.Components.Settings
+@using Toolbox.Data.Services
 @inject EasterEggService EasterEggService
 @implements IDisposable
 
@@ -16,6 +17,7 @@
       <MudListItem Class="m-0" T="object" Selected="@(_section==SettingsSection.Logs)" Icon="@Icons.Material.Filled.Message" OnClick="@(()=>Select(SettingsSection.Logs))">Logs</MudListItem>
       <MudListItem Class="m-0" T="object" Selected="@(_section==SettingsSection.Shops)" Icon="@Icons.Material.Filled.Store" OnClick="@(()=>Select(SettingsSection.Shops))">Shops</MudListItem>
       <MudListItem Class="m-0" T="object" Selected="@(_section==SettingsSection.IIS)" Icon="@Icons.Material.Filled.Computer" OnClick="@(()=>Select(SettingsSection.IIS))">IIS</MudListItem>
+      <MudListItem Class="m-0" T="object" Selected="@(_section==SettingsSection.Vmware)" Icon="@Icons.Material.Filled.Cloud" OnClick="@(()=>Select(SettingsSection.Vmware))">VMware</MudListItem>
       @if (EasterEggService.IsSecretUnlocked)
       {
           <MudListItem Class="m-0" T="object" Selected="@(_section==SettingsSection.SlotMachine)" Icon="@Icons.Material.Filled.Casino" OnClick="@(()=>Select(SettingsSection.SlotMachine))">Slotmaschine</MudListItem>
@@ -38,6 +40,9 @@
         case SettingsSection.IIS:
             <IisSettings />
             break;
+        case SettingsSection.Vmware:
+            <VmwareSettings />
+            break;
         case SettingsSection.SlotMachine:
             <SlotMachineSettings />
             break;
@@ -46,7 +51,7 @@
 </div>
 
 @code {
-    private enum SettingsSection {General, Logs, Shops, IIS, SlotMachine }
+    private enum SettingsSection {General, Logs, Shops, IIS, Vmware, SlotMachine }
     private SettingsSection _section = SettingsSection.General;
     protected override void OnInitialized()
     {
@@ -65,6 +70,7 @@
     {
         SettingsSection.General => "Allgemein",
         SettingsSection.IIS => "IIS",
+        SettingsSection.Vmware => "VMware",
         SettingsSection.Logs => "Logs",
         SettingsSection.Shops => "Shop",
         SettingsSection.SlotMachine => "Slotmaschine",

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Toolbox.Data.DataContexts;
 
@@ -10,9 +11,11 @@ using Toolbox.Data.DataContexts;
 namespace Toolbox.Data.Migrations
 {
     [DbContext(typeof(InternalAppDbContext))]
-    partial class InternalAppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260316120000_AddVCenterSettings")]
+    partial class AddVCenterSettings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.10");
@@ -243,38 +246,6 @@ namespace Toolbox.Data.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Toolbox.Data.Models.VmCustomerMapping", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER")
-                        .HasAnnotation("Sqlite:Autoincrement", true);
-
-                    b.Property<string>("CustomerName")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("CustomerId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("LastSynced")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("TfsProjectName")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("VmName")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("VmName");
-
-                    b.ToTable("VmCustomerMappings");
-                });
-
             modelBuilder.Entity("Toolbox.Data.Models.ShopSetting", b =>
                 {
                     b.HasOne("Toolbox.Data.Models.ToolboxSettings", "ToolboxSettings")
@@ -294,4 +265,3 @@ namespace Toolbox.Data.Migrations
         }
     }
 }
-

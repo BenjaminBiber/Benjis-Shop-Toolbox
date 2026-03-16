@@ -1,0 +1,118 @@
+@using Toolbox.Data.Models
+@using Toolbox.Data.Services
+@inject SettingsService SettingsService
+@inject NotificationService NotificationService
+@inject VmwareService VmwareService
+@inject ISnackbar Snackbar
+
+<div class="row g-0 pl-4 flex-column">
+    <div class="col-12 mt-3 d-flex gap-1 align-items-center justify-content-center">
+        <MudText Class="fw-bold" Typo="Typo.body1">vCenter Verbindung</MudText>
+        <MudDivider Class="w-auto"></MudDivider>
+    </div>
+    <div class="col-12 d-flex flex-column gap-2 pl-4">
+        <MudTextField T="string"
+                      Label="vCenter URL"
+                      Placeholder="https://vcenter.example.com"
+                      Value="Setting.VCenterUrl"
+                      ValueChanged="(string v) => SettingsService.SaveSettingChanges(x => x.VCenterUrl = v, NotificationService)"
+                      Variant="Variant.Text"
+                      Class="settings-field-grow" />
+
+        <MudTextField T="string"
+                      Label="Benutzername"
+                      Placeholder="administrator@vsphere.local"
+                      Value="Setting.VCenterUsername"
+                      ValueChanged="(string v) => SettingsService.SaveSettingChanges(x => x.VCenterUsername = v, NotificationService)"
+                      Variant="Variant.Text"
+                      Class="settings-field-grow" />
+
+        <MudTextField T="string"
+                      Label="Passwort"
+                      Value="Setting.VCenterPassword"
+                      ValueChanged="(string v) => SettingsService.SaveSettingChanges(x => x.VCenterPassword = v, NotificationService)"
+                      Variant="Variant.Text"
+                      InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                      Adornment="Adornment.End"
+                      AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                      OnAdornmentClick="() => _showPassword = !_showPassword"
+                      Class="settings-field-grow" />
+
+        <MudCheckBox T="bool"
+                     Class="p-0"
+                     Value="Setting.VCenterIgnoreSslErrors"
+                     ValueChanged="(bool v) => SettingsService.SaveSettingChanges(x => x.VCenterIgnoreSslErrors = v, NotificationService)"
+                     Color="Color.Primary">
+            SSL-Zertifikatsfehler ignorieren (selbstsignierte Zertifikate)
+        </MudCheckBox>
+
+        <div class="d-flex gap-2 align-items-center mt-1 flex-wrap">
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.CloudSync"
+                       OnClick="TestConnectionAsync"
+                       Disabled="_testing">
+                @if (_testing)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                }
+                Verbindung testen
+            </MudButton>
+
+            @if (_testResult.HasValue)
+            {
+                @if (_testResult.Value)
+                {
+                    <MudChip T="string" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small">
+                        Verbindung erfolgreich
+                    </MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Color="Color.Error" Icon="@Icons.Material.Filled.Error" Size="Size.Small">
+                        Verbindung fehlgeschlagen
+                    </MudChip>
+                }
+            }
+        </div>
+
+        @if (!string.IsNullOrEmpty(_testError))
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-1">@_testError</MudAlert>
+        }
+    </div>
+</div>
+
+@code {
+    private ToolboxSettings Setting => SettingsService.Settings;
+    private bool _showPassword;
+    private bool _testing;
+    private bool? _testResult;
+    private string _testError = "";
+
+    private async Task TestConnectionAsync()
+    {
+        _testing = true;
+        _testResult = null;
+        _testError = "";
+        StateHasChanged();
+
+        try
+        {
+            if (VmwareService.IsConnected)
+                await VmwareService.DisconnectAsync();
+
+            var ok = await VmwareService.ConnectAsync();
+            _testResult = ok;
+            if (!ok)
+                _testError = VmwareService.LastError ?? "Unbekannter Fehler";
+            else
+                await VmwareService.DisconnectAsync();
+        }
+        finally
+        {
+            _testing = false;
+            StateHasChanged();
+        }
+    }
+}
