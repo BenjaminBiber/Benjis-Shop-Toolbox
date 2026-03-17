@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Frozen;
 using System.IO;
 using Toolbox.Data.Models;
 
@@ -13,6 +14,17 @@ public class CacheService
 
     private readonly ConcurrentDictionary<string, CacheEntry<ThemeInfo>> _themeCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, CacheEntry<ExtensionInfo>> _extensionCache = new(StringComparer.OrdinalIgnoreCase);
+
+    // ── VM cache ─────────────────────────────────────────────────────────────
+    private FrozenDictionary<string, VmwareVm> _vmCache = FrozenDictionary<string, VmwareVm>.Empty;
+
+    public FrozenDictionary<string, VmwareVm> VmCache => _vmCache;
+
+    public void SetVmCache(IEnumerable<VmwareVm> vms) =>
+        _vmCache = vms.ToFrozenDictionary(v => v.Id, StringComparer.OrdinalIgnoreCase);
+
+    public void InvalidateVmCache() =>
+        _vmCache = FrozenDictionary<string, VmwareVm>.Empty;
 
     public IReadOnlyList<ThemeInfo> GetThemes(string shopThemesPath, string shopYamlPath, Func<IEnumerable<ThemeInfo>> factory)
     {

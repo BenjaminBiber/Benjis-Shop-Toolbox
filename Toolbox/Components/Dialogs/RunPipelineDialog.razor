@@ -375,8 +375,8 @@
         _currentYaml         = "";
         _pipelineDefinitionId = 0;
         _loadError           = "";
-        _origVmName = _origSqlServer = _origSqlDatabase = _origSqlUser = _origSqlPassword = "";
-        _varVmName  = _varSqlServer  = _varSqlDatabase  = _varSqlUser  = _varSqlPassword  = "";
+        _origVmName = _origShopId = _origSqlServer = _origSqlDatabase = _origSqlUser = _origSqlPassword = "";
+        _varVmName  = _varShopId  = _varSqlServer  = _varSqlDatabase  = _varSqlUser  = _varSqlPassword  = "";
 
         if (string.IsNullOrEmpty(url)) return;
 
@@ -406,12 +406,14 @@
             if (!string.IsNullOrEmpty(_currentYaml))
             {
                 _varVmName      = ExtractYamlValue(_currentYaml, "ESXNewVmName") ?? "";
+                _varShopId      = ExtractYamlValue(_currentYaml, "ShopId")       ?? "";
                 _varSqlServer   = ExtractYamlValue(_currentYaml, "SQLServer")    ?? "";
                 _varSqlDatabase = ExtractYamlValue(_currentYaml, "SQLDatabase")  ?? "";
                 _varSqlUser     = ExtractYamlValue(_currentYaml, "SQLUser")      ?? "";
                 _varSqlPassword = ExtractYamlValue(_currentYaml, "SQLPassword")  ?? "";
 
                 _origVmName      = _varVmName;
+                _origShopId      = _varShopId;
                 _origSqlServer   = _varSqlServer;
                 _origSqlDatabase = _varSqlDatabase;
                 _origSqlUser     = _varSqlUser;
@@ -460,6 +462,8 @@
 
                 var updatedYaml = _currentYaml;
                 updatedYaml = SetYamlValue(updatedYaml, "ESXNewVmName", _varVmName);
+                if (!string.IsNullOrWhiteSpace(_varShopId))
+                    updatedYaml = SetYamlValue(updatedYaml, "ShopId", _varShopId);
                 if (!string.IsNullOrWhiteSpace(_varSqlServer))
                     updatedYaml = SetYamlValue(updatedYaml, "SQLServer", _varSqlServer);
                 if (!string.IsNullOrWhiteSpace(_varSqlDatabase))

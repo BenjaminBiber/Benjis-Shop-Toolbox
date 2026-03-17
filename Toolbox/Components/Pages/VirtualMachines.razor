@@ -13,6 +13,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject CustomerLogoService CustomerLogoService
+@inject CacheService CacheService
 
 
 <div class="vmp">
@@ -463,7 +464,25 @@
         _customerMappings = await SyncService.GetMappingsAsync();
 
         if (!VmwareService.IsConnected && !string.IsNullOrWhiteSpace(SettingsService.Settings?.VCenterUrl))
+        {
+            // Pre-populate from cache so the page isn't empty while connecting
+            if (CacheService.VmCache.Count > 0)
+            {
+                _vms = CacheService.VmCache.Values.ToList();
+                StateHasChanged();
+            }
             await ConnectAsync();
+        }
+        else if (VmwareService.IsConnected)
+        {
+            // Already connected (navigated back) — show cache immediately, then refresh
+            if (CacheService.VmCache.Count > 0)
+            {
+                _vms = CacheService.VmCache.Values.ToList();
+                StateHasChanged();
+            }
+            await LoadVmsAsync();
+        }
     }
 
     private VmCustomerMapping? GetMapping(string vmName) =>
@@ -586,6 +605,8 @@
 
                 await Task.WhenAll(tasks);
             }
+
+            CacheService.SetVmCache(_vms);
         }
         catch (Exception ex)
         {
