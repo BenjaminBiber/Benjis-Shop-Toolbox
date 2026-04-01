@@ -28,7 +28,9 @@
       "WebFetch(domain:www.silberketten-store.de)",
       "WebFetch(domain:www.grimmeissen.de)",
       "WebFetch(domain:www.werny.de)",
-      "WebFetch(domain:www.zoominfo.com)"
+      "WebFetch(domain:www.zoominfo.com)",
+      "Bash(python:*)",
+      "Bash(grep:*)"
     ]
   }
 }
