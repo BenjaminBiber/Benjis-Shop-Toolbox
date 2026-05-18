@@ -1,0 +1,90 @@
+@page "/tfs-projects-test"
+@using Toolbox.Data.Services
+@inject TfsRepoService TfsRepoService
+
+<div class="tfs-test-root pa-4">
+    <div class="d-flex align-items-center gap-3 mb-4">
+        <MudText Typo="Typo.h5">TFS Projekte – Bildtest</MudText>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="LoadProjects" Disabled="_loading">Laden</MudButton>
+    </div>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+    }
+
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@_error</MudAlert>
+    }
+
+    @if (_entries is not null)
+    {
+        <MudText Typo="Typo.body2" Class="mb-3 mud-text-secondary">
+            @_entries.Count(e => e.Source == AvatarSource.RestApi) via REST-API,
+            @_entries.Count(e => e.Source == AvatarSource.Generated) generiert —
+            @_entries.Count gesamt
+        </MudText>
+        <div class="projects-grid">
+            @foreach (var entry in _entries)
+            {
+                <MudPaper Class="project-card pa-3 d-flex align-items-center gap-3" Elevation="1">
+                    <img src="@entry.AvatarUrl" alt="@entry.Project.Name"
+                         style="width:48px;height:48px;border-radius:50%;object-fit:cover;flex-shrink:0;" />
+                    <div class="d-flex flex-column overflow-hidden">
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600">@entry.Project.Name</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                            @(entry.Source == AvatarSource.RestApi ? "Echtes Bild (REST)" : "Generiert")
+                        </MudText>
+                    </div>
+                </MudPaper>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private enum AvatarSource { RestApi, Generated }
+    private record ProjectEntry(TfsProjectInfo Project, string AvatarUrl, AvatarSource Source);
+
+    private List<ProjectEntry>? _entries;
+    private bool _loading;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync() => await LoadProjects();
+
+    private async Task LoadProjects()
+    {
+        _loading = true;
+        _error = null;
+        _entries = null;
+        StateHasChanged();
+
+        try
+        {
+            var projects = await TfsRepoService.GetProjectsAsync();
+
+            var entries = await Task.WhenAll(projects.Select(async p =>
+            {
+                var dataUrl = await TfsRepoService.GetProjectAvatarAsDataUrlAsync(p);
+                if (dataUrl != null)
+                {
+                    return new ProjectEntry(p, dataUrl, AvatarSource.RestApi);
+                }
+
+                return new ProjectEntry(p, TfsRepoService.GenerateSvgAvatar(p.Name), AvatarSource.Generated);
+            }));
+
+            _entries = entries.ToList();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

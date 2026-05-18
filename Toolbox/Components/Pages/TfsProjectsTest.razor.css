@@ -1,0 +1,13 @@
+.tfs-test-root {
+    max-width: 900px;
+}
+
+.projects-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.project-card {
+    min-width: 0;
+}

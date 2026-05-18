@@ -12,7 +12,12 @@ public sealed record TfsRepoInfo(string Name, string RemoteUrl, string Project, 
 }
 
 public sealed record TfsRepoItemInfo(string Path, bool IsFolder);
-public sealed record TfsProjectInfo(string Name, string Url);
+public sealed record TfsProjectInfo(string Name, string Url)
+{
+    public Guid Id { get; init; }
+    public string? DefaultTeamImageUrl { get; init; }
+}
+
 public sealed record TfsCommitInfo(string CommitId, string AuthorName, string AuthorEmail, DateTime Date, string Comment);
 
 public class TfsRepoService
@@ -96,11 +101,27 @@ public class TfsRepoService
 
         var connection = GetConnection(normalized);
         var projectClient = await connection.GetClientAsync<Microsoft.TeamFoundation.Core.WebApi.ProjectHttpClient>(cancellationToken);
-        var projects = await projectClient.GetProjects();
+        var projectRefs = await projectClient.GetProjects();
+        var validRefs = projectRefs.Where(p => !string.IsNullOrWhiteSpace(p.Name)).ToList();
 
-        return projects
-            .Where(p => !string.IsNullOrWhiteSpace(p.Name))
-            .Select(p => new TfsProjectInfo(p.Name!, BuildProjectUrl(normalized, p.Name!)))
+        var fullProjects = await Task.WhenAll(validRefs.Select(async p =>
+        {
+            try
+            {
+                return await projectClient.GetProject(p.Name!);
+            }
+            catch
+            {
+                return null;
+            }
+        }));
+
+        return validRefs
+            .Select((p, i) => new TfsProjectInfo(p.Name!, BuildProjectUrl(normalized, p.Name!))
+            {
+                Id = p.Id,
+                DefaultTeamImageUrl = fullProjects[i]?.DefaultTeamImageUrl
+            })
             .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
@@ -356,6 +377,71 @@ public class TfsRepoService
     {
         var connection = GetConnection(collectionUrl);
         return await connection.GetClientAsync<GitHttpClient>();
+    }
+
+    /// <summary>
+    /// Tries to load a project avatar via the REST avatar endpoint.
+    /// Returns a base64 data URL on success, or null if not available.
+    /// </summary>
+    public async Task<string?> GetProjectAvatarAsDataUrlAsync(
+        TfsProjectInfo project,
+        string? collectionUrl = null,
+        CancellationToken cancellationToken = default)
+    {
+        var pat = _settings.Settings.TfsApiKey ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(pat)) return null;
+
+        var normalized = NormalizeCollectionUrl(collectionUrl ?? _settings.Settings.TfsCollectionUrl);
+        if (string.IsNullOrWhiteSpace(normalized)) return null;
+
+        // Try REST avatar endpoint: GET {collection}/_apis/projects/{id}/avatar?api-version=5.0
+        var avatarUrl = $"{normalized}/_apis/projects/{project.Id}/avatar?api-version=5.0";
+
+        try
+        {
+            using var http = new System.Net.Http.HttpClient();
+            var credentials = Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes($":{pat}"));
+            http.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", credentials);
+
+            var response = await http.GetAsync(avatarUrl, cancellationToken);
+            if (!response.IsSuccessStatusCode) return null;
+
+            var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+            var contentType = response.Content.Headers.ContentType?.MediaType ?? "image/png";
+            return $"data:{contentType};base64,{Convert.ToBase64String(bytes)}";
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Generates a deterministic SVG avatar (colored circle with initial) from the project name.
+    /// </summary>
+    public static string GenerateSvgAvatar(string projectName)
+    {
+        var initial = string.IsNullOrWhiteSpace(projectName) ? "?" : projectName.Trim()[0].ToString().ToUpper();
+
+        // Deterministic hue from project name
+        var hash = 0;
+        foreach (var c in projectName)
+        {
+            hash = c + ((hash << 5) - hash);
+        }
+        var hue = Math.Abs(hash) % 360;
+
+        var svg = $"""
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+              <circle cx="24" cy="24" r="24" fill="hsl({hue},55%,45%)"/>
+              <text x="24" y="24" text-anchor="middle" dominant-baseline="central"
+                    font-family="Segoe UI,Arial,sans-serif" font-size="22" font-weight="600" fill="white">{initial}</text>
+            </svg>
+            """;
+
+        var base64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(svg));
+        return $"data:image/svg+xml;base64,{base64}";
     }
 
     private VssConnection GetConnection(string? collectionUrl = null)

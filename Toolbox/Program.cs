@@ -38,7 +38,7 @@ await WaitForDebuggerIfRequestedAsync(args, "Toolbox");
 builder.Services.AddMudServices();
 builder.Services.AddApplicationState(
     "https://benjaminbiber.de/api/applications",
-    "65c677bc-9df6-46d7-907f-a6cd150d67cb"
+    "cba826c8-68eb-48f5-bf48-338cc16dac4b\n\n\n"
 );
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
