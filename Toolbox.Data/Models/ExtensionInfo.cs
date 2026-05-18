@@ -14,6 +14,8 @@ public class ExtensionInfo
     public bool HasInstallProject { get; set; }
     public bool HasDataProject { get; set; }
     public bool HasThemeV4 { get; set; }
+    public bool HasChangelog { get; set; }
+    public string? CurrentVersion { get; set; }
 
     public string GetCustomerName()
     {

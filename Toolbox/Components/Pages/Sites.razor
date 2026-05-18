@@ -4,7 +4,7 @@
 @using Microsoft.Web.Administration
 @using Toolbox.Components.Dialogs
 @using Toolbox.Services
-@inject Toolbox.Services.SettingsService SettingsService
+@inject Toolbox.Data.Services.SettingsService SettingsService
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 @inject IisService IisService
@@ -97,5 +97,6 @@
         await DialogService.ShowAsync<SitePathsDialog>("Shop-Pfade", parameters, options);
     }
 }
+
 
 

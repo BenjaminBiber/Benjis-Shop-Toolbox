@@ -7,21 +7,25 @@
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>0.4.3</Version>
-    <AssemblyVersion>0.4.3.0</AssemblyVersion>
-    <FileVersion>0.4.3.0</FileVersion>
+    <Version>0.8.6</Version>
+    <AssemblyVersion>0.8.6.0</AssemblyVersion>
+    <FileVersion>0.8.6.0</FileVersion>
     <ApplicationIcon>wwwroot\favicon.ico</ApplicationIcon>
+  <InformationalVersion>0.8.6</InformationalVersion></PropertyGroup>
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);NU1605</NoWarn>
+    <DartSassOutputStyle>expanded</DartSassOutputStyle>
   </PropertyGroup>
-    <PropertyGroup>
-        <NoWarn>$(NoWarn);NU1605</NoWarn>
-    </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="BenjaminBiber.ApplicationState" Version="1.0.6" />
     <PackageReference Include="BenjaminBiber.DynamicInput" Version="0.1.1" />
     <PackageReference Include="Blazor.AceEditorJs" Version="1.2.1" />
     <PackageReference Include="BlazorDesktop" Version="9.0.2" />
+    <PackageReference Include="DartSassBuilder" Version="1.1.0" />
     <PackageReference Include="H.NotifyIcon" Version="2.3.2" />
     <PackageReference Include="H.NotifyIcon.Wpf" Version="2.3.2" />
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />
+    <PackageReference Include="Markdig" Version="0.38.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.10">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -56,6 +60,12 @@
   <ItemGroup>
     <_ContentIncludedByDefault Remove="Components\Settings-Test\SettingsField.razor" />
     <_ContentIncludedByDefault Remove="Components\Settings-Test\Test.razor" />
+    <_ContentIncludedByDefault Remove="wwwroot\Changelog\.gitkeep" />
+    <_ContentIncludedByDefault Remove="wwwroot\Changelog\0.5.1.md" />
+    <_ContentIncludedByDefault Remove="wwwroot\Changelog\0.5.2.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="wwwroot\Help\Images\" />
   </ItemGroup>
 
   <!-- Publish Toolbox.Updater alongside Toolbox output and publish -->

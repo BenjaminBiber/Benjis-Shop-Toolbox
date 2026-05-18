@@ -1,0 +1,71 @@
+@using System.IO
+@using Toolbox.Data.Models
+@using Toolbox.Services
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-3">Shop-Setting hinzufügen</MudText>
+        <MudNumericField T="long?" @bind-Value="_siteId" Variant="Variant.Text" Label="Site ID (optional)" Class="mb-2" />
+        <MudTextField @bind-Value="_yamlPath"
+                      Label="shop.yaml"
+                      Variant="Variant.Filled"
+                      Class="mb-2"
+                      Adornment="Adornment.End"
+                      AdornmentIcon="@Icons.Material.Filled.FolderOpen"
+                      OnAdornmentClick="ChooseYaml" />
+        <MudTextField @bind-Value="_themePath"
+                      Label="Themes Ordner"
+                      Variant="Variant.Filled"
+                      Class="mb-2"
+                      Adornment="Adornment.End"
+                      AdornmentIcon="@Icons.Material.Filled.FolderOpen"
+                      OnAdornmentClick="ChooseTheme" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="Save">Speichern</MudButton>
+        <MudButton Color="Color.Default" OnClick="Cancel">Abbrechen</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Inject] FileDialogService FileDialog { get; set; } = default!;
+
+    private long? _siteId;
+    private string _yamlPath = string.Empty;
+    private string _themePath = string.Empty;
+
+    private void ChooseYaml()
+    {
+        var filters = new FileFilter[] { new FileFilter { Name = "YAML", Extensions = new[] { "yaml", "yml" } } };
+        var initial = Path.GetDirectoryName(_yamlPath) ?? string.Empty;
+        var path = FileDialog.OpenFile("shop.yaml auswählen", filters, initial);
+        if (!string.IsNullOrEmpty(path))
+        {
+            _yamlPath = path;
+        }
+    }
+
+    private void ChooseTheme()
+    {
+        var path = FileDialog.OpenFolder("Themes Ordner auswählen", _themePath);
+        if (!string.IsNullOrEmpty(path))
+        {
+            _themePath = path;
+        }
+    }
+
+    private void Save()
+    {
+        var setting = new ShopSetting
+        {
+            SiteId = _siteId ?? long.MinValue,
+            ShopYamlPath = _yamlPath?.Trim() ?? string.Empty,
+            ThemeFolderPath = _themePath?.Trim() ?? string.Empty
+        };
+        MudDialog.Close(DialogResult.Ok(setting));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

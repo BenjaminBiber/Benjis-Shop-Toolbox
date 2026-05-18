@@ -22,11 +22,11 @@
                 </MudCollapse>
             </MudStack>
             <MudText Typo="Typo.h6" Class="mb-2">Message:</MudText>
-            <MudText Class="mt-2 text-break text-wrap" Style="white-space: pre-wrap;">@FormatMessage(Entry.ParsedMessage.Message)</MudText>
+            <MudText Class="mt-2 text-break text-wrap log-entry-message">@FormatMessage(Entry.ParsedMessage.Message)</MudText>
         }
         else
         {
-            <MudText Class="mt-2" Style="white-space: pre-wrap;">@FormatMessage(Entry.Message)</MudText>
+            <MudText Class="mt-2 log-entry-message">@FormatMessage(Entry.Message)</MudText>
         }
        
     </DialogContent>

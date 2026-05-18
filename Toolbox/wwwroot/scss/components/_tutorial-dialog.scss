@@ -1,0 +1,241 @@
+﻿@use "../vars" as *;
+
+.tutorial-dialog {
+    .mud-dialog-content {
+        padding: 0;
+    }
+
+    .mud-dialog-actions {
+        padding: $space-16 $space-24 $space-24;
+    }
+}
+
+.tutorial-dialog__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $space-16;
+}
+
+.tutorial-dialog__title-block {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.tutorial-dialog__time {
+    font-weight: 600;
+}
+
+.tutorial-dialog__progress {
+    padding: $space-16 $space-24 0;
+}
+
+.tutorial-dialog__body {
+    display: flex;
+    flex-direction: column;
+    gap: $space-24;
+    padding: $space-16 $space-24 $space-24;
+}
+
+.tutorial-dialog__hero {
+    background: linear-gradient(135deg, var(--mud-palette-primary), var(--mud-palette-secondary));
+    color: $color-white;
+    padding: $space-24;
+    border-radius: $radius-8;
+    display: flex;
+    flex-direction: column;
+    gap: $space-16;
+}
+
+.tutorial-dialog__hero-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-8;
+}
+
+.tutorial-dialog__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: $space-16;
+}
+
+.tutorial-dialog__card {
+    padding: $space-16;
+    border-radius: $radius-8;
+    background: var(--mud-palette-surface);
+    border: 1px solid $color-border-subtle;
+    display: flex;
+    flex-direction: column;
+    gap: $space-8;
+}
+
+.tutorial-dialog__card-icon {
+    font-size: 28px;
+}
+
+.tutorial-dialog__step {
+    display: flex;
+    flex-direction: column;
+    gap: $space-16;
+}
+
+.tutorial-dialog__panel {
+    background: var(--mud-palette-surface);
+    border-radius: $radius-8;
+    padding: $space-16;
+    display: flex;
+    flex-direction: column;
+    gap: $space-16;
+    border: 1px solid $color-border-subtle;
+}
+
+.tutorial-dialog__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-12;
+    align-items: center;
+}
+
+.tutorial-dialog__select {
+    min-width: 220px;
+}
+
+.tutorial-dialog__button-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-12;
+}
+
+.tutorial-dialog__hint {
+    color: $color-muted-light;
+}
+
+.tutorial-dialog__chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-8;
+}
+
+.tutorial-dialog__chip {
+    cursor: pointer;
+}
+
+.tutorial-dialog__log-list {
+    display: flex;
+    flex-direction: column;
+    gap: $space-12;
+}
+
+.tutorial-dialog__log-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: $space-12;
+    align-items: center;
+    padding: $space-12;
+    border-radius: $radius-8;
+    border: 1px solid $color-border-subtle;
+    background: $color-white;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tutorial-dialog__log-row:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+.tutorial-dialog__log-row--active {
+    border-color: var(--mud-palette-primary);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.tutorial-dialog__log-time {
+    color: $color-muted-light;
+}
+
+.tutorial-dialog__empty {
+    color: $color-muted-light;
+}
+
+.tutorial-dialog__detail {
+    background: $color-white;
+    border-radius: $radius-8;
+    padding: $space-16;
+    border: 1px solid $color-border-subtle;
+    display: flex;
+    flex-direction: column;
+    gap: $space-12;
+}
+
+.tutorial-dialog__detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $space-12;
+}
+
+.tutorial-dialog__nav-panel {
+    display: grid;
+    grid-template-columns: minmax(160px, 220px) 1fr;
+    gap: $space-16;
+}
+
+.tutorial-dialog__nav-list {
+    display: flex;
+    flex-direction: column;
+    gap: $space-8;
+}
+
+.tutorial-dialog__nav-button {
+    justify-content: flex-start;
+    gap: $space-8;
+}
+
+.tutorial-dialog__nav-icon {
+    font-size: 20px;
+}
+
+.tutorial-dialog__nav-detail {
+    display: flex;
+    flex-direction: column;
+    gap: $space-12;
+}
+
+.tutorial-dialog__switch {
+    display: flex;
+    align-items: center;
+    gap: $space-12;
+    padding: $space-12;
+    border-radius: $radius-8;
+    background: $color-surface-muted;
+}
+
+.tutorial-dialog__finish {
+    display: flex;
+    align-items: center;
+    gap: $space-12;
+    padding: $space-16;
+    border-radius: $radius-8;
+    background: $color-surface-muted;
+}
+
+.tutorial-dialog__finish-icon {
+    font-size: 32px;
+    color: var(--mud-palette-success);
+}
+
+@media (max-width: 900px) {
+    .tutorial-dialog__nav-panel {
+        grid-template-columns: 1fr;
+    }
+
+    .tutorial-dialog__log-row {
+        grid-template-columns: auto 1fr;
+    }
+
+    .tutorial-dialog__log-time {
+        grid-column: 1 / -1;
+    }
+}
+

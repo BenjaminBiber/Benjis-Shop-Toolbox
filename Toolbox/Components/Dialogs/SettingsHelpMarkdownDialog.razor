@@ -1,0 +1,52 @@
+@using MudBlazor
+@using Markdig
+@using Microsoft.AspNetCore.Components
+
+<MudDialog MaxWidth="MaxWidth.Large" FullWidth="true">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Class="fw-bold">@Title</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (string.IsNullOrWhiteSpace(MarkdownContent))
+        {
+            <MudText Typo="Typo.body1">Keine Hilfe verfuegbar.</MudText>
+        }
+        else
+        {
+            <div>@((MarkupString)_htmlContent)</div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="Close">Schliessen</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string Title { get; set; } = "Hilfe";
+    [Parameter] public string MarkdownContent { get; set; } = string.Empty;
+
+    private static readonly MarkdownPipeline MarkdownPipeline = new MarkdownPipelineBuilder()
+        .UseAdvancedExtensions()
+        .DisableHtml()
+        .Build();
+
+    private string _htmlContent = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        _htmlContent = RenderMarkdown(MarkdownContent);
+    }
+
+    private void Close() => MudDialog.Close();
+
+    private static string RenderMarkdown(string markdown)
+    {
+        if (string.IsNullOrWhiteSpace(markdown))
+        {
+            return string.Empty;
+        }
+
+        return Markdown.ToHtml(markdown, MarkdownPipeline);
+    }
+}

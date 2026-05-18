@@ -1,0 +1,61 @@
+@using MudBlazor
+@using Markdig
+@using Microsoft.AspNetCore.Components
+
+<MudDialog Class="changelog-dialog" MaxWidth="MaxWidth.Large">
+    <TitleContent>
+        <div class="changelog-dialog__title">
+            <MudText Typo="Typo.h6" Class="fw-bold">@TitleText</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div class="changelog-dialog__content">
+            @if (string.IsNullOrWhiteSpace(MarkdownContent))
+            {
+                <MudText Typo="Typo.body1">Kein Changelog fuer diese Version gefunden.</MudText>
+            }
+            else
+            {
+                <div class="changelog-dialog__markdown">@((MarkupString)_htmlContent)</div>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="Close">Schliessen</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string MarkdownContent { get; set; } = string.Empty;
+    [Parameter] public string CurrentVersion { get; set; } = string.Empty;
+    [Parameter] public string PreviousVersion { get; set; } = string.Empty;
+
+    private static readonly MarkdownPipeline MarkdownPipeline = new MarkdownPipelineBuilder()
+        .UseAdvancedExtensions()
+        .DisableHtml()
+        .Build();
+
+    private string _htmlContent = string.Empty;
+
+    private string TitleText => string.IsNullOrWhiteSpace(PreviousVersion)
+        ? "Was ist neu?"
+        : $"Was ist neu seit {PreviousVersion}?";
+
+    protected override void OnParametersSet()
+    {
+        _htmlContent = RenderMarkdown(MarkdownContent);
+    }
+
+    private void Close() => MudDialog.Close();
+
+    private static string RenderMarkdown(string markdown)
+    {
+        if (string.IsNullOrWhiteSpace(markdown))
+        {
+            return string.Empty;
+        }
+
+        return Markdown.ToHtml(markdown, MarkdownPipeline);
+    }
+}

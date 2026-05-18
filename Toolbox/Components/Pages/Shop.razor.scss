@@ -1,0 +1,16 @@
+@use "../../wwwroot/scss/vars" as *;
+
+.page-shop-select {
+    min-width: $select-min-width;
+}
+
+.shop-action-bar {
+    ::deep .mud-button-root,
+    ::deep .mud-button-root.mud-icon-button {
+        width: $size-action-button;
+        height: $size-action-button;
+        min-width: $size-action-button;
+        min-height: $size-action-button;
+        padding: 0;
+    }
+}

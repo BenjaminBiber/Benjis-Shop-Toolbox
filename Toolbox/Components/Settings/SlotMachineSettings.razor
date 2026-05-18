@@ -1,0 +1,22 @@
+@using Toolbox.Components.MiniGames
+@inject EasterEggService EasterEggService
+@implements IDisposable
+
+    <SlotMachinePanel />
+
+@code {
+    protected override void OnInitialized()
+    {
+        EasterEggService.StateChanged += OnStateChanged;
+    }
+
+    public void Dispose()
+    {
+        EasterEggService.StateChanged -= OnStateChanged;
+    }
+
+    private void OnStateChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+}

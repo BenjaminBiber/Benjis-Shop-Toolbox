@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace Toolbox.Updater;
@@ -29,10 +30,12 @@ class Program
             var destDir = options.GetValueOrDefault("--installer-dest")
                          ?? Path.Combine(Path.GetTempPath(), "ShopToolboxUpdater");
 
-            var currentVersion = NormalizeVersion(options.GetValueOrDefault("--current-version") ?? TryGetLocalVersion() ?? "0.0.0");
+            var currentVersion = NormalizeVersionText(options.GetValueOrDefault("--current-version") ?? TryGetLocalVersion() ?? "0.0.0");
             var pidArg = options.GetValueOrDefault("--pid");
             var processName = options.GetValueOrDefault("--process-name") ?? "Toolbox";
+            var processNamesArg = options.GetValueOrDefault("--process-names");
             var interactive = options.ContainsKey("--interactive") || string.Equals(options.GetValueOrDefault("--silent"), "false", StringComparison.OrdinalIgnoreCase);
+            var allowBeta = IsTruthy(options.GetValueOrDefault("--allow-beta"));
 
             if (!Directory.Exists(sourcePath))
             {
@@ -42,7 +45,7 @@ class Program
             }
 
             // Suche nach Inno-Installerdateien (flacher Ordner): Installer_Shop-Toolbox_<version>.exe
-            var latest = FindLatestInstaller(sourcePath);
+            var latest = FindLatestInstaller(sourcePath, allowBeta);
             if (latest is null)
             {
                 Logger.Write("Kein Installer gefunden (Pattern: Installer_Shop-Toolbox_<version>.exe).");
@@ -50,9 +53,9 @@ class Program
                 return 3;
             }
 
-            Logger.Write($"Aktuelle Version={currentVersion}, verfügbare Version={latest.Value.version}, Datei={latest.Value.fullPath}");
+            Logger.Write($"Aktuelle Version={currentVersion}, verfügbare Version={latest.Value.version}{(latest.Value.isBeta ? " (beta)" : "")}, Datei={latest.Value.fullPath}");
             Console.WriteLine($"Aktuelle Version:  {currentVersion}");
-            Console.WriteLine($"Verfügbare Version: {latest.Value.version} (Datei: {latest.Value.fullPath})");
+            Console.WriteLine($"Verfügbare Version: {latest.Value.version}{(latest.Value.isBeta ? " (beta)" : "")} (Datei: {latest.Value.fullPath})");
             if (CompareVersions(latest.Value.version, currentVersion) <= 0)
             {
                 Logger.Write("Keine neuere Version gefunden. Abbruch.");
@@ -62,6 +65,7 @@ class Program
                     TimestampUtc = DateTime.UtcNow,
                     LocalVersion = currentVersion,
                     AvailableVersion = latest.Value.version,
+                    AvailableIsBeta = latest.Value.isBeta,
                     InstallerPath = latest.Value.fullPath,
                     Action = "noop",
                     Success = true
@@ -80,7 +84,14 @@ class Program
             {
                 TryKillProcessByPid(pid);
             }
-            if (!string.IsNullOrWhiteSpace(processName))
+            if (!string.IsNullOrWhiteSpace(processNamesArg))
+            {
+                foreach (var name in SplitProcessNames(processNamesArg))
+                {
+                    TryKillProcessesByName(name);
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(processName))
             {
                 TryKillProcessesByName(processName);
             }
@@ -95,6 +106,7 @@ class Program
                 TimestampUtc = DateTime.UtcNow,
                 LocalVersion = currentVersion,
                 AvailableVersion = latest.Value.version,
+                AvailableIsBeta = latest.Value.isBeta,
                 InstallerPath = latest.Value.fullPath,
                 CopiedInstallerPath = localInstaller,
                 Action = "install",
@@ -138,32 +150,48 @@ class Program
         return dict;
     }
 
-    private static (string version, string fileName, string fullPath)? FindLatestInstaller(string sourceDir)
+    private static bool IsTruthy(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        var v = value.Trim().ToLowerInvariant();
+        return v is "1" or "true" or "yes" or "y" or "ja" or "j";
+    }
+
+    private static (string version, bool isBeta, string fileName, string fullPath)? FindLatestInstaller(string sourceDir, bool allowBeta)
     {
         var rx = new Regex(
-            @"^Installer_Shop\-Toolbox_(\d+(?:[._]\d+){1,3})\.exe$",
+            @"^Installer_Shop\-Toolbox_(\d+(?:[._]\d+){1,3})(?:-([A-Za-z][0-9A-Za-z._-]*))?\.exe$",
             RegexOptions.IgnoreCase
         );
-        var candidates = new List<(string version, string fileName, string fullPath, DateTime writeTimeUtc)>();
+        var candidates = new List<(VersionInfo version, string fileName, string fullPath, DateTime writeTimeUtc)>();
 
         foreach (var file in Directory.EnumerateFiles(sourceDir, "*.exe", SearchOption.TopDirectoryOnly))
         {
             var name = Path.GetFileName(file) ?? string.Empty;
             var m = rx.Match(name);
             if (!m.Success) continue;
-            var ver = NormalizeVersion(m.Groups[1].Value);
+            var versionText = m.Groups[1].Value;
+            if (m.Groups[2].Success)
+            {
+                versionText = $"{versionText}-{m.Groups[2].Value}";
+            }
+            var ver = ParseVersionInfo(versionText);
             var fi = new FileInfo(file);
+            if (!allowBeta && ver.IsBeta)
+            {
+                continue;
+            }
             candidates.Add((ver, name, file, fi.LastWriteTimeUtc));
         }
 
         if (candidates.Count == 0) return null;
 
         var best = candidates
-            .OrderByDescending(c => c.version, Comparer<string>.Create(CompareVersions))
+            .OrderByDescending(c => c.version, Comparer<VersionInfo>.Create(CompareVersionInfos))
             .ThenByDescending(c => c.writeTimeUtc)
             .First();
 
-        return (best.version, best.fileName, best.fullPath);
+        return (best.version.NormalizedText, best.version.IsBeta, best.fileName, best.fullPath);
     }
 
     private static string? TryGetLocalVersion()
@@ -175,34 +203,170 @@ class Program
             {
                 var info = FileVersionInfo.GetVersionInfo(exe);
                 if (!string.IsNullOrWhiteSpace(info.ProductVersion))
-                    return NormalizeVersion(info.ProductVersion!);
+                    return NormalizeVersionText(info.ProductVersion!);
             }
         }
         catch { }
         return null;
     }
 
-    private static string NormalizeVersion(string v)
+    private sealed record VersionInfo(string NumericText, Version Numeric, string? PreRelease)
     {
-        // Accept underscores as separators and normalize to dots
-        var s = (v ?? string.Empty).Replace('_', '.');
-        var m = Regex.Match(s, @"\d+(?:\.\d+){0,3}");
-        return m.Success ? m.Value : s.Trim();
+        public bool IsBeta => PreRelease?.StartsWith("beta", StringComparison.OrdinalIgnoreCase) == true;
+        public string NormalizedText => string.IsNullOrWhiteSpace(PreRelease) ? NumericText : $"{NumericText}-{PreRelease}";
+    }
+
+    private static string NormalizeVersionText(string v)
+    {
+        var info = ParseVersionInfo(v);
+        return info.NormalizedText;
+    }
+
+    private static VersionInfo ParseVersionInfo(string v)
+    {
+        var s = (v ?? string.Empty).Trim();
+        var plusIndex = s.IndexOf('+');
+        if (plusIndex >= 0)
+        {
+            s = s[..plusIndex];
+        }
+        if (s.StartsWith('v') || s.StartsWith('V'))
+        {
+            s = s[1..];
+        }
+
+        string? pre = null;
+        var hyphenIndex = s.IndexOf('-');
+        if (hyphenIndex >= 0)
+        {
+            var after = s[(hyphenIndex + 1)..];
+            if (ContainsLetters(after))
+            {
+                pre = NormalizePreRelease(after);
+                s = s[..hyphenIndex];
+            }
+            else
+            {
+                s = s.Replace('-', '.');
+            }
+        }
+
+        s = s.Replace('_', '.').Replace(',', '.');
+        while (s.Contains("..")) s = s.Replace("..", ".");
+        s = s.Trim('.');
+
+        if (!Version.TryParse(s, out var ver))
+        {
+            ver = new Version(0, 0, 0, 0);
+            s = "0.0.0";
+            pre = null;
+        }
+
+        return new VersionInfo(s, ver, pre);
+    }
+
+    private static bool ContainsLetters(string value)
+        => value.Any(c => char.IsLetter(c));
+
+    private static string NormalizePreRelease(string value)
+    {
+        var p = (value ?? string.Empty).Trim();
+        p = p.Replace('_', '.').Replace('-', '.').Trim('.');
+        while (p.Contains("..")) p = p.Replace("..", ".");
+        p = p.ToLowerInvariant();
+        if (p.StartsWith("beta", StringComparison.OrdinalIgnoreCase))
+        {
+            var rest = p[4..].Trim('.');
+            if (rest.Length > 0 && !rest.StartsWith('.'))
+            {
+                p = "beta." + rest;
+            }
+            else if (rest.Length == 0)
+            {
+                p = "beta";
+            }
+        }
+        return p;
     }
 
     private static int CompareVersions(string a, string b)
     {
-        var pa = a.Split('.', StringSplitOptions.RemoveEmptyEntries);
-        var pb = b.Split('.', StringSplitOptions.RemoveEmptyEntries);
-        for (int i = 0; i < Math.Max(pa.Length, pb.Length); i++)
+        return CompareVersionInfos(ParseVersionInfo(a), ParseVersionInfo(b));
+    }
+
+    private static int CompareVersionInfos(VersionInfo a, VersionInfo b)
+    {
+        var cmp = CompareNumeric(a.Numeric, b.Numeric);
+        if (cmp != 0) return cmp;
+        return ComparePreRelease(a.PreRelease, b.PreRelease);
+    }
+
+    private static int CompareNumeric(Version a, Version b)
+    {
+        var aa = new[]
         {
-            var ai = i < pa.Length && int.TryParse(pa[i], out var av) ? av : 0;
-            var bi = i < pb.Length && int.TryParse(pb[i], out var bv) ? bv : 0;
-            var cmp = ai.CompareTo(bi);
-            if (cmp != 0) return cmp;
+            a.Major,
+            a.Minor,
+            a.Build >= 0 ? a.Build : 0,
+            a.Revision >= 0 ? a.Revision : 0
+        };
+        var bb = new[]
+        {
+            b.Major,
+            b.Minor,
+            b.Build >= 0 ? b.Build : 0,
+            b.Revision >= 0 ? b.Revision : 0
+        };
+
+        for (var i = 0; i < aa.Length; i++)
+        {
+            var c = aa[i].CompareTo(bb[i]);
+            if (c != 0) return c;
         }
         return 0;
     }
+
+    private static int ComparePreRelease(string? a, string? b)
+    {
+        var hasA = !string.IsNullOrWhiteSpace(a);
+        var hasB = !string.IsNullOrWhiteSpace(b);
+        if (!hasA && !hasB) return 0;
+        if (!hasA) return 1;  // stable > prerelease
+        if (!hasB) return -1;
+
+        var ap = SplitPreRelease(a!);
+        var bp = SplitPreRelease(b!);
+        var len = Math.Max(ap.Length, bp.Length);
+        for (var i = 0; i < len; i++)
+        {
+            if (i >= ap.Length) return -1;
+            if (i >= bp.Length) return 1;
+
+            var ai = ap[i];
+            var bi = bp[i];
+            var aNum = int.TryParse(ai, out var av);
+            var bNum = int.TryParse(bi, out var bv);
+
+            if (aNum && bNum)
+            {
+                var cmp = av.CompareTo(bv);
+                if (cmp != 0) return cmp;
+            }
+            else if (aNum != bNum)
+            {
+                return aNum ? -1 : 1; // numeric < non-numeric
+            }
+            else
+            {
+                var cmp = string.Compare(ai, bi, StringComparison.OrdinalIgnoreCase);
+                if (cmp != 0) return cmp;
+            }
+        }
+        return 0;
+    }
+
+    private static string[] SplitPreRelease(string value)
+        => value.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     private static void TryKillProcessByPid(int pid)
     {
@@ -240,6 +404,24 @@ class Program
             catch (Exception ex)
             {
                 Console.WriteLine($"Hinweis: Prozess {name} (PID {proc.Id}) konnte nicht beendet werden: {ex.Message}");
+            }
+        }
+    }
+
+    private static IEnumerable<string> SplitProcessNames(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            yield break;
+        }
+
+        var parts = raw.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var part in parts)
+        {
+            var name = part.Trim();
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                yield return name;
             }
         }
     }
@@ -286,6 +468,7 @@ class Program
         public DateTime TimestampUtc { get; set; }
         public string? LocalVersion { get; set; }
         public string? AvailableVersion { get; set; }
+        public bool AvailableIsBeta { get; set; }
         public string? InstallerPath { get; set; }
         public string? CopiedInstallerPath { get; set; }
         public string? Action { get; set; }

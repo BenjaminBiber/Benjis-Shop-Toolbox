@@ -1,0 +1,65 @@
+variables:
+  ESXNewVmName: 'VM-10441-19245'
+  ShopId: '1'
+  ShopUpdateTo: 'latest' # current or latest or x.x.x.x
+  SQLServer: 'dev-sql-4.lb-dev.local'
+  SQLDatabase: '10441_20251120_Shopsystem_Bandel_2025-14559'
+
+  TFSPersonalAccessToken: ""  # Set via pipeline secret variable
+  TFSCollection: 'ERP-Kunden'
+  TFSProject: 'Bandel Automobiltechnik GmbH'
+  SQLUser: '10441-dbo'
+  SQLPassword: 'pwd'
+
+  ESXServer: 'staging-satsat-1.atat-atatattat.local'
+  ESXUser: 'usr'
+  ESXPassword: 'pwd'
+  ESXDataStore: 'Volume-01'
+  ESXVmHost: 'esx-staging-'
+  ESXResourcePool: 'Staging'
+  CustomerId: '10441'
+  GuestPassword: 'pwd'
+
+resources:
+  repositories:
+    - repository: TeamShopTools
+      type: git
+      name: 4SELLERS Shopsystem Toolbox/TeamShopTools
+
+trigger:
+  - none
+
+pool:
+  name: 'ERP-Kunden'
+
+stages:
+  - stage:
+    jobs:
+      - ${{ if eq(variables.ShopId, '1') }}:
+          - job:
+            steps:
+              - checkout: self
+              - checkout: TeamShopTools
+              - template: StagingSystem/PipelineTemplates/CreateStaging.yml@TeamShopTools
+                parameters:
+                  ESXServer: '$(ESXServer)'
+                  ESXUser: '$(ESXUser)'
+                  ESXPassword: '$(ESXPassword)'
+                  ESXNewVmName: '$(ESXNewVmName)'
+                  ESXDataStore: '$(ESXDataStore)'
+                  ESXVmHost: '$(ESXVmHost)'
+                  ESXResourcePool: '$(ESXResourcePool)'
+                  GuestPassword: '$(GuestPassword)'
+                  TFSPersonalAccessToken: ""  # Set via pipeline secret variable
+                  TFSCollection: '$(TFSCollection)'
+                  TFSProject: '$(TFSProject)'
+                  TFSRepository: 'Shopsystem.bandel-online.de'
+                  TFSThemePath: '/bandel-online.de/Themes'
+                  ShopUpdateTo: '$(ShopUpdateTo)'
+                  ShopId: '1'
+                  ShopName: 'bandel-online.de'
+                  ShopBaseTheme: '4SELLERS_Responsive_2'
+                  SQLServer: '$(SQLServer)'
+                  SQLDatabase: '$(SQLDatabase)'
+                  SQLUser: '$(SQLUser)'
+                  SQLPassword: '$(SQLPassword)'

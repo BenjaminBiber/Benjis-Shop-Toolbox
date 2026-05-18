@@ -10,7 +10,7 @@
 @inject ThemeLinkService ThemeService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
-@inject Toolbox.Services.SettingsService SettingsService
+@inject Toolbox.Data.Services.SettingsService SettingsService
 @inject SolutionOpener SolutionOpener
 @inject IisService IisService
 
@@ -24,7 +24,7 @@
         </MudAlert>
         @if (Settings.ShopSettingsList.Any())
         {
-            <div class="mt-4" style="min-width:300px;">
+            <div class="mt-4 page-shop-select">
                 <MudSelect Variant="Variant.Outlined" Value="_selectedShopPath" ValueChanged="ChangeSelectedShop" T="string">
                     @foreach (var shopPaths in Settings.ShopSettingsList)
                     {
@@ -38,7 +38,7 @@
 
 @if (Settings.ShopSettingsList.Any())
 {        
-    <div class="row p-4">
+    <div class="row g-0 p-4">
         <MudText Typo="Typo.h5">Themes</MudText>   
         <div class="col-4">
             <MudSelect Variant="Variant.Outlined" Value="_selectedShopPath" ValueChanged="ChangeSelectedShop" T="string">
@@ -461,6 +461,7 @@ else
         }
     }
 }
+
 
 
 

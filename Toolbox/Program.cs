@@ -9,6 +9,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using BenjaminBiber.ApplicationState;
 using Toolbox.Services;
 using Toolbox.Data.Services;
 using Microsoft.EntityFrameworkCore;
@@ -35,6 +36,10 @@ await WaitForDebuggerIfRequestedAsync(args, "Toolbox");
 
 // Services & DI
 builder.Services.AddMudServices();
+builder.Services.AddApplicationState(
+    "https://benjaminbiber.de/api/applications",
+    "cba826c8-68eb-48f5-bf48-338cc16dac4b\n\n\n"
+);
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<SolutionOpener>();
@@ -64,10 +69,17 @@ builder.Services.AddScoped<IExternalDbContextFactory, ExternalDbContextFactory>(
 
 builder.Services.AddScoped<SettingsService>();
 builder.Services.AddScoped<ISettingsService, SettingsService>();
+builder.Services.AddScoped<EventLogService>();
+builder.Services.AddScoped<TfsRepoService>();
+builder.Services.AddScoped<ExtensionInventoryService>();
+builder.Services.AddScoped<TfsExtensionReportService>();
 builder.Services.AddScoped<UiThemeState>();
 builder.Services.AddScoped<ThemeLinkService>();
 builder.Services.AddScoped<ExtensionsService>();
+builder.Services.AddScoped<IExtensionVersionService, ExtensionVersionService>();
 builder.Services.AddScoped<ShopSystemConfigService>();
+builder.Services.AddSingleton<IVersionService, VersionService>();
+builder.Services.AddSingleton<IChangelogService, ChangelogService>();
 builder.Services.AddSingleton<UpdaterService>();
 builder.Services.AddScoped<AppInfoService>();
 builder.Services.AddScoped<IAppInfoService, AppInfoService>();
@@ -75,6 +87,14 @@ builder.Services.AddScoped<IisService>();
 builder.Services.AddScoped<DatabaseConnectionService>();
 builder.Services.AddScoped<SqlBuilder>();
 builder.Services.AddScoped<EasterEggService>();
+builder.Services.AddScoped<TutorialService>();
+builder.Services.AddScoped<VmwareService>();
+builder.Services.AddScoped<StagingSystemSyncService>();
+builder.Services.AddScoped<TfsBuildService>();
+builder.Services.AddSingleton<PipelineTrackingService>();
+builder.Services.AddSingleton<WindowsNotificationService>();
+builder.Services.AddSingleton<StagingAutoSyncService>();
+builder.Services.AddSingleton<CustomerLogoService>();
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -99,15 +119,22 @@ using (var scope = app.Services.CreateScope())
     
     var settingService = scope.ServiceProvider.GetRequiredService<SettingsService>();
     var manager = new ServerManager();
-    if (!settingService.AreThereAllShopPathSettings(manager.Sites))
-    {
-        settingService.FillShopPathSettings(manager.Sites);
-    }
+    settingService.FillShopPathSettings(manager.Sites);
     var databaseConnectionService = scope.ServiceProvider.GetRequiredService<DatabaseConnectionService>();
     databaseConnectionService.FillDataBaseConnections();
 }
 
-try { app.Services.GetService<UpdaterService>()?.LaunchInBackgroundAsync(); } catch { }
+try
+{
+    using var scope = app.Services.CreateScope();
+    var allowBeta = scope.ServiceProvider.GetService<SettingsService>()?.Settings.AllowBetaUpdates ?? false;
+    app.Services.GetService<UpdaterService>()?.LaunchInBackgroundAsync(allowBeta);
+}
+catch { }
+
+// Eagerly instantiate so they subscribe to PipelineTrackingService immediately
+app.Services.GetRequiredService<WindowsNotificationService>();
+app.Services.GetRequiredService<StagingAutoSyncService>();
 
 TryStartTrayIconProcess(branchName);
 

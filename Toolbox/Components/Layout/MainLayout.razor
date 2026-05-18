@@ -1,9 +1,18 @@
+@using MudBlazor
 @using Toolbox.Themes
 @using Toolbox.Components.Layout.TopBar
+@using Toolbox.Components.Dialogs
+@using Toolbox.Components.Tutorial
 @using Toolbox.Services
+@using Toolbox.Data.Models.Interfaces
 @inherits LayoutComponentBase
 @implements IDisposable
 @inject UiThemeState ThemeState
+@inject IDialogService DialogService
+@inject IChangelogService ChangelogService
+@inject IAppInfoService AppInfoService
+@inject IVersionService VersionService
+@inject TutorialService TutorialService
 
 <MudThemeProvider Theme="@CurrentTheme" />
 <MudPopoverProvider />
@@ -12,22 +21,88 @@
 
 <MudLayout Class="@LayoutClass">
     <TopBar />
-    <MudMainContent>
-        <div style="height: calc(100dvh - var(--mud-appbar-height));" class="content">
+    <MudMainContent Class="main-content">
+        <div class="content">
             @Body
         </div>
     </MudMainContent>
-    
-    
+    <TutorialOverlay />
 </MudLayout>
 
 @code {
     private MudTheme CurrentTheme => ThemeState.IsWin95Mode ? Windows95Theme.Theme : ModernTheme.Yetitheme;
     private string LayoutClass => ThemeState.IsWin95Mode ? "win95-mode" : string.Empty;
+    private bool _startupChecked;
+    private bool _tutorialStarted;
 
     protected override void OnInitialized()
     {
         ThemeState.StateChanged += OnThemeChanged;
+        TutorialService.Completed += OnTutorialCompleted;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _startupChecked)
+        {
+            return;
+        }
+
+        _startupChecked = true;
+
+        try
+        {
+            var currentVersion = VersionService.GetCurrentVersion();
+            var appInfo = await AppInfoService.GetOrCreateAsync();
+            var previousVersion = appInfo.LastInstalledVersion;
+            var isCleanInstall = string.IsNullOrWhiteSpace(previousVersion);
+
+            appInfo.CurrentVersion = currentVersion;
+
+            var hasPrevious = !string.IsNullOrWhiteSpace(previousVersion);
+            var isUpdate = hasPrevious && VersionService.IsNewer(currentVersion, previousVersion!);
+            var alreadyShown = string.Equals(appInfo.LastShownChangelogForVersion, currentVersion, StringComparison.OrdinalIgnoreCase);
+
+            if (isUpdate && !alreadyShown)
+            {
+                var markdown = await ChangelogService.BuildMarkdownAsync(previousVersion!, currentVersion);
+                var parameters = new DialogParameters
+                {
+                    { nameof(ChangelogDialog.MarkdownContent), markdown },
+                    { nameof(ChangelogDialog.CurrentVersion), currentVersion },
+                    { nameof(ChangelogDialog.PreviousVersion), previousVersion! }
+                };
+                var options = new DialogOptions
+                {
+                    CloseButton = true,
+                    FullWidth = true,
+                    MaxWidth = MaxWidth.Large
+                };
+
+                var dialog = await DialogService.ShowAsync<ChangelogDialog>("Changelog", parameters, options);
+                await dialog.Result;
+
+                appInfo.LastShownChangelogForVersion = currentVersion;
+            }
+
+            if (!isCleanInstall && !appInfo.HasCompletedTutorial)
+            {
+                appInfo.HasCompletedTutorial = true;
+            }
+
+            appInfo.LastInstalledVersion = currentVersion;
+            await AppInfoService.UpdateAsync(appInfo);
+
+            if (isCleanInstall && !appInfo.HasCompletedTutorial && !_tutorialStarted)
+            {
+                _tutorialStarted = true;
+                TutorialService.Start();
+            }
+        }
+        catch
+        {
+            // ignore
+        }
     }
 
     private void OnThemeChanged()
@@ -38,5 +113,28 @@
     public void Dispose()
     {
         ThemeState.StateChanged -= OnThemeChanged;
+        TutorialService.Completed -= OnTutorialCompleted;
+    }
+
+    private void OnTutorialCompleted(bool skipped)
+    {
+        _ = PersistTutorialCompletionAsync();
+    }
+
+    private async Task PersistTutorialCompletionAsync()
+    {
+        try
+        {
+            var appInfo = await AppInfoService.GetOrCreateAsync();
+            if (!appInfo.HasCompletedTutorial)
+            {
+                appInfo.HasCompletedTutorial = true;
+                await AppInfoService.UpdateAsync(appInfo);
+            }
+        }
+        catch
+        {
+            // ignore
+        }
     }
 }

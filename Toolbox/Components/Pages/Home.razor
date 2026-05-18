@@ -1,13 +1,11 @@
 @page "/"
 @inject ISnackbar Snackbar
-@inject IDialogService DialogService
-@inject Toolbox.Services.SettingsService SettingsService
-@inject Toolbox.Services.AppInfoService AppInfoService
+@inject Toolbox.Data.Services.SettingsService SettingsService
+@inject Toolbox.Data.Services.AppInfoService AppInfoService
 @using Toolbox.Data.Models
 @using Toolbox.Data.Models.Logs
 @using Toolbox.Data.Common
 @using Toolbox.Data.Services
-@using Toolbox.Components.Dialogs
 @using Microsoft.Web.Administration
 @using Toolbox.Services
 @using Toolbox.Data.Models.Extensions
@@ -57,54 +55,73 @@
                 </MudMenu>
             </div>
             <div class="col-7 d-flex col-lg-12 justify-content-evenly gap-3 flex-lg-column align-items-center">
-                <MudButton Color="Color.Success" Class="w-100" StartIcon="@Icons.Material.Filled.Start" Variant="Variant.Filled" OnClick="@IisService.StartIisApp">Start</MudButton>
-                <MudButton Color="Color.Warning" Class="w-100" StartIcon="@Icons.Material.Filled.RestartAlt" Variant="Variant.Filled" OnClick="@(() => IisService.RestartIisApp())">Neustart</MudButton>
+                <MudButton Color="Color.Success" Class="w-100" StartIcon="@Icons.Material.Filled.Start" Variant="Variant.Filled" OnClick="@IisService.StartIisApp" data-tutorial="iis-start">Start</MudButton>
+                <MudButton Color="Color.Warning" Class="w-100" StartIcon="@Icons.Material.Filled.RestartAlt" Variant="Variant.Filled" OnClick="RestartIisAppAndRefresh">Neustart</MudButton>
                 <MudButton Color="Color.Error" Class="w-100" StartIcon="@Icons.Material.Filled.Stop" Variant="Variant.Filled" OnClick="@IisService.StopCurrentIisApp">Stop</MudButton>
             </div>
         </div>
 
         @if (_onlySinceRestart && (_loadedExtensions.Any() || _excludedExtensions.Any()))
         {
-            <div class="row mt-5">
+            <div class="row mt-2 mt-xl-5">
                 <div class="col-12">
-                    <div class="p-2 d-flex flex-column align-items-start justify-content-center">
+                    <div class="p-2 d-flex flex-column align-items-start justify-content-center w-100">
                         @if (_loadedExtensions.Any())
                         {
-                            <MudText Typo="Typo.body2" Class="mb-1 fw-bold">
-                                @(_extensionsSinceRestart
-                                    ? "Geladene Extensions seit letztem Neustart"
-                                    : _loadedExtensionsTimestamp.HasValue
-                                        ? $"Zuletzt geladene Extensions ({_loadedExtensionsTimestamp:dd.MM.yyyy HH:mm})"
-                                        : "Zuletzt geladene Extensions")
-                            </MudText>
-                            @foreach (var ext in _loadedExtensions)
-                            {
-                                <MudChip T="string" Class="me-1 w-100 mb-1"
-                                         Color="Color.Primary"
-                                         Variant="Variant.Outlined"
-                                         OnClick="@(() => ShowExtensionLog(ext, false))">
-                                    @ext
-                                </MudChip>
-                            }
+                            <div class="d-flex flex-row gap-2 align-items-center justify-content-center w-100">
+                                <MudText Typo="Typo.body2" Class="mb-1 fw-bold" >
+                                    @(_extensionsSinceRestart
+                                        ? "Geladene Extensions seit letztem Neustart"
+                                        : _loadedExtensionsTimestamp.HasValue
+                                            ? $"Zuletzt geladene Extensions ({_loadedExtensionsTimestamp:dd.MM.yyyy HH:mm})"
+                                            : "Zuletzt geladene Extensions")
+                                </MudText>
+                                <MudToggleIconButton @bind-Toggled="expandLoadedExtensions"  ToggledIcon="@Icons.Material.Filled.KeyboardArrowUp" Icon="@Icons.Material.Filled.KeyboardArrowDown"></MudToggleIconButton>
+                            </div>
+                            <MudCollapse Class="w-100" Expanded="expandLoadedExtensions">
+                                <div style="max-height: 32dvh; overflow-x: hidden; overflow-y: auto" class="row g-2 d-flex justify-content-center align-items-center w-100">
+                                    @foreach (var ext in _loadedExtensions)
+                                    {
+                                        <div class="col-6 col-lg-12">
+                                            <MudChip T="string" Class="me-1 w-100 mb-1"
+                                                     Color="Color.Primary"
+                                                     Variant="Variant.Outlined"
+                                                     OnClick="@(() => ShowExtensionLog(ext, false))">
+                                                @ext
+                                            </MudChip>
+                                        </div>
+                                    }
+                                </div>
+                            </MudCollapse>
                         }
                         @if (_excludedExtensions.Any())
                         {
-                            <MudText Typo="Typo.body2" Class="mt-3 mb-1 fw-bold">
-                                @(_excludedSinceRestart
-                                    ? "Nicht geladene Extensions seit letztem Neustart"
-                                    : _excludedExtensionsTimestamp.HasValue
-                                        ? $"Zuletzt nicht geladene Extensions ({_excludedExtensionsTimestamp:dd.MM.yyyy HH:mm})"
-                                        : "Nicht geladene Extensions")
-                            </MudText>
-                            @foreach (var ext in _excludedExtensions)
-                            {
-                                <MudChip T="string" Class="me-1 w-100 mb-1"
-                                         Color="Color.Error"
-                                         Variant="Variant.Outlined"
-                                         OnClick="@(() => ShowExtensionLog(ext, true))">
-                                    @ext
-                                </MudChip>
-                            }
+                            <div class="d-flex flex-row gap-2 align-items-center justify-content-center w-100">
+
+                                <MudText Typo="Typo.body2" Class="mt-3 mb-1 fw-bold">
+                                    @(_excludedSinceRestart
+                                        ? "Nicht geladene Extensions seit letztem Neustart"
+                                        : _excludedExtensionsTimestamp.HasValue
+                                            ? $"Zuletzt nicht geladene Extensions ({_excludedExtensionsTimestamp:dd.MM.yyyy HH:mm})"
+                                            : "Nicht geladene Extensions")
+                                </MudText>
+                                <MudToggleIconButton @bind-Toggled="expandFailedExtensions"  ToggledIcon="@Icons.Material.Filled.KeyboardArrowUp" Icon="@Icons.Material.Filled.KeyboardArrowDown"></MudToggleIconButton>
+                            </div>
+                            <MudCollapse Class="w-100" Expanded="expandFailedExtensions">
+                                <div style="max-height: 32dvh; overflow-x: hidden; overflow-y: auto" class="row g-2 d-flex justify-content-center align-items-center w-100">
+                                    @foreach (var ext in _excludedExtensions)
+                                    {
+                                        <div class="col-6 col-lg-12">
+                                            <MudChip T="string" Class="me-1 w-100 mb-1"
+                                                     Color="Color.Error"
+                                                     Variant="Variant.Outlined"
+                                                     OnClick="@(() => ShowExtensionLog(ext, true))">
+                                                @ext
+                                            </MudChip>
+                                        </div>
+                                    }
+                                </div>
+                            </MudCollapse>
                         }
                     </div>
                 </div>
@@ -113,51 +130,75 @@
     </div>
 
     @*FILTER AND SEARCH*@
-    <div class="col-12 col-lg-9 d-flex flex-column p-4 " style="height: calc(100dvh - var(--mud-appbar-height)); min-height:0; overflow:hidden;">
-        <div class="row mb-3">
-            @*SEARCH*@
-            <div class="col">
-                <MudTextField Variant="Variant.Text" @bind-Value="_searchText" Immediate="true" Label="Suche" Class="w-100"/>
-            </div>
-            @*FILTER*@
-            <div class="col-1">
-                <MudIconButton Icon="@Icons.Material.Filled.FilterAlt" OnClick="HandlePopOver"></MudIconButton>
-                <div @onclick="HandlePopOver" class="@(_isPopOverOpen ? "position-absolute" : "d-none")" style="background: rgba(1,1,1,0.1); z-index: 3; height: 100dvh; width: 100vw; left: 0; top: 0"></div>
-                <MudPopover Class="pa-6" Open="@_isPopOverOpen" AnchorOrigin="Origin.BottomRight">
-                    <div class="d-flex gap-3 flex-column">
-                        <MudText Class="fw-bold fs-3">Filter</MudText>
-                        <MudSelect T="LogLevel" MultiSelection="true" MultiSelectionTextFunc="@(new Func<List<string>, string>(GetMultiSelectionText))" SelectedValues="_selectedLevels" SelectedValuesChanged="@(async levels => await SelectedLevelsChanged(levels))" Label="Ebene">
-                            @foreach (var level in Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All))
-                            {
-                                <MudSelectItem Value="@level">@level.GetDescription()</MudSelectItem>
-                            }
-                        </MudSelect>
-                        <MudSelect T="ReloadOption" Value="reload" ValueChanged="@(async (ReloadOption l) => await LoadLogs(l))" Label="Zeitpunkt">
-                            @foreach (var level in Enum.GetValues<ReloadOption>())
-                            {
-                                <MudSelectItem Value="@level">@level.GetDescription()</MudSelectItem>
-                            }
-                        </MudSelect>
-                        <MudSelect T="double" Value="_refreshSeconds" ValueChanged="@((double l) => HandleTimer(l))" Label="Logs neu laden">
-                            @foreach (var reloadTime in ReloadTime.ReloadTimes)
-                            {
-                                <MudSelectItem Value="@reloadTime.Value.TotalSeconds">@reloadTime.Key</MudSelectItem>
-                            }
-                        </MudSelect>
-                    </div>
-                </MudPopover>
-            </div>
-            @*RELOAD*@
-            <div class="col-1">
-                <MudIconButton Icon="@Icons.Material.Filled.Autorenew" OnClick="LoadLogs"></MudIconButton>
-            </div>
-        </div>
-
-        <div class="flex-grow-1 d-flex flex-column" style="min-height:0;">
-            @if (DisplayLogs.Any())
-            {
-                <div class="flex-grow-1" style="@GetTableContainerStyle()">
-                    <MudTable Height="100%" Loading="_isLoading" FixedFooter="true" FixedHeader="true" Items="DisplayLogs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
+    <div class="col-12 col-lg-9 d-flex flex-column p-4 home-main-panel">
+        <div class="flex-grow-1 d-flex flex-column home-log-panel">
+                    <MudTable Height="calc(90dvh - (2rem * 2))"  FixedFooter="true" FixedHeader="true" Items="DisplayLogs" Hover="true" OnRowClick="@((TableRowClickEventArgs<LogEntry> t) => ShowLogDetails(t))">
+                        <NoRecordsContent>
+                            <div class="d-flex w-100 h-100 align-items-center justify-content-center">
+                                <MudAlert Class="w-50">Keine Logs gefunden.</MudAlert>
+                            </div>
+                        </NoRecordsContent>
+                        <ToolBarContent>
+                            <div class="row w-100">
+                                @*SEARCH*@
+                                <div class="col">
+                                    <MudTextField T="string" Variant="Variant.Text" Value="_searchTextInput" ValueChanged="OnSearchTextChanged" Immediate="true" Label="Suche" Class="w-100 tutorial-log-search"/>
+                                </div>
+                                @*FILTER*@
+                                <div class="col-1">
+                                    <MudIconButton Icon="@Icons.Material.Filled.FilterAlt" OnClick="HandlePopOver" data-tutorial="log-filter"></MudIconButton>
+                                    <div @onclick="HandlePopOver" class="home-filter-overlay @(_isPopOverOpen ? "home-filter-overlay--visible" : "home-filter-overlay--hidden")"></div>
+                                    <MudPopover Class="pa-6 tutorial-popover" Open="@_isPopOverOpen" AnchorOrigin="Origin.BottomRight">
+                                        <div class="d-flex gap-3 flex-column">
+                                            <MudText Class="fw-bold fs-3">Filter</MudText>
+                                            <MudSelect T="LogLevel" MultiSelection="true" MultiSelectionTextFunc="@(new Func<List<string>, string>(GetMultiSelectionText))" SelectedValues="_selectedLevels" SelectedValuesChanged="@(async levels => await SelectedLevelsChanged(levels))" Label="Ebene">
+                                                @foreach (var level in Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All))
+                                                {
+                                                    <MudSelectItem Value="@level">@level.GetDescription()</MudSelectItem>
+                                                }
+                                            </MudSelect>
+                                            <MudSelect T="string" MultiSelection="true" MultiSelectionTextFunc="@(new Func<List<string>, string>(GetLogSelectionText))" SelectedValues="_selectedLogNames" SelectedValuesChanged="@(async names => await SelectedLogNamesChanged(names))" Label="Logs" Disabled="@(!_availableLogNames.Any())">
+                                                @foreach (var logName in _availableLogNames)
+                                                {
+                                                    <MudSelectItem Value="@logName">@logName</MudSelectItem>
+                                                }
+                                            </MudSelect>
+                                            <MudSelect T="ReloadOption" Value="reload" ValueChanged="@(async (ReloadOption l) => await LoadLogs(l))" Label="Zeitpunkt">
+                                                @foreach (var level in Enum.GetValues<ReloadOption>())
+                                                {
+                                                    <MudSelectItem Value="@level">@level.GetDescription()</MudSelectItem>
+                                                }
+                                            </MudSelect>
+                                            <MudSelect T="double" Value="_refreshSeconds" ValueChanged="@((double l) => HandleTimer(l))" Label="Logs neu laden">
+                                                @foreach (var reloadTime in ReloadTime.ReloadTimes)
+                                                {
+                                                    <MudSelectItem Value="@reloadTime.Value.TotalSeconds">@reloadTime.Key</MudSelectItem>
+                                                }
+                                            </MudSelect>
+                                            <div class="d-flex gap-2">
+                                                <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AccessTime" OnClick="SetLogTimeToNow">
+                                                    Zeit auf jetzt setzen
+                                                </MudButton>
+                                                <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Restore" OnClick="ResetFilters">
+                                                    Filter zurücksetzen
+                                                </MudButton>
+                                            </div>
+                                        </div>
+                                    </MudPopover>
+                                </div>
+                                @*RELOAD*@
+                                <div class="col-1">
+                                    @if (!_isLoading)
+                                    { 
+                                        <MudIconButton Icon="@Icons.Material.Filled.Autorenew" OnClick="LoadLogs"></MudIconButton>
+                                    }
+                                    else
+                                    {
+                                        <MudProgressCircular Indeterminate="true" Size="Size.Medium" Color="Color.Primary"></MudProgressCircular>
+                                    }
+                                </div>
+                            </div>
+                        </ToolBarContent>
                         <HeaderContent>
                             <MudTh><MudTableSortLabel SortBy="new Func<LogEntry, object>(x=>x.Time)">Zeit</MudTableSortLabel></MudTh>
                             <MudTh>Ebene</MudTh>
@@ -166,7 +207,8 @@
                         <RowTemplate>
                             <MudTd DataLabel="Zeit">@context.Time</MudTd>
                             <MudTd DataLabel="Ebene">
-                                <MudChip T="string" Color="@GetColor(context.Level)" Icon="@GetIcon(context.Level)" Variant="Variant.Filled">@context.Level</MudChip>
+                                <MudChip T="string" Class="d-none d-xl-flex" Color="@GetColor(context.Level)" Icon="@GetIcon(context.Level)" Variant="Variant.Filled">@context.Level</MudChip>
+                                <MudIcon Class="d-flex d-xl-none" Color="@GetColor(context.Level)" Icon="@GetIcon(context.Level)"/>
                             </MudTd>
                             <MudTd DataLabel="Nachricht">
                                 @HighlightSnippet(GetSnippet(context))
@@ -185,41 +227,30 @@
                         </PagerContent>
                     </MudTable>
                 </div>
-                    @if (_selectedLog is not null)
-                    {
-                        <MudPaper Elevation="5" Class="mt-2 p-3 mb-5 mr-3" style="@GetDetailStyle()">
+                @if (_selectedLog is not null)
+                {
+                    <MudPaper Style="z-index: 999; max-height: 45dvh;" Elevation="5" Class="@($"mt-2 p-3 mb-5 mr-3 home-log-detail {(_selectedLog is null ? "home-log-detail--hidden" : string.Empty)}")">
 
-                        <div class="d-flex align-items-start mb-2">
-                            <MudText Typo="Typo.h6" Class="fw-bold me-auto">Logdetails</MudText>
-                            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Default" OnClick="ClearLogSelection" />
-                        </div>
-                        <div class="row mb-2 pb-1">
-                            <div class="col-12 col-lg-5">
-                                <MudText Typo="Typo.subtitle2" Class="fw-bold mb-1">Metadaten</MudText>
-                                <MudPaper Elevation="0" Class="p-2 h-100" Style=" max-height:40vh; overflow:auto;">
-                                    <pre style="white-space:pre-wrap; word-wrap: break-word; word-break: break-word; hyphens: auto; font-size: 0.85rem; margin:0;">@HighlightDetail(_selectedLog.ParsedMessage?.GetFormattedMessage(new HashSet<MessageType>() { MessageType.Origin, MessageType.Metadata }) ?? _selectedLog.Message)</pre>
-                                </MudPaper>
-                            </div>
-                            <div class="col-12 col-lg-7">
-                                <MudText Typo="Typo.subtitle2" Class="fw-bold mb-1">Nachricht</MudText>
-                                <MudPaper Elevation="0" Class="p-2 h-100" Style="max-height:35vh; overflow:auto;">
-                                    <pre style="white-space:pre-wrap; word-wrap: break-word; word-break: break-word; hyphens: auto; font-size: 0.85rem; margin:0;">@HighlightDetail(_selectedLog.ParsedMessage?.GetFormattedMessage(new HashSet<MessageType>() { MessageType.Message }) ?? _selectedLog.Message)</pre>
-                                </MudPaper>
-                            </div>
-                        </div>
-                        </MudPaper>
-                    }
-            }
-            else
-            {
-                <div class="row">
-                    <div class="col d-flex align-items-center justify-content-center">
-                        <MudAlert Class="w-100">Keine Logs gefunden.</MudAlert>
+                    <div class="d-flex align-items-start mb-2">
+                        <MudText Typo="Typo.h6" Class="fw-bold me-auto">Logdetails</MudText>
+                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Default" OnClick="ClearLogSelection" />
                     </div>
-                </div>
-            }
-        </div>
-
+                    <div class="row mb-2 pb-1">
+                        <div class="col-12 col-lg-5">
+                            <MudText Typo="Typo.subtitle2" Class="fw-bold mb-1">Metadaten</MudText>
+                            <MudPaper Elevation="0" Class="p-2 h-100 home-log-meta">
+                                <pre class="home-log-pre">@HighlightDetail(_selectedLog.ParsedMessage?.GetFormattedMessage(new HashSet<MessageType>() { MessageType.Origin, MessageType.Metadata }) ?? _selectedLog.Message)</pre>
+                            </MudPaper>
+                        </div>
+                        <div class="col-12 col-lg-7">
+                            <MudText Typo="Typo.subtitle2" Class="fw-bold mb-1">Nachricht</MudText>
+                            <MudPaper Elevation="0" Class="p-2 h-100 home-log-message" Style="max-height: 35dvh; overflow-y: scroll">
+                                <pre class="home-log-pre">@HighlightDetail(_selectedLog.ParsedMessage?.GetFormattedMessage(new HashSet<MessageType>() { MessageType.Message }) ?? _selectedLog.Message)</pre>
+                            </MudPaper>
+                        </div>
+                    </div>
+                    </MudPaper>
+                }
     </div>
 </div>
 
@@ -230,6 +261,7 @@
     private bool _autoRefresh;
     private int _refreshSeconds = 0;
     private DateTime _lastShopRestart = DateTime.Now;
+    private DateTime _logSinceTime = DateTime.Now;
     private DateTime _appStartTime = DateTime.Now;
     private ReloadOption reload = ReloadOption.SeitStartDerAnwendung;
     private bool _onlySinceRestart;
@@ -244,12 +276,22 @@
     private DateTime? _excludedExtensionsTimestamp;
     private bool _extensionsSinceRestart;
     private bool _excludedSinceRestart;
+    private string _searchTextInput = string.Empty;
     private string _searchText = string.Empty;
+    private string _searchTextNormalized = string.Empty;
     private LogEntry? _selectedLog;
+    private bool expandFailedExtensions;
+    private bool expandLoadedExtensions;
     private LogService? _logService;
     private bool _isPopOverOpen = false;
     private HashSet<LogLevel> _selectedLevels = new(Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All));
+    private readonly List<string> _availableLogNames = new();
+    private HashSet<string> _selectedLogNames = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, long> _lastRecordIds = new(StringComparer.OrdinalIgnoreCase);
     private static readonly HashSet<MessageType> _allMessageTypes = new(Enum.GetValues<MessageType>());
+    private const int MaxLogEntries = 5000;
+    private const int SearchDebounceMs = 250;
+    private System.Timers.Timer? _searchDebounceTimer;
     
     private IEnumerable<LogEntry> DisplayLogs => FilterAndBundle(_displayLogs);
 
@@ -259,18 +301,28 @@
         await LoadLogs();
     }
 
+    private async Task SelectedLogNamesChanged(IEnumerable<string> names)
+    {
+        _selectedLogNames = names.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        UpdateLogService();
+        ResetLogCursor();
+        await LoadLogs();
+    }
+
     private IEnumerable<LogEntry> FilterAndBundle(IEnumerable<LogEntry> source)
     {
         if (!EasterEggService.IsSecretUnlocked && string.Equals(_searchText, "andy ist der beste", StringComparison.OrdinalIgnoreCase))
         {
             EasterEggService.UnlockSecret();
-            _searchText = string.Empty;
+            _searchTextInput = string.Empty;
+            ApplySearchText();
             StateHasChanged();
         }
         
-        var filtered = string.IsNullOrWhiteSpace(_searchText)
+        var searchText = _searchTextNormalized;
+        var filtered = string.IsNullOrWhiteSpace(searchText)
             ? source
-            : source.Where(e => GetFullMessage(e).Contains(_searchText, StringComparison.OrdinalIgnoreCase));
+            : source.Where(e => GetSearchText(e).Contains(searchText, StringComparison.Ordinal));
 
         if (!Settings.BundleLogs)
         {
@@ -284,13 +336,17 @@
         {
             if (current == null)
             {
+                var fullMessage = GetFullMessage(log);
+                searchText = GetSearchText(log);
                 current = new LogEntry
                 {
                     Time = log.Time,
                     Level = log.Level,
                     Message = log.Message,
                     Count = log.Count,
-                    ParsedMessage = log.ParsedMessage
+                    ParsedMessage = log.ParsedMessage,
+                    FullMessage = fullMessage,
+                    SearchText = searchText
                 };
             }
             else if (current.Level == log.Level &&
@@ -307,7 +363,9 @@
                     Level = log.Level,
                     Message = log.Message,
                     Count = log.Count,
-                    ParsedMessage = log.ParsedMessage
+                    ParsedMessage = log.ParsedMessage,
+                    FullMessage = GetFullMessage(log),
+                    SearchText = GetSearchText(log)
                 };
             }
         }
@@ -317,17 +375,6 @@
         }
     }
 
-    private async Task ShowDialogEasterEgg()
-    {
-        var options = new DialogOptions()
-        {
-            FullWidth = true,
-            MaxWidth = MaxWidth.Medium
-        };
-        await DialogService.ShowAsync<EasterEggDialog>("Gluecksrad", options);
-        EasterEggService.MarkEasterEggCompleted();
-    }
-    
     private MarkupString Highlight(string message)
     {
         if (string.IsNullOrWhiteSpace(_searchText))
@@ -339,7 +386,7 @@
         var pattern = System.Text.RegularExpressions.Regex.Escape(_searchText);
         var highlighted = System.Text.RegularExpressions.Regex.Replace(encoded, pattern,
             m => $"<mark>{m.Value}</mark>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        return (MarkupString)$"<span style=\"font-size:smaller\">{highlighted}</span>";
+        return (MarkupString)$"<span class=\"home-highlight\">{highlighted}</span>";
 
     }
 
@@ -347,6 +394,7 @@
     {
         var appInfo = await AppInfoService.GetAsync();
         _appStartTime = appInfo.StartTime;
+        _lastShopRestart = appInfo.IisRestartTime;
        
         if (SettingsService.IsConfigured)
         {
@@ -364,11 +412,16 @@
 
     private async Task ApplySettings()
     {
-        _logService = new LogService(Settings.LogName!);
+        _availableLogNames.Clear();
+        _availableLogNames.AddRange(Settings.GetLogNames());
+        _selectedLogNames = new HashSet<string>(_availableLogNames, StringComparer.OrdinalIgnoreCase);
+        UpdateLogService();
+        ResetLogCursor();
         _autoRefresh = Settings.AutoRefreshEnabled;
         _refreshSeconds = Settings.AutoRefreshSeconds;
         _onlySinceRestart = Settings.OnlySinceRestart;
         reload = _onlySinceRestart ? ReloadOption.SeitLetztemNeuladen : ReloadOption.SeitStartDerAnwendung;
+        _logSinceTime = _onlySinceRestart ? _lastShopRestart : _appStartTime;
         await LoadLogs();
         StartTimer();
     }
@@ -391,9 +444,27 @@
     {
         _isLoading = true;
         StateHasChanged();
-        var since = reload == ReloadOption.AlleLogs ? DateTime.MinValue  : _onlySinceRestart ? _lastShopRestart : _appStartTime;
-        var logs = await Task.Run(() => _logService?.GetLogs(since, LogLevel.All) ?? Enumerable.Empty<LogEntry>());
-        _logs = logs.ToList();
+        await RefreshRestartTimeIfChangedAsync();
+        var since = reload switch
+        {
+            ReloadOption.AlleLogs => DateTime.MinValue,
+            ReloadOption.SeitLetztemNeuladen => _logSinceTime,
+            ReloadOption.SeitStartDerAnwendung => _appStartTime,
+            _ => _appStartTime
+        };
+        var canUseIncremental = CanUseIncremental();
+        var batch = await Task.Run(() => _logService?.GetLogsBatch(since, LogLevel.All, canUseIncremental ? _lastRecordIds : null) ?? LogBatch.Empty);
+        UpdateLogCursor(batch.LastRecordIds);
+
+        if (canUseIncremental)
+        {
+            _logs.InsertRange(0, batch.Entries);
+        }
+        else
+        {
+            _logs = batch.Entries.ToList();
+        }
+        TrimLogCache();
         await UpdateLoadedExtensions();
         _displayLogs = _logs
             .Where(l => _selectedLevels.Contains(l.Level))
@@ -405,7 +476,61 @@
     private async Task LoadLogs(ReloadOption option)
     {
         reload = option;
+        ResetLogCursor();
         await LoadLogs();
+    }
+
+    private async Task SetLogTimeToNow()
+    {
+        _logSinceTime = DateTime.Now;
+        reload = ReloadOption.SeitLetztemNeuladen;
+        ResetLogCursor();
+        await LoadLogs();
+    }
+
+    private async Task ResetFilters()
+    {
+        _searchTextInput = string.Empty;
+        ApplySearchText();
+        _selectedLevels = new HashSet<LogLevel>(Enum.GetValues<LogLevel>().Where(l => l != LogLevel.All));
+        _selectedLogNames = new HashSet<string>(_availableLogNames, StringComparer.OrdinalIgnoreCase);
+        UpdateLogService();
+        ResetLogCursor();
+        reload = _onlySinceRestart ? ReloadOption.SeitLetztemNeuladen : ReloadOption.SeitStartDerAnwendung;
+        _logSinceTime = _onlySinceRestart ? _lastShopRestart : _appStartTime;
+        _autoRefresh = Settings.AutoRefreshEnabled;
+        _refreshSeconds = Settings.AutoRefreshSeconds;
+        StartTimer();
+        await LoadLogs();
+    }
+
+    private async Task RestartIisAppAndRefresh()
+    {
+        await IisService.RestartIisApp();
+        await RefreshRestartTimeIfChangedAsync(forceReload: true);
+        await LoadLogs();
+    }
+
+    private async Task RefreshRestartTimeIfChangedAsync(bool forceReload = false)
+    {
+        if (!_onlySinceRestart && !forceReload)
+        {
+            return;
+        }
+
+        var appInfo = await AppInfoService.GetAsync();
+        if (appInfo.IisRestartTime <= _lastShopRestart && !forceReload)
+        {
+            return;
+        }
+
+        _lastShopRestart = appInfo.IisRestartTime;
+        if (_onlySinceRestart)
+        {
+            _logSinceTime = _lastShopRestart;
+            reload = ReloadOption.SeitLetztemNeuladen;
+            ResetLogCursor();
+        }
     }
 
     private async Task UpdateLoadedExtensions()
@@ -601,16 +726,6 @@
         StateHasChanged();
     }
 
-    private string GetTableContainerStyle() =>
-        _selectedLog is null
-            ? "min-height:0; max-height:80vh; overflow:auto;"
-            : "min-height:0; flex:1 1 0; overflow:auto;";
-
-    private string GetDetailStyle() =>
-        _selectedLog is null
-            ? "display:none;"
-            : "min-height:0; flex:0 0 auto;";
-
     private Task ShowLogDetails(TableRowClickEventArgs<LogEntry> args) => ShowLogDetails(args.Item);
 
     private Task ShowLogDetails(LogEntry entry)
@@ -623,8 +738,11 @@
     private string GetFullMessage(LogEntry entry)
     {
         if (entry == null) return string.Empty;
-        var text = entry.ParsedMessage?.GetFormattedMessage(new HashSet<MessageType>() { MessageType.Message }) ?? entry.Message ?? string.Empty;
-        return text;
+        if (!string.IsNullOrWhiteSpace(entry.FullMessage))
+        {
+            return entry.FullMessage;
+        }
+        return entry.Message ?? string.Empty;
     }
 
     private string GetSnippet(LogEntry entry)
@@ -722,6 +840,7 @@
     public void Dispose()
     {
         _timer?.Dispose();
+        _searchDebounceTimer?.Dispose();
     }
 
     private string GetMultiSelectionText(List<string> selectedValues)
@@ -740,6 +859,70 @@
         }
     }
 
+    private string GetLogSelectionText(List<string> selectedValues)
+    {
+        if (_availableLogNames.Count == 0)
+        {
+            return "Keine Logs konfiguriert";
+        }
+
+        if (selectedValues.Count == 0)
+        {
+            return "Keine Logs ausgewählt";
+        }
+
+        if (selectedValues.Count == _availableLogNames.Count)
+        {
+            return "Alle Logs";
+        }
+
+        return string.Join(", ", selectedValues);
+    }
+
+    private void ResetLogCursor()
+    {
+        _lastRecordIds.Clear();
+    }
+
+    private void UpdateLogCursor(IReadOnlyDictionary<string, long> latest)
+    {
+        foreach (var kvp in latest)
+        {
+            _lastRecordIds[kvp.Key] = kvp.Value;
+        }
+    }
+
+    private void TrimLogCache()
+    {
+        if (_logs.Count <= MaxLogEntries)
+        {
+            return;
+        }
+
+        _logs = _logs.Take(MaxLogEntries).ToList();
+    }
+
+    private bool CanUseIncremental()
+    {
+        if (_logService == null || _lastRecordIds.Count == 0)
+        {
+            return false;
+        }
+
+        return _selectedLogNames.All(name => _lastRecordIds.ContainsKey(name));
+    }
+
+    private void UpdateLogService()
+    {
+        if (_selectedLogNames.Count == 0)
+        {
+            _logService = null;
+            return;
+        }
+
+        _logService = new LogService(_selectedLogNames);
+    }
+
     private MarkupString HighlightDetail(string message) => Highlight(message);
     private MarkupString HighlightSnippet(string snippet) => Highlight(snippet);
 
@@ -747,4 +930,46 @@
     {
         _isPopOverOpen = !_isPopOverOpen;
     }
+
+    private void OnSearchTextChanged(string value)
+    {
+        _searchTextInput = value ?? string.Empty;
+
+        if (_searchDebounceTimer == null)
+        {
+            _searchDebounceTimer = new System.Timers.Timer(SearchDebounceMs)
+            {
+                AutoReset = false
+            };
+            _searchDebounceTimer.Elapsed += async (_, _) =>
+            {
+                await InvokeAsync(() =>
+                {
+                    ApplySearchText();
+                    StateHasChanged();
+                });
+            };
+        }
+
+        _searchDebounceTimer.Stop();
+        _searchDebounceTimer.Start();
+    }
+
+    private void ApplySearchText()
+    {
+        _searchText = _searchTextInput ?? string.Empty;
+        _searchTextNormalized = _searchText.Trim().ToLowerInvariant();
+    }
+
+    private string GetSearchText(LogEntry entry)
+    {
+        if (!string.IsNullOrEmpty(entry.SearchText))
+        {
+            return entry.SearchText;
+        }
+
+        var full = GetFullMessage(entry);
+        return full.ToLowerInvariant();
+    }
 }
+

@@ -7,17 +7,19 @@ namespace Toolbox.Services;
 
 public class UpdaterService
 {
-    public Task LaunchInBackgroundAsync()
+    public UpdaterService() { }
+
+    public Task LaunchInBackgroundAsync(bool allowBeta)
     {
         if (!OperatingSystem.IsWindows()) return Task.CompletedTask;
-        _ = Task.Run(() => TryLaunchUpdaterInternal());
+        _ = Task.Run(() => TryLaunchUpdaterInternal(allowBeta));
         return Task.CompletedTask;
     }
 
-    public Task<bool> TryLaunchUpdaterAsync()
-        => Task.Run(TryLaunchUpdaterInternal);
+    public Task<bool> TryLaunchUpdaterAsync(bool allowBeta)
+        => Task.Run(() => TryLaunchUpdaterInternal(allowBeta));
 
-    private bool TryLaunchUpdaterInternal()
+    private bool TryLaunchUpdaterInternal(bool allowBeta)
     {
         try
         {
@@ -32,7 +34,9 @@ public class UpdaterService
 
             var current = GetInformationalVersion()
                           ?? (typeof(UpdaterService).Assembly.GetName().Version?.ToString() ?? "0.0.0");
-            var args = $"--pid {Environment.ProcessId} --process-name \"Toolbox\" --current-version {current}";
+            var allowBetaArg = allowBeta ? "true" : "false";
+            var processNames = "Toolbox;Toolbox.TrayIcon";
+            var args = $"--pid {Environment.ProcessId} --process-name \"Toolbox\" --process-names \"{processNames}\" --current-version {current} --allow-beta {allowBetaArg}";
 #if DEBUG
             args += " --TOOLBOX_UPDATER_DEBUG=1";
 #endif
@@ -80,7 +84,7 @@ public class UpdaterService
             var v = attr?.InformationalVersion ?? asm.GetName().Version?.ToString();
             if (!string.IsNullOrEmpty(v))
             {
-                var idx = v.IndexOfAny(new[] { '+', '-' });
+                var idx = v.IndexOf('+');
                 if (idx > 0) v = v.Substring(0, idx);
             }
             return v;

@@ -1,0 +1,587 @@
+﻿@using System.IO
+@using System.Linq
+@using System.Text.Json
+@inject EasterEggService EasterEggService
+@implements IDisposable
+
+<div class="slot-machine-panel" style="@GetFxStyle()" tabindex="0" @ref="_panelRef" @onclick="FocusPanel" @onkeydown="OnKeyDown" @onkeydown:preventDefault="true">
+    <div class="slot-toolbar @(_fxFreeSpin ? "fx-free-spin" : string.Empty)">
+        <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined">Muenzen: @EasterEggService.SlotCoins</MudChip>
+        <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined">Freispiele: @EasterEggService.SlotFreeSpins</MudChip>
+    </div>
+    <div class="slot-stage">
+        <div class="slot-machine @GetSlotMachineClass() @GetFxClass()">
+            @if (_segments.Count == 0)
+            {
+                <div class="empty">Keine Bilder gefunden</div>
+            }
+            else
+            {
+                <div class="slot-reel @GetReelClass(0)" style="@GetReelStyle(0)">
+                    <div class="slot-reel-window">
+                        <div class="slot-symbol slot-symbol-top">
+                            <img src="@GetSlotImage(0, -1)" alt="slot-0-top" />
+                        </div>
+                        <div class="slot-symbol slot-symbol-middle">
+                            <img src="@GetSlotImage(0, 0)" alt="slot-0-mid" />
+                        </div>
+                        <div class="slot-symbol slot-symbol-bottom">
+                            <img src="@GetSlotImage(0, 1)" alt="slot-0-bottom" />
+                        </div>
+                    </div>
+                </div>
+                <div class="slot-reel @GetReelClass(1)" style="@GetReelStyle(1)">
+                    <div class="slot-reel-window">
+                        <div class="slot-symbol slot-symbol-top">
+                            <img src="@GetSlotImage(1, -1)" alt="slot-1-top" />
+                        </div>
+                        <div class="slot-symbol slot-symbol-middle">
+                            <img src="@GetSlotImage(1, 0)" alt="slot-1-mid" />
+                        </div>
+                        <div class="slot-symbol slot-symbol-bottom">
+                            <img src="@GetSlotImage(1, 1)" alt="slot-1-bottom" />
+                        </div>
+                    </div>
+                </div>
+            <div class="slot-reel @GetReelClass(2)" style="@GetReelStyle(2)">
+                <div class="slot-reel-window">
+                    <div class="slot-symbol slot-symbol-top">
+                        <img src="@GetSlotImage(2, -1)" alt="slot-2-top" />
+                    </div>
+                    <div class="slot-symbol slot-symbol-middle">
+                        <img src="@GetSlotImage(2, 0)" alt="slot-2-mid" />
+                    </div>
+                    <div class="slot-symbol slot-symbol-bottom">
+                        <img src="@GetSlotImage(2, 1)" alt="slot-2-bottom" />
+                    </div>
+                </div>
+            </div>
+                <div class="slot-payline" aria-hidden="true"></div>
+            <div class="slot-bezel" aria-hidden="true"></div>
+            <div class="slot-coins" aria-hidden="true"></div>
+            <div class="slot-multiplier @GetMultiplierClass()">@_fxMultiplierText</div>
+        }
+    </div>
+        <div class="slot-side">
+            <div class="slot-bets">
+                <MudText Typo="Typo.body2" Class="slot-bet-label">Einsatz</MudText>
+                <MudSelect T="int"
+                           Dense="true"
+                           Value="_slotBet"
+                           ValueChanged="(int v) => _slotBet = v"
+                           Variant="Variant.Outlined">
+                    @foreach (var bet in _slotBetOptions)
+                    {
+                        <MudSelectItem T="int" Value="@bet">@bet</MudSelectItem>
+                    }
+                </MudSelect>
+            </div>
+            <div class="slot-controls">
+                @if (EasterEggService.SlotFreeSpins > 0)
+                {
+                    <MudButton Class="slot-spin-btn slot-spin-btn--free" Color="Color.Success" Variant="Variant.Filled" Disabled="@(_slotSpinning || _segments.Count == 0)" OnClick="SpinSlots">
+                        Freispiel drehen (@EasterEggService.SlotFreeSpins)
+                    </MudButton>
+                }
+                else
+                {
+                    <MudButton Class="slot-spin-btn" Color="Color.Primary" Variant="Variant.Filled" Disabled="@(_slotSpinning || _segments.Count == 0 || EasterEggService.SlotCoins < _slotBet)" OnClick="SpinSlots">Drehen</MudButton>
+                }
+            </div>
+            <div class="slot-autospin">
+                <MudText Typo="Typo.body2" Class="slot-bet-label">Autospins</MudText>
+                <MudSelect T="int"
+                           Dense="true"
+                           Value="_autoSpinCount"
+                           ValueChanged="(int v) => _autoSpinCount = v"
+                           Variant="Variant.Outlined">
+                    @foreach (var count in _autoSpinOptions)
+                    {
+                        <MudSelectItem T="int" Value="@count">@count</MudSelectItem>
+                    }
+                </MudSelect>
+                @if (_autoSpinActive)
+                {
+                    <MudButton Color="Color.Error" Variant="Variant.Filled" Disabled="@(!_autoSpinActive)" OnClick="StopAutoSpins">Stopp</MudButton>
+                    <MudText Typo="Typo.caption">Rest: @_autoSpinsRemaining</MudText>
+                }
+                else
+                {
+                    <MudButton Color="Color.Tertiary" Variant="Variant.Outlined" Disabled="@(_segments.Count == 0)" OnClick="StartAutoSpins">Start</MudButton>
+                }
+            </div>
+        </div>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(_funFactText))
+    {
+        <div class="slot-funfact">
+            <div class="slot-funfact-title">Fun Fact</div>
+            <div class="slot-funfact-text">@_funFactText</div>
+        </div>
+    }
+</div>
+
+@code {
+    private readonly List<string> _segments = new();
+    private readonly Random _rng = new();
+    private string? _slotResultText;
+    private string? _funFactText;
+    private bool _slotSpinning;
+    private const int SlotReelCount = 3;
+    private readonly int[] _slotIndices = new int[SlotReelCount];
+    private readonly bool[] _slotReelSpinning = new bool[SlotReelCount];
+    private readonly int[] _slotSpinDurations = new int[SlotReelCount];
+    private readonly int[] _slotSpinDelays = new int[SlotReelCount];
+    private SlotOutcome _lastSlotOutcome = SlotOutcome.None;
+    private readonly int[] _slotBetOptions = { 1, 10, 100 };
+    private int _slotBet = 1;
+    private bool _fxCombo;
+    private bool _fxJackpot;
+    private bool _fxFreeSpin;
+    private int _fxSequence;
+    private string? _fxMultiplierText;
+    private string _fxMultiplierClass = string.Empty;
+    private readonly Dictionary<string, string> _funFacts = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, int> _weights = new(StringComparer.OrdinalIgnoreCase);
+    private readonly int[] _autoSpinOptions = { 10, 25, 50, 100 };
+    private int _autoSpinCount = 10;
+    private bool _autoSpinActive;
+    private int _autoSpinsRemaining;
+    private CancellationTokenSource? _autoSpinCts;
+    private ElementReference _panelRef;
+
+    protected override void OnInitialized()
+    {
+        EasterEggService.StateChanged += OnStateChanged;
+        try
+        {
+            var baseDir = AppContext.BaseDirectory;
+            var dir = Path.Combine(baseDir, "wwwroot", "images", "Easter-Egg");
+            if (Directory.Exists(dir))
+            {
+                var files = Directory.GetFiles(dir)
+                    .Where(HasImageExtension)
+                    .OrderBy(f => f)
+                    .ToList();
+
+                foreach (var f in files)
+                {
+                    var fileName = Path.GetFileName(f);
+                    var webPath = $"/images/Easter-Egg/{fileName}";
+                    _segments.Add(webPath);
+                }
+                TryLoadFunFacts(Path.Combine(dir, "funfacts.json"));
+                InitWeights(Path.Combine(dir, "weights.json"));
+                InitSlots();
+            }
+        }
+        catch { }
+    }
+
+    public void Dispose()
+    {
+        EasterEggService.StateChanged -= OnStateChanged;
+        _autoSpinCts?.Cancel();
+        _autoSpinCts?.Dispose();
+    }
+
+    private async Task FocusPanel()
+    {
+        try { await _panelRef.FocusAsync(); } catch { }
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case " ":
+            case "Spacebar":
+            case "Enter":
+                await SpinSlots();
+                break;
+        }
+    }
+
+    private void OnStateChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void InitSlots()
+    {
+        if (_segments.Count == 0) return;
+        for (var i = 0; i < SlotReelCount; i++)
+        {
+            _slotIndices[i] = NextWeightedIndex();
+            _slotReelSpinning[i] = false;
+            _slotSpinDurations[i] = 420 + (i * 90);
+            _slotSpinDelays[i] = i * 60;
+        }
+    }
+
+    private static bool HasImageExtension(string path)
+    {
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        return ext is ".png" or ".jpg" or ".jpeg" or ".gif" or ".webp" or ".bmp" or ".svg";
+    }
+
+    private void TryLoadFunFacts(string path)
+    {
+        try
+        {
+            if (!File.Exists(path)) return;
+            var json = File.ReadAllText(path);
+            var dict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+            if (dict is null) return;
+            foreach (var kv in dict)
+            {
+                if (!_funFacts.ContainsKey(kv.Key))
+                    _funFacts[kv.Key] = kv.Value;
+            }
+        }
+        catch { }
+    }
+
+    private void InitWeights(string path)
+    {
+        _weights.Clear();
+        foreach (var segment in _segments)
+        {
+            var name = Path.GetFileNameWithoutExtension(segment);
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                _weights[name] = 1;
+            }
+        }
+
+        TryLoadWeights(path);
+    }
+
+    private void TryLoadWeights(string path)
+    {
+        try
+        {
+            if (!File.Exists(path)) return;
+            var json = File.ReadAllText(path);
+            var dict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, int>>(json);
+            if (dict is null) return;
+            foreach (var kv in dict)
+            {
+                if (kv.Value < 0) continue;
+                _weights[kv.Key] = kv.Value;
+            }
+        }
+        catch { }
+    }
+
+    private int GetWeightForIndex(int index)
+    {
+        if (index < 0 || index >= _segments.Count) return 1;
+        var name = Path.GetFileNameWithoutExtension(_segments[index]);
+        if (string.IsNullOrWhiteSpace(name)) return 1;
+        var weight = _weights.TryGetValue(name, out var baseWeight) ? baseWeight : 1;
+        if (weight <= 0) return 0;
+
+        if (string.Equals(name, "Daniel", StringComparison.OrdinalIgnoreCase))
+        {
+            weight *= GetDanielWeightMultiplier();
+        }
+
+        return weight;
+    }
+
+    private int GetDanielWeightMultiplier()
+    {
+        return _slotBet switch
+        {
+            10 => 2,
+            100 => 3,
+            _ => 1
+        };
+    }
+
+    private int NextWeightedIndex()
+    {
+        if (_segments.Count == 0) return 0;
+        var total = 0;
+        for (var i = 0; i < _segments.Count; i++)
+        {
+            total += Math.Max(0, GetWeightForIndex(i));
+        }
+
+        if (total <= 0)
+        {
+            return _rng.Next(0, _segments.Count);
+        }
+
+        var roll = _rng.Next(1, total + 1);
+        var acc = 0;
+        for (var i = 0; i < _segments.Count; i++)
+        {
+            acc += Math.Max(0, GetWeightForIndex(i));
+            if (roll <= acc)
+            {
+                return i;
+            }
+        }
+
+        return _segments.Count - 1;
+    }
+
+    private string GetSlotImage(int reelIndex, int offset)
+    {
+        if (_segments.Count == 0) return string.Empty;
+        if (reelIndex < 0 || reelIndex >= SlotReelCount) return string.Empty;
+        var baseIndex = _slotIndices[reelIndex];
+        var index = baseIndex + offset;
+        if (_segments.Count > 0)
+        {
+            index = ((index % _segments.Count) + _segments.Count) % _segments.Count;
+        }
+        if (index < 0 || index >= _segments.Count) index = 0;
+        return _segments[index];
+    }
+
+    private async Task SpinSlots()
+    {
+        if (_segments.Count == 0 || _slotSpinning) return;
+        var usedFreeSpin = EasterEggService.TryConsumeFreeSpin();
+        if (!usedFreeSpin && !EasterEggService.TrySpendSlotCoins(_slotBet))
+        {
+            _slotResultText = "Nicht genug Muenzen.";
+            StopAutoSpins();
+            StateHasChanged();
+            return;
+        }
+        _slotSpinning = true;
+        _slotResultText = null;
+        _funFactText = null;
+        _lastSlotOutcome = SlotOutcome.None;
+
+        var stopTicks = new int[SlotReelCount];
+        for (var i = 0; i < SlotReelCount; i++)
+        {
+            _slotReelSpinning[i] = true;
+            stopTicks[i] = 9 + (i * 4) + _rng.Next(0, 3);
+            _slotSpinDurations[i] = 320 + (i * 150) + _rng.Next(0, 100);
+            _slotSpinDelays[i] = i * 60;
+        }
+
+        var maxTicks = stopTicks.Max();
+        for (var t = 0; t <= maxTicks; t++)
+        {
+            for (var i = 0; i < SlotReelCount; i++)
+            {
+                if (t <= stopTicks[i])
+                {
+                    _slotIndices[i] = NextWeightedIndex();
+                }
+                else
+                {
+                    _slotReelSpinning[i] = false;
+                }
+            }
+
+            StateHasChanged();
+            var delay = 45 + (t * 9);
+            try { await Task.Delay(delay); } catch { }
+        }
+
+        for (var i = 0; i < SlotReelCount; i++)
+        {
+            _slotReelSpinning[i] = false;
+        }
+        StateHasChanged();
+
+        var names = _slotIndices
+            .Select(index => Path.GetFileNameWithoutExtension(_segments[index]))
+            .ToList();
+        var distinctCount = names.Distinct(StringComparer.OrdinalIgnoreCase).Count();
+        var isJackpot = distinctCount == 1;
+        var isCombo = distinctCount == 2;
+        var hasDanielJackpot = isJackpot &&
+                               string.Equals(names[0], "Daniel", StringComparison.OrdinalIgnoreCase);
+        _fxMultiplierText = null;
+        _fxMultiplierClass = string.Empty;
+
+        if (isJackpot)
+        {
+            var name = names[0];
+            _slotResultText = $"Jackpot: {name}";
+            _lastSlotOutcome = SlotOutcome.Jackpot;
+            SetFunFact(name);
+            _fxMultiplierText = "x10";
+            _fxMultiplierClass = "jackpot";
+        }
+        else if (isCombo)
+        {
+            _slotResultText = string.Join(" | ", names);
+            _lastSlotOutcome = SlotOutcome.Combo;
+            _fxMultiplierText = "x2";
+            _fxMultiplierClass = "combo";
+        }
+        else
+        {
+            _slotResultText = string.Join(" | ", names);
+            _lastSlotOutcome = SlotOutcome.None;
+        }
+
+        if (hasDanielJackpot)
+        {
+            EasterEggService.AwardFreeSpin();
+            _slotResultText = string.IsNullOrWhiteSpace(_slotResultText)
+                ? "Freispiel gewonnen"
+                : $"{_slotResultText} + Freispiel";
+            _fxMultiplierText = "FREE SPIN";
+            _fxMultiplierClass = "free";
+        }
+
+        _ = TriggerFxAsync(isCombo, isJackpot, hasDanielJackpot);
+        EasterEggService.RegisterSlotSpin(_lastSlotOutcome, _slotBet);
+        _slotSpinning = false;
+        StateHasChanged();
+    }
+
+    private string GetReelStyle(int index)
+    {
+        if (index < 0 || index >= SlotReelCount) return string.Empty;
+        return $"--slot-duration:{_slotSpinDurations[index]}ms; --slot-delay:{_slotSpinDelays[index]}ms;";
+    }
+
+    private string GetReelClass(int index)
+    {
+        if (index < 0 || index >= SlotReelCount) return string.Empty;
+        return _slotReelSpinning[index] ? "spinning" : string.Empty;
+    }
+
+    private string GetSlotMachineClass()
+    {
+        return _lastSlotOutcome switch
+        {
+            SlotOutcome.Jackpot => "jackpot",
+            SlotOutcome.Combo => "combo",
+            _ => string.Empty
+        };
+    }
+
+    private void SetFunFact(string? name)
+    {
+        _funFactText = null;
+        if (string.IsNullOrWhiteSpace(name)) return;
+        if (_funFacts.TryGetValue(name, out var fact) && !string.IsNullOrWhiteSpace(fact))
+        {
+            _funFactText = fact;
+        }
+        else
+        {
+            _funFactText = "Kein Fun-Fact hinterlegt.";
+        }
+    }
+
+    private string GetFxClass()
+    {
+        var classes = new List<string>();
+        if (_fxCombo) classes.Add("fx-combo");
+        if (_fxJackpot) classes.Add("fx-jackpot");
+        if (_fxFreeSpin) classes.Add("fx-free-spin");
+        return string.Join(" ", classes);
+    }
+
+    private string GetFxStyle()
+    {
+        return $"--slot-fx-seq:{_fxSequence};";
+    }
+
+    private string GetMultiplierClass()
+    {
+        return string.IsNullOrWhiteSpace(_fxMultiplierClass) ? string.Empty : $"slot-multiplier--{_fxMultiplierClass}";
+    }
+
+    private async Task TriggerFxAsync(bool combo, bool jackpot, bool freeSpin)
+    {
+        _fxCombo = combo;
+        _fxJackpot = jackpot;
+        _fxFreeSpin = freeSpin;
+        _fxSequence++;
+        var seq = _fxSequence;
+        StateHasChanged();
+
+        var delay = 1400;
+        if (jackpot) delay = 2200;
+        if (freeSpin) delay = Math.Max(delay, 1800);
+
+        try { await Task.Delay(delay); } catch { }
+
+        if (seq != _fxSequence)
+        {
+            return;
+        }
+
+        _fxCombo = false;
+        _fxJackpot = false;
+        _fxFreeSpin = false;
+        StateHasChanged();
+    }
+
+    private void StartAutoSpins()
+    {
+        if (_autoSpinActive || _segments.Count == 0) return;
+        if (EasterEggService.SlotCoins < _slotBet && EasterEggService.SlotFreeSpins <= 0)
+        {
+            _slotResultText = "Nicht genug Muenzen.";
+            StateHasChanged();
+            return;
+        }
+
+        _autoSpinActive = true;
+        _autoSpinsRemaining = _autoSpinCount;
+        _autoSpinCts?.Cancel();
+        _autoSpinCts?.Dispose();
+        _autoSpinCts = new CancellationTokenSource();
+        _ = RunAutoSpinsAsync(_autoSpinCts.Token);
+        StateHasChanged();
+    }
+
+    private void StopAutoSpins()
+    {
+        if (!_autoSpinActive) return;
+        _autoSpinActive = false;
+        _autoSpinCts?.Cancel();
+        StateHasChanged();
+    }
+
+    private async Task RunAutoSpinsAsync(CancellationToken token)
+    {
+        try
+        {
+            while (!token.IsCancellationRequested && _autoSpinActive && _autoSpinsRemaining > 0)
+            {
+                if (_slotSpinning)
+                {
+                    await Task.Delay(120, token);
+                    continue;
+                }
+
+                if (EasterEggService.SlotCoins < _slotBet && EasterEggService.SlotFreeSpins <= 0)
+                {
+                    _slotResultText = "Autospin gestoppt: Nicht genug Muenzen.";
+                    _autoSpinActive = false;
+                    await InvokeAsync(StateHasChanged);
+                    return;
+                }
+
+                await InvokeAsync(SpinSlots);
+                _autoSpinsRemaining--;
+                await InvokeAsync(StateHasChanged);
+                await Task.Delay(200, token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // ignored
+        }
+
+        _autoSpinActive = false;
+        await InvokeAsync(StateHasChanged);
+    }
+}

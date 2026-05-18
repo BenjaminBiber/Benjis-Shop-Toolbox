@@ -3,13 +3,15 @@
 @using System.IO
 @using Toolbox.Components.Dialogs
 @using Toolbox.Data.Models
+@using Toolbox.Data.Models.ShopYaml
 @using Toolbox.Data.Services
 @using Toolbox.ExtensionMethods
+@using Toolbox.Services
 @inject NotificationService NotificationService
 @inject ExtensionsService ExtensionsService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
-@inject Toolbox.Services.SettingsService SettingsService
+@inject Toolbox.Data.Services.SettingsService SettingsService
 @inject SolutionOpener SolutionOpener
 @inject IisService IisService
 @inject ShopSystemConfigService ShopSystemConfigService
@@ -24,7 +26,7 @@
         </MudAlert>
         @if (Settings.ShopSettingsList.Any())
         {
-            <div class="mt-4" style="min-width:300px;">
+            <div class="mt-4 page-shop-select">
                 <MudSelect Variant="Variant.Outlined" Value="_selectedShopPath" ValueChanged="ChangeSelectedShop" T="string">
                     @foreach (var shopPaths in Settings.ShopSettingsList)
                     {
@@ -38,7 +40,7 @@
 
 @if (Settings.ShopSettingsList.Any())
 {        
-    <div class="row p-4">
+    <div class="row g-0 p-4">
         <MudText Typo="Typo.h5">Extensions</MudText>   
         <div class="col-6">
             <MudSelect Variant="Variant.Outlined" Value="_selectedShopPath" ValueChanged="ChangeSelectedShop" T="string">
@@ -48,7 +50,7 @@
                 }
             </MudSelect>
         </div>
-        <div class="col-5">
+        <div class="col-4">
             <MudTextField Variant="Variant.Outlined"
                           Value="_searchText"
                           ValueChanged="(string s) => SearchChanged(s)"
@@ -59,9 +61,12 @@
                           IconSize="Size.Medium"
                           Class="mt-0" />
         </div>
-        <div class="col-1 d-flex align-items-center justify-content-center">
+        <div class="col-2 d-flex align-items-center justify-content-center gap-1">
+            <MudTooltip Text="Object Extensions prüfen">
+                <MudIconButton Icon="@Icons.Material.Filled.Assessment" Size="Size.Medium" Color="Color.Primary" OnClick="OpenObjectExtensionCheckDialog" />
+            </MudTooltip>
             <MudTooltip Text="Extension klonen">
-                <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="OpenCloneDialog" />
+                <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Medium" Color="Color.Primary" OnClick="OpenCloneDialog" />
             </MudTooltip>
         </div>
     </div>
@@ -82,6 +87,7 @@
                       Dense="true">
                 <HeaderContent>
                     <MudTh>Name</MudTh>
+                    <MudTh>Version</MudTh>
                     <MudTh>Install Projekt</MudTh>
                     <MudTh>Data Projekt</MudTh>
                     <MudTh>Shop Projekt</MudTh>
@@ -90,7 +96,7 @@
                     <MudTh>Öffnen</MudTh>
                 </HeaderContent>
                 <GroupHeaderTemplate>
-                    <MudTh Class="mud-table-cell-custom-group" colspan="7">
+                    <MudTh Class="mud-table-cell-custom-group" colspan="8">
                         <div class="d-flex align-items-center">
                             <MudText Class="fw-bold me-auto" Typo="Typo.h6">@($"{context.Key}")</MudText>
                             @{
@@ -106,6 +112,7 @@
                 </GroupHeaderTemplate>
                 <RowTemplate>
                     <MudTd DataLabel="Name">@context.Name</MudTd>
+                    <MudTd DataLabel="Version">@(!string.IsNullOrWhiteSpace(context.CurrentVersion) ? context.CurrentVersion : "-")</MudTd>
                     <MudTd DataLabel="Install Projekt">
                         @if (context.HasInstallProject)
                         {
@@ -138,6 +145,13 @@
                         <MudMenu Icon="@Icons.Material.Filled.Build" Color="Color.Error">
                             <MudMenuItem Label="Extension Builden"
                                          OnClick="@(() => BuildExtensionFromMenuAsync(context))" />
+                            <MudMenuItem Label="Extension Version updaten"
+                                         OnClick="@(() => OpenExtensionVersionDialogAsync(context))" />
+                            @if (context.HasChangelog)
+                            {
+                                <MudMenuItem Label="Extension Changelog anzeigen"
+                                             OnClick="@(() => OpenExtensionChangelogDialogAsync(context))" />
+                            }
                             @if (context.HasDataProject)
                             {
                                 <MudMenuItem Label="Extension Datenbank Installieren"
@@ -184,6 +198,7 @@ else
     private MudTable<ExtensionInfo> _table = null!;
     private string _searchText = string.Empty;
     private readonly HashSet<string> _pinnedExtensionGroups = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _notifiedShopYamlPaths = new(StringComparer.OrdinalIgnoreCase);
   
     private TableGroupDefinition<ExtensionInfo> _groupDefinition = new()
     {
@@ -263,7 +278,9 @@ else
                              ?? visibleGroups[0].FirstOrDefault();
   
             if (firstMatch is not null)
+            {
                 await _table.ScrollToItemAsync(firstMatch);
+            }
         }
         else
         {
@@ -276,7 +293,9 @@ else
         _pinnedExtensionGroups.Clear();
         var raw = Settings.PinnedExtensionGroups;
         if (string.IsNullOrWhiteSpace(raw))
+        {
             return;
+        }
 
         foreach (var part in raw.Split(';', StringSplitOptions.RemoveEmptyEntries))
         {
@@ -454,7 +473,7 @@ else
             }
         }
 
-        var conn = s.GetConnection();
+        var conn = TryGetConnection(s);
         if (conn != null && (!string.IsNullOrWhiteSpace(conn.Server) || !string.IsNullOrWhiteSpace(conn.Database)))
         {
             var server = string.IsNullOrWhiteSpace(conn.Server) ? "?" : conn.Server;
@@ -531,10 +550,11 @@ else
                         HasShopProject = Directory.GetDirectories(dir, "*.Shop", SearchOption.AllDirectories).Length > 0,
                         HasDataProject = Directory.GetDirectories(dir, "*.Data", SearchOption.AllDirectories).Length > 0,
                         HasInstallProject = Directory.GetDirectories(dir, "*.Install", SearchOption.AllDirectories).Length > 0,
-                        HasThemeV4 = Directory.GetDirectories(dir, "4SELLERS_Responsive_4", SearchOption.AllDirectories).Length > 0
+                        HasThemeV4 = Directory.GetDirectories(dir, "4SELLERS_Responsive_4", SearchOption.AllDirectories).Length > 0,
+                        HasChangelog = File.Exists(Path.Combine(dir, "changelog.json"))
                     };
 
-                    var conn = SelectedShopSetting?.GetConnection();
+                    var conn = TryGetConnection(SelectedShopSetting);
                     if (conn == null)
                     {
                         error?.Report("Keine Datenbankverbindung (shop.yaml) gefunden.\n");
@@ -584,6 +604,22 @@ else
         }
     }
 
+    private async Task OpenObjectExtensionCheckDialog()
+    {
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            CloseButton = true,
+            BackdropClick = true
+        };
+
+        await DialogService.ShowAsync<ObjectExtensionCheckDialog>(
+            "Object Extensions prüfen",
+            options: options);
+    }
+
+
     private async Task<bool> InstallExtension(string dir)
     {
         var info = new ExtensionInfo
@@ -595,7 +631,8 @@ else
             HasShopProject = Directory.GetDirectories(dir, "*.Shop", SearchOption.AllDirectories).Length > 0,
             HasDataProject = Directory.GetDirectories(dir, "*.Data", SearchOption.AllDirectories).Length > 0,
             HasInstallProject = Directory.GetDirectories(dir, "*.Install", SearchOption.AllDirectories).Length > 0,
-            HasThemeV4 = Directory.GetDirectories(dir, "4SELLERS_Responsive_4", SearchOption.AllDirectories).Length > 0
+            HasThemeV4 = Directory.GetDirectories(dir, "4SELLERS_Responsive_4", SearchOption.AllDirectories).Length > 0,
+            HasChangelog = File.Exists(Path.Combine(dir, "changelog.json"))
         };
 
         return await InstallExtensionCoreAsync(info);
@@ -608,7 +645,7 @@ else
     {
         try
         {
-            var conn = SelectedShopSetting?.GetConnection();
+            var conn = TryGetConnection(SelectedShopSetting);
             if (conn == null)
             {
                 Snackbar.Add("Keine Datenbankverbindung (shop.yaml) gefunden.", Severity.Warning);
@@ -654,6 +691,48 @@ else
     private async Task BuildExtensionFromMenuAsync(ExtensionInfo info) =>
         await BuildExtensionWithDialogAsync(info.Path, info.Name);
 
+    private async Task OpenExtensionVersionDialogAsync(ExtensionInfo info)
+    {
+        var parameters = new DialogParameters<ExtensionVersionDialog>
+        {
+            { x => x.ExtensionRoot, info.Path },
+            { x => x.ExtensionName, info.Name }
+        };
+
+        var dlg = await DialogService.ShowAsync<ExtensionVersionDialog>(
+            "Extension Version",
+            parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dlg.Result;
+
+        if (result.Canceled || result.Data is not ExtensionVersionResult versionResult)
+        {
+            return;
+        }
+
+        ShowVersionUpdateResult(info, versionResult);
+        if (versionResult.NewVersion != null)
+        {
+            info.CurrentVersion = versionResult.NewVersion.ToString();
+        }
+        UpdateChangelogFlag(info);
+        StateHasChanged();
+    }
+
+    private async Task OpenExtensionChangelogDialogAsync(ExtensionInfo info)
+    {
+        var parameters = new DialogParameters<ExtensionChangelogDialog>
+        {
+            { x => x.ExtensionRoot, info.Path },
+            { x => x.ExtensionName, info.Name }
+        };
+
+        await DialogService.ShowAsync<ExtensionChangelogDialog>(
+            "Extension Changelog",
+            parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+    }
+
     private async Task<bool> BuildExtensionWithDialogAsync(string directory, string extensionName)
     {
         try
@@ -690,4 +769,109 @@ else
             return false;
         }
     }
+
+    private void ShowVersionUpdateResult(ExtensionInfo info, ExtensionVersionResult result)
+    {
+        var name = string.IsNullOrWhiteSpace(info.Name) ? "Extension" : info.Name;
+
+        if (result.Success)
+        {
+            var previous = result.PreviousVersion?.ToString();
+            var next = result.NewVersion?.ToString();
+            if (!string.IsNullOrWhiteSpace(previous) && !string.IsNullOrWhiteSpace(next))
+            {
+                Snackbar.Add($"{name}: Version {previous} -> {next} gesetzt.", Severity.Success);
+            }
+            else if (!string.IsNullOrWhiteSpace(next))
+            {
+                Snackbar.Add($"{name}: Version gesetzt: {next}.", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add($"{name}: Version aktualisiert.", Severity.Success);
+            }
+        }
+        else if (result.Errors.Count > 0)
+        {
+            Snackbar.Add($"{name}: {result.Errors[0]}", Severity.Error);
+        }
+        else
+        {
+            Snackbar.Add($"{name}: Version konnte nicht aktualisiert werden.", Severity.Warning);
+        }
+
+        foreach (var warning in result.Warnings)
+        {
+            Snackbar.Add($"{name}: {warning}", Severity.Warning);
+        }
+
+        for (var i = 1; i < result.Errors.Count; i++)
+        {
+            Snackbar.Add($"{name}: {result.Errors[i]}", Severity.Error);
+        }
+    }
+
+    private void UpdateChangelogFlag(ExtensionInfo info)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(info.Path))
+            {
+                return;
+            }
+
+            var path = Path.Combine(info.Path, "changelog.json");
+            info.HasChangelog = File.Exists(path);
+        }
+        catch
+        {
+        }
+    }
+
+    private DatabaseConnection? TryGetConnection(ShopSetting? setting)
+    {
+        if (setting == null)
+        {
+            return null;
+        }
+
+        var yamlPath = setting.ShopYamlPath ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(yamlPath))
+        {
+            return null;
+        }
+
+        if (!File.Exists(yamlPath))
+        {
+            NotifyMissingShopYaml(yamlPath);
+            return null;
+        }
+
+        try
+        {
+            return setting.GetConnection();
+        }
+        catch (Exception ex)
+        {
+            NotifyShopYamlError(yamlPath, ex);
+            return null;
+        }
+    }
+
+    private void NotifyMissingShopYaml(string yamlPath)
+    {
+        if (_notifiedShopYamlPaths.Add(yamlPath))
+        {
+            Snackbar.Add($"Shop-Pfad existiert nicht: {yamlPath}", Severity.Warning);
+        }
+    }
+
+    private void NotifyShopYamlError(string yamlPath, Exception ex)
+    {
+        if (_notifiedShopYamlPaths.Add(yamlPath))
+        {
+            Snackbar.Add($"Fehler beim Laden der shop.yaml ({yamlPath}): {ex.Message}", Severity.Warning);
+        }
+    }
 }
+

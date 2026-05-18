@@ -1,0 +1,45 @@
+@use "../../wwwroot/scss/vars" as *;
+
+.settings-root {
+    display: flex;
+    gap: 0;
+    min-height: $appbar-viewport-height-with-gap;
+}
+
+.settings-nav {
+    width: 280px;
+    border-right: 1px solid var(--mud-palette-lines-default);
+    padding: $space-12 0;
+
+    ::deep .mud-list-subheader {
+        padding: $space-8 $space-16;
+    }
+
+    ::deep .mud-list-item {
+        border-radius: 6px;
+        margin: 2px $space-8;
+    }
+
+    ::deep .mud-selected-item {
+        background-color: rgba(0, 0, 0, 0.04);
+    }
+}
+
+.settings-content {
+    flex: 1;
+    padding: $space-16 $space-24;
+    max-height: $appbar-viewport-height;
+    overflow-y: scroll;
+}
+
+.settings-section-title {
+    margin: $space-8 0 $space-12 0;
+}
+
+.settings-group {
+    padding: $space-16 $space-16 $space-8 $space-16;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: $radius-8;
+    background: var(--mud-palette-background);
+    margin-bottom: $space-16;
+}

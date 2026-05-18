@@ -7,7 +7,15 @@
 
 <MudDialog>
     <DialogContent>
-        <MudText Typo="Typo.h6" Class="mb-4">@Title</MudText>
+        <div class="d-flex align-items-center mb-4">
+            <MudText Typo="Typo.h6" Class="me-auto">@Title</MudText>
+            @if (AllowMultiple)
+            {
+                <MudTooltip Text="Repos aus TFS/Azure DevOps hinzufügen">
+                    <MudIconButton Icon="@Icons.Material.Filled.AddCircleOutline" Color="Color.Primary" Disabled="_busy" OnClick="OpenTfsPicker" />
+                </MudTooltip>
+            }
+        </div>
         @if (AllowMultiple)
         {
             @for (var i = 0; i < _gitUrls.Count; i++)
@@ -223,4 +231,59 @@
     }
 
     private void Cancel() => MudDialog.Cancel();
+
+    private async Task OpenTfsPicker()
+    {
+        var opts = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            CloseButton = true,
+            BackdropClick = true
+        };
+
+        var dlg = await DialogService.ShowAsync<TfsRepoPickerDialog>("Repos auswählen", options: opts);
+        var result = await dlg.Result;
+        if (result.Canceled || result.Data is not List<string> urls)
+        {
+            return;
+        }
+
+        AddUrls(urls);
+    }
+
+    private void AddUrls(IEnumerable<string> urls)
+    {
+        var list = urls?
+            .Select(u => u?.Trim())
+            .Where(u => !string.IsNullOrWhiteSpace(u))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList() ?? new List<string>();
+
+        if (list.Count == 0)
+        {
+            return;
+        }
+
+        if (!AllowMultiple)
+        {
+            _gitUrl = list.First();
+            return;
+        }
+
+        if (_gitUrls.Count == 1 && string.IsNullOrWhiteSpace(_gitUrls[0]))
+        {
+            _gitUrls[0] = list[0];
+            list.RemoveAt(0);
+        }
+
+        foreach (var url in list)
+        {
+            if (_gitUrls.Any(u => string.Equals(u, url, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+            _gitUrls.Add(url);
+        }
+    }
 }

@@ -19,3 +19,11 @@ tmp_*.txt
 /Toolbox/TrayPublish/*.pdb
 /Toolbox/UpdaterPublish/*.exe
 /Toolbox/UpdaterPublish/*.pdb
+
+# publish/output
+Toolbox/UpdaterPublish/
+Toolbox/TrayPublish/
+
+# allgemein
+bin/
+obj/

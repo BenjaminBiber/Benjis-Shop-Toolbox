@@ -1,0 +1,194 @@
+@using Toolbox.Services
+@inject TfsRepoService TfsRepoService
+@inject SettingsService SettingsService
+
+<MudDialog>
+    <DialogContent>
+        <div class="d-flex align-items-center mb-3">
+            <MudText Typo="Typo.h6" Class="me-auto">TFS Projekte</MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                           Disabled="_loading"
+                           OnClick="@(async _ => await LoadAsync())" />
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_collectionUrl))
+        {
+            <MudText Typo="Typo.caption" Class="text-secondary mb-2">
+                Collection: @_collectionUrl
+            </MudText>
+        }
+
+        <MudTextField Value="@_searchText"
+                      ValueChanged="@((string v) => OnSearchChanged(v))"
+                      Immediate="true"
+                      Placeholder="Suche..."
+                      Variant="Variant.Text"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Class="mb-3 w-100" />
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Filled" Class="mb-2">@_error</MudAlert>
+        }
+        else if (_loading)
+        {
+            <MudProgressCircular Indeterminate="true" Size="Size.Medium" Color="Color.Primary" />
+        }
+        else if (!_filtered.Any())
+        {
+            <MudText Typo="Typo.caption" Class="text-secondary">Keine Projekte gefunden.</MudText>
+        }
+        else
+        {
+            <MudTable Items="_filtered" Dense="true" Hover="true" Elevation="0" SortLabel="Sortieren">
+                <HeaderContent>
+                    <MudTh></MudTh>
+                    <MudTh>
+                        <MudTableSortLabel SortBy="new Func<ProjectRow, object>(x => x.Name)">Projekt</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel SortBy="new Func<ProjectRow, object>(x => x.Url)">URL</MudTableSortLabel>
+                    </MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Auswählen">
+                        <MudCheckBox Value="context.Selected"
+                                     ValueChanged="@((bool v) => OnSelectedChanged(context, v))"
+                                     Color="Color.Primary" />
+                    </MudTd>
+                    <MudTd DataLabel="Projekt">@context.Name</MudTd>
+                    <MudTd DataLabel="URL">
+                        <MudText Typo="Typo.caption">@context.Url</MudText>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" Disabled="@(_selected == null)" OnClick="Confirm">Auswählen</MudButton>
+        <MudButton Color="Color.Default" OnClick="Cancel">Abbrechen</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private string _collectionUrl = string.Empty;
+    private string _searchText = string.Empty;
+    private string _searchTextNormalized = string.Empty;
+    private bool _loading;
+    private string? _error;
+    private List<ProjectRow> _projects = new();
+    private List<ProjectRow> _filtered = new();
+    private ProjectRow? _selected;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _collectionUrl = TfsRepoService.NormalizeCollectionUrl(SettingsService.Settings.TfsCollectionUrl);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            if (string.IsNullOrWhiteSpace(_collectionUrl))
+            {
+                _error = "Keine TFS Collection URL gesetzt.";
+                _projects.Clear();
+                _filtered.Clear();
+                return;
+            }
+
+            var projects = await TfsRepoService.GetProjectsAsync(_collectionUrl);
+            _projects = projects
+                .Select(p => new ProjectRow(p.Name, p.Url))
+                .ToList();
+            ApplyFilter();
+        }
+        catch (Exception ex)
+        {
+            _projects.Clear();
+            _filtered.Clear();
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OnSearchChanged(string value)
+    {
+        _searchText = value ?? string.Empty;
+        _searchTextNormalized = _searchText.Trim().ToLowerInvariant();
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        IEnumerable<ProjectRow> query = _projects;
+
+        if (!string.IsNullOrWhiteSpace(_searchTextNormalized))
+        {
+            query = query.Where(p =>
+                p.Name.Contains(_searchTextNormalized, StringComparison.OrdinalIgnoreCase) ||
+                p.Url.Contains(_searchTextNormalized, StringComparison.OrdinalIgnoreCase));
+        }
+
+        _filtered = query.ToList();
+    }
+
+    private void OnSelectedChanged(ProjectRow row, bool value)
+    {
+        if (!value)
+        {
+            row.Selected = false;
+            if (_selected == row)
+            {
+                _selected = null;
+            }
+            return;
+        }
+
+        foreach (var item in _projects)
+        {
+            item.Selected = false;
+        }
+
+        row.Selected = true;
+        _selected = row;
+    }
+
+    private void Confirm()
+    {
+        if (_selected == null)
+        {
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(_selected.Url));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private sealed class ProjectRow
+    {
+        public ProjectRow(string name, string url)
+        {
+            Name = name;
+            Url = url;
+        }
+
+        public string Name { get; }
+        public string Url { get; }
+        public bool Selected { get; set; }
+    }
+}
+

@@ -1,0 +1,277 @@
+@using System.IO
+@using Toolbox.Components.Settings
+@using Toolbox.Data.Models
+@using Toolbox.Data.Models.ShopYaml
+@using Toolbox.Services
+@inject SettingsService SettingsService
+@inject DatabaseConnectionService DatabaseConnectionService
+@inject ExtensionInventoryService ExtensionInventoryService
+@inject TfsRepoService TfsRepoService
+@inject TfsExtensionReportService TfsExtensionReportService
+@inject FileDialogService FileDialog
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex flex-row gap-3 w-100 align-items-center justify-content-start">
+            <MudText Typo="Typo.h6">Object Extensions prüfen</MudText>
+            <SettingsHelp MarkdownPath="Help/ObjectExtensionInfo.md" MarkdownTitle="Object-Extensions prüfen" Text="Was macht dieser Dialog?"></SettingsHelp>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div class="d-flex align-items-center gap-2">
+            <MudTextField Value="@_csvPath"
+                          ValueChanged="(string v) => _csvPath = v"
+                          Label="CSV Datei"
+                          Variant="Variant.Text"
+                          Class="settings-field-grow"/>
+            <MudTooltip Text="CSV Auswählen">
+                <MudIconButton Icon="@Icons.Material.Filled.FolderOpen" OnClick="ChooseCsv"/>
+            </MudTooltip>
+            <SettingsHelp Text="Wie bekomme ich die CSV Datei?" MarkdownPath="Help/ObjectExtensionCSV.md" MarkdownTitle="Object-Extension CSV erhalten"></SettingsHelp>
+        </div>
+        <MudText Typo="Typo.caption" Class="text-secondary mt-1">
+            Eine Extension pro Zeile, keine Kopfzeile.
+        </MudText>
+
+        <div class="d-flex align-items-center gap-2 mb-2 mt-3">
+            <MudTextField Value="@_tfsProjectUrl"
+                          ValueChanged="(string v) => _tfsProjectUrl = v"
+                          Label="TFS Projekt URL"
+                          Variant="Variant.Text"
+                          Class="settings-field-grow"/>
+            <MudTooltip Text="Projekt auswählen">
+                <MudIconButton Icon="@Icons.Material.Filled.List" OnClick="OpenProjectPicker"/>
+            </MudTooltip>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="mb-3">@_error</MudAlert>
+        }
+
+        @if (_rows.Count > 0)
+        {
+            <MudText Typo="Typo.caption" Class="text-secondary mb-2">
+                Treffer: @_rows.Count | Repos: @_processedRepos / @_totalRepos | SQL Dateien: @_sqlFiles
+            </MudText>
+            <MudTable Items="_rows" Dense="true" Hover="true" Elevation="0">
+                <HeaderContent>
+                    <MudTh>Extension</MudTh>
+                    <MudTh>Object Extension</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Extension">@context.Repo</MudTd>
+                    <MudTd DataLabel="Object Extension">@context.ObjectExtension</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+        else if (_hasRun && string.IsNullOrWhiteSpace(_error))
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Filled">
+                Keine passenden Object Extensions gefunden.
+            </MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Default" OnClick="Cancel">Schließen</MudButton>
+        <MudButton Color="Color.Primary" Disabled="_loading" OnClick="RunCheckAsync">
+            @(_loading ? "Prüfe..." : "Prüfen")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private enum SourceType
+    {
+        ShopDatabase,
+        CsvFile
+    }
+
+    private SourceType _source = SourceType.CsvFile;
+    private int _tabIndex;
+    private readonly List<DatabaseConnection> _connections = new();
+    private DatabaseConnection? _selectedConnection;
+    private string _tfsProjectUrl = string.Empty;
+    private string _csvPath = string.Empty;
+
+    private bool _loading;
+    private bool _hasRun;
+    private string? _error;
+    private int _totalRepos;
+    private int _processedRepos;
+    private int _sqlFiles;
+    private readonly List<ResultRow> _rows = new();
+
+    protected override void OnInitialized()
+    {
+        _connections.Clear();
+        _connections.AddRange(DatabaseConnectionService.DatabaseConnections);
+        _selectedConnection = _connections.FirstOrDefault();
+
+        _tfsProjectUrl = SettingsService.Settings.GetTfsProjectUrls()
+            .Select(TfsRepoService.NormalizeProjectUrl)
+            .FirstOrDefault(u => !string.IsNullOrWhiteSpace(u)) ?? string.Empty;
+        _tabIndex = _source == SourceType.ShopDatabase ? 0 : 1;
+    }
+
+    private int TabIndex
+    {
+        get => _tabIndex;
+        set
+        {
+            _tabIndex = value;
+            var source = value == 0 ? SourceType.ShopDatabase : SourceType.CsvFile;
+            OnSourceChanged(source);
+        }
+    }
+
+    private void OnSourceChanged(SourceType source)
+    {
+        if (_source == source)
+        {
+            return;
+        }
+
+        _source = source;
+        _error = null;
+        _hasRun = false;
+        _rows.Clear();
+    }
+
+    private void ChooseCsv()
+    {
+        var filters = new[] { new FileFilter { Name = "CSV", Extensions = new[] { "csv" } } };
+        var initial = string.IsNullOrWhiteSpace(_csvPath) ? string.Empty : Path.GetDirectoryName(_csvPath) ?? string.Empty;
+        var path = FileDialog.OpenFile("CSV Datei ausw�hlen", filters, initial);
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            _csvPath = path;
+        }
+    }
+
+    private async Task OpenProjectPicker()
+    {
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true
+        };
+
+        var dlg = await DialogService.ShowAsync<TfsProjectPickerDialog>("TFS Projekte", options: options);
+        var result = await dlg.Result;
+
+        if (!result.Canceled && result.Data is string url && !string.IsNullOrWhiteSpace(url))
+        {
+            _tfsProjectUrl = url;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RunCheckAsync()
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        _error = null;
+        _hasRun = false;
+        _rows.Clear();
+        _totalRepos = 0;
+        _processedRepos = 0;
+        _sqlFiles = 0;
+
+        if (string.IsNullOrWhiteSpace(SettingsService.Settings.TfsApiKey))
+        {
+            Snackbar.Add("Kein TFS API Key (PAT) gesetzt.", Severity.Warning);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_tfsProjectUrl))
+        {
+            Snackbar.Add("Bitte eine TFS Projekt URL angeben.", Severity.Warning);
+            return;
+        }
+
+        if (_source == SourceType.ShopDatabase && _selectedConnection == null)
+        {
+            Snackbar.Add("Bitte eine Datenbankverbindung ausw�hlen.", Severity.Warning);
+            return;
+        }
+
+        if (_source == SourceType.CsvFile && (string.IsNullOrWhiteSpace(_csvPath) || !File.Exists(_csvPath)))
+        {
+            Snackbar.Add("Bitte eine g�ltige CSV Datei ausw�hlen.", Severity.Warning);
+            return;
+        }
+
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            List<string> extensions;
+            if (_source == SourceType.ShopDatabase)
+            {
+                extensions = await ExtensionInventoryService.LoadFromDatabaseAsync(_selectedConnection!);
+            }
+            else
+            {
+                extensions = ExtensionInventoryService.LoadFromCsv(_csvPath);
+            }
+
+            if (extensions.Count == 0)
+            {
+                _error = "Keine Object Extensions in der Quelle gefunden.";
+                return;
+            }
+
+            var repos = await TfsRepoService.GetRepositoriesForProjectAsync(_tfsProjectUrl);
+            if (repos.Count == 0)
+            {
+                _error = "Keine Repositories im TFS Projekt gefunden.";
+                return;
+            }
+
+            var report = await TfsExtensionReportService.BuildReportAsync(repos, extensions);
+            _totalRepos = report.TotalRepositories;
+            _processedRepos = report.ProcessedRepositories;
+            _sqlFiles = report.SqlFileCount;
+
+            foreach (var kvp in report.MatchingExtensions)
+            {
+                foreach (var ext in kvp.Value.Distinct(StringComparer.OrdinalIgnoreCase))
+                {
+                    _rows.Add(new ResultRow(kvp.Key, ext));
+                }
+            }
+
+            _rows.Sort((a, b) =>
+            {
+                var cmp = string.Compare(a.Repo, b.Repo, StringComparison.OrdinalIgnoreCase);
+                if (cmp != 0) return cmp;
+                return string.Compare(a.ObjectExtension, b.ObjectExtension, StringComparison.OrdinalIgnoreCase);
+            });
+
+            _hasRun = true;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancel() => MudDialog.Close();
+
+    private sealed record ResultRow(string Repo, string ObjectExtension);
+}

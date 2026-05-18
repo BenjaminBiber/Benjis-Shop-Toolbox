@@ -1,0 +1,29 @@
+@use "../vars" as *;
+
+.settings-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  border-radius: 50%;
+  border: 1px solid $color-win95-border;
+  color: $color-win95-primary;
+  background: $color-muted-light;
+  cursor: help;
+}
+
+.settings-field-with-help {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-field-grow {
+  flex: 1 1 auto;
+  min-width: 0;
+}

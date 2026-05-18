@@ -1,0 +1,202 @@
+@using MudBlazor
+@using System.ComponentModel
+@using System.IO
+@using System.Reflection
+@using System.Text.RegularExpressions
+@using Toolbox.Data.Models
+@using Toolbox.Components.Dialogs
+@using Microsoft.AspNetCore.Hosting
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject IWebHostEnvironment HostEnvironment
+
+@if (ShouldRenderHelp)
+{
+    <MudTooltip Text="@TooltipText"
+                Placement="Placement.Right"
+                Inline="true"
+                Disabled="@string.IsNullOrWhiteSpace(TooltipText)">
+        <span class="settings-help"
+              aria-label="Hilfe"
+              role="button"
+              tabindex="0"
+              style="@(MarkdownPath != null ? "cursor: pointer;" : "")"
+              @onclick="OnHelpClicked"
+              @onclick:stopPropagation="true">?</span>
+    </MudTooltip>
+}
+
+@code {
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public string? PropertyName { get; set; }
+    [Parameter] public string? MarkdownPath { get; set; }
+    [Parameter] public string? MarkdownTitle { get; set; }
+
+    private string TooltipText => !string.IsNullOrWhiteSpace(Text)
+        ? Text!
+        : GetDescriptionFromProperty(PropertyName);
+
+    private bool ShouldRenderHelp => !string.IsNullOrWhiteSpace(TooltipText) || !string.IsNullOrWhiteSpace(MarkdownPath);
+
+    private async Task OnHelpClicked()
+    {
+        if (string.IsNullOrWhiteSpace(MarkdownPath))
+        {
+            return;
+        }
+
+        var resolved = ResolveMarkdownPath(MarkdownPath);
+        if (string.IsNullOrWhiteSpace(resolved) || !File.Exists(resolved))
+        {
+            Snackbar.Add("Markdown Datei nicht gefunden.", Severity.Warning);
+            return;
+        }
+
+        string content;
+        try
+        {
+            content = await File.ReadAllTextAsync(resolved);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Markdown konnte nicht geladen werden: {ex.Message}", Severity.Warning);
+            return;
+        }
+
+        var basePath = ResolveMarkdownBasePath(resolved);
+        if (!string.IsNullOrWhiteSpace(basePath))
+        {
+            content = RewriteRelativeMarkdownUrls(content, basePath);
+        }
+
+        var parameters = new DialogParameters<SettingsHelpMarkdownDialog>
+        {
+            { x => x.Title, string.IsNullOrWhiteSpace(MarkdownTitle) ? "Hilfe" : MarkdownTitle! },
+            { x => x.MarkdownContent, content }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            CloseButton = true
+        };
+
+        await DialogService.ShowAsync<SettingsHelpMarkdownDialog>("Hilfe", parameters, options);
+    }
+
+    private string ResolveMarkdownPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            if (Path.IsPathRooted(path))
+            {
+                return Path.GetFullPath(path);
+            }
+
+            var trimmed = path.TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var root = HostEnvironment.WebRootPath ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(root))
+            {
+                return Path.GetFullPath(path);
+            }
+
+            return Path.GetFullPath(Path.Combine(root, trimmed));
+        }
+        catch
+        {
+            return path;
+        }
+    }
+
+    private string ResolveMarkdownBasePath(string resolvedPath)
+    {
+        if (string.IsNullOrWhiteSpace(resolvedPath))
+        {
+            return string.Empty;
+        }
+
+        var root = HostEnvironment.WebRootPath ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(root))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            var relative = Path.GetRelativePath(root, resolvedPath);
+            if (relative.StartsWith(".."))
+            {
+                return string.Empty;
+            }
+
+            var dir = Path.GetDirectoryName(relative) ?? string.Empty;
+            var webDir = dir.Replace('\\', '/').Trim('/');
+            return string.IsNullOrWhiteSpace(webDir) ? "/" : $"/{webDir}/";
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    private static string RewriteRelativeMarkdownUrls(string markdown, string basePath)
+    {
+        if (string.IsNullOrWhiteSpace(markdown) || string.IsNullOrWhiteSpace(basePath))
+        {
+            return markdown;
+        }
+
+        var normalizedBase = basePath.TrimEnd('/') + "/";
+        return Regex.Replace(markdown, @"(!?\[[^\]]*\]\()([^)]+)(\))", match =>
+        {
+            var url = match.Groups[2].Value.Trim();
+            if (IsAbsoluteOrRootUrl(url))
+            {
+                return match.Value;
+            }
+
+            var combined = normalizedBase + url.TrimStart('/', '\\');
+            return match.Groups[1].Value + combined + match.Groups[3].Value;
+        });
+    }
+
+    private static bool IsAbsoluteOrRootUrl(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return true;
+        }
+
+        if (url.StartsWith("#", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (url.StartsWith("/", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return url.Contains("://", StringComparison.OrdinalIgnoreCase) ||
+               url.StartsWith("data:", StringComparison.OrdinalIgnoreCase) ||
+               url.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetDescriptionFromProperty(string? propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(propertyName))
+        {
+            return string.Empty;
+        }
+
+        var prop = typeof(ToolboxSettings).GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public);
+        var attribute = prop?.GetCustomAttribute<DescriptionAttribute>();
+        return attribute?.Description ?? string.Empty;
+    }
+}

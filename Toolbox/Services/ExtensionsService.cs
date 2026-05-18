@@ -1,8 +1,10 @@
 ﻿using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using Toolbox.Data.Models;
 using Toolbox.Data.Models.Interfaces;
+using Toolbox.Data.Services;
 
 namespace Toolbox.Services;
 
@@ -46,6 +48,8 @@ public class ExtensionsService
                         var hasDataProject = Directory.GetDirectories(dir, "*.Data", SearchOption.AllDirectories).Length > 0;
                         var hasInstallProject = Directory.GetDirectories(dir, "*.Install", SearchOption.AllDirectories).Length > 0;
                         var isThemeV4 = Directory.GetDirectories(dir, "4SELLERS_Responsive_4", SearchOption.AllDirectories).Length > 0;
+                        var hasChangelog = File.Exists(Path.Combine(dir, "changelog.json"));
+                        var currentVersion = TryReadExtensionVersion(dir);
                         list.Add(new ExtensionInfo
                         {
                             Name = name,
@@ -55,7 +59,9 @@ public class ExtensionsService
                             HasShopProject = hasShopProject,
                             HasDataProject = hasDataProject,
                             HasInstallProject = hasInstallProject,
-                            HasThemeV4 = isThemeV4
+                            HasThemeV4 = isThemeV4,
+                            HasChangelog = hasChangelog,
+                            CurrentVersion = currentVersion
                         });
                     }
                 }
@@ -193,6 +199,32 @@ public class ExtensionsService
             errorProgress?.Report($"Fehler beim Starten von dotnet build: {ex.Message}{Environment.NewLine}");
             return false;
         }
+    }
+
+    private static string? TryReadExtensionVersion(string extensionRoot)
+    {
+        try
+        {
+            var path = Path.Combine(extensionRoot, "version.json");
+            if (!File.Exists(path))
+            {
+                return null;
+            }
+
+            var json = File.ReadAllText(path);
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("version", out var versionElement) &&
+                versionElement.ValueKind == JsonValueKind.String)
+            {
+                return versionElement.GetString();
+            }
+        }
+        catch
+        {
+            return null;
+        }
+
+        return null;
     }
 }
 

@@ -23,7 +23,10 @@
     </div>
     <div class="col-12 d-flex flex-column gap-2">
         <div class="pl-4 d-flex flex-column gap-2">
-            <MudText Typo="Typo.caption" Class="fw-bold">Repo Pfade</MudText>
+            <MudText Typo="Typo.caption" Class="fw-bold">
+                Repo Pfade
+                <SettingsHelp PropertyName="@nameof(ToolboxSettings.ThemeRepositoryPath)" />
+            </MudText>
             <MudChipSet T="string" Class="d-flex flex-wrap gap-1">
                 @if (_themePaths.Any())
                 {
@@ -48,7 +51,10 @@
                            OnClick="AddThemePath">Pfad hinzufügen</MudButton>
             </div>
         </div>
-        <MudCheckBox Class="p-0" ValueChanged="(bool i) => SettingsService.SaveSettingChanges(x => x.RestartShopOnThemeChange = i, NotificationService)" Value="Setting.RestartShopOnThemeChange" T="bool" Color="Color.Primary">Shop bei Theme-Wechsel neustarten</MudCheckBox>
+        <MudCheckBox Class="p-0" ValueChanged="(bool i) => SettingsService.SaveSettingChanges(x => x.RestartShopOnThemeChange = i, NotificationService)" Value="Setting.RestartShopOnThemeChange" T="bool" Color="Color.Primary">
+            Shop bei Theme-Wechsel neustarten
+            <SettingsHelp PropertyName="@nameof(ToolboxSettings.RestartShopOnThemeChange)" />
+        </MudCheckBox>
     </div>
 
     <div class="col-12 mt-3 d-flex gap-1 align-items-center justify-content-center">
@@ -57,7 +63,10 @@
     </div>
     <div class="col-12 d-flex flex-column gap-2">
         <div class="pl-4 d-flex flex-column gap-2">
-            <MudText Typo="Typo.caption" Class="fw-bold">Repo Pfade</MudText>
+            <MudText Typo="Typo.caption" Class="fw-bold">
+                Repo Pfade
+                <SettingsHelp PropertyName="@nameof(ToolboxSettings.ExtensionsRepositoryPath)" />
+            </MudText>
             <MudChipSet T="string" Class="d-flex flex-wrap gap-1">
                 @if (_extensionPaths.Any())
                 {
@@ -85,19 +94,90 @@
     </div>
     
     <div class="col-12 mt-3 d-flex gap-1 align-items-center justify-content-center">
+        <MudText Class="fw-bold" Typo="Typo.body1">TFS / Azure DevOps</MudText>
+        <MudDivider Class="w-auto"></MudDivider>
+    </div>
+    <div class="col-12 d-flex flex-column gap-2">
+        <div class="settings-field-with-help">
+            <MudTextField ValueChanged="(string v) => SettingsService.SaveSettingChanges(x => x.TfsCollectionUrl = v, NotificationService)"
+                          Value="Setting.TfsCollectionUrl"
+                          Label="TFS Collection URL"
+                          Variant="Variant.Text"
+                          Class="pl-4 settings-field-grow" />
+            <SettingsHelp PropertyName="@nameof(ToolboxSettings.TfsCollectionUrl)" />
+        </div>
+        <div class="pl-4 d-flex flex-column gap-2">
+            <MudText Typo="Typo.caption" Class="fw-bold">
+                Projekt-Links
+                <SettingsHelp PropertyName="@nameof(ToolboxSettings.TfsProjectUrls)" />
+            </MudText>
+            <MudChipSet T="string" Class="d-flex flex-wrap gap-1">
+                @if (_tfsProjectUrls.Any())
+                {
+                    @foreach (var url in _tfsProjectUrls)
+                    {
+                        <MudChip T="string"
+                                 Variant="Variant.Outlined"
+                                 Color="Color.Primary"
+                                 OnClose="@(() => RemoveTfsProjectUrl(url))"
+                                 Closeable="true">@url</MudChip>
+                    }
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption" Class="text-secondary">Keine Projekt-Links hinterlegt</MudText>
+                }
+            </MudChipSet>
+            <div class="d-flex gap-2 align-items-center">
+                <MudTextField @bind-Value="_newTfsProjectUrl"
+                              Label="TFS Projekt-URL hinzufügen"
+                              Variant="Variant.Text"
+                              Class="settings-field-grow" />
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="AddTfsProjectUrl">Hinzufügen</MudButton>
+            </div>
+        </div>
+        <div class="settings-field-with-help">
+            <MudTextField ValueChanged="(string v) => SettingsService.SaveSettingChanges(x => x.TfsApiKey = v, NotificationService)"
+                          Value="Setting.TfsApiKey"
+                          Label="TFS API Key (PAT)"
+                          Variant="Variant.Text"
+                          Class="pl-4 settings-field-grow"
+                          InputType="@_tfsApiKeyInputType"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@_tfsApiKeyAdornment"
+                          OnAdornmentClick="@(() => _showTfsApiKey = !_showTfsApiKey)" />
+            <SettingsHelp MarkdownPath="Help/TFSPATGet.md" MarkdownTitle="Personal-Access-Token erstellen" PropertyName="@nameof(ToolboxSettings.TfsApiKey)" />
+        </div>
+    </div>
+
+    <div class="col-12 mt-3 d-flex gap-1 align-items-center justify-content-center">
         <MudText Class="fw-bold" Typo="Typo.body1">Pfade</MudText>
         <MudDivider Class="w-auto"></MudDivider>
     </div>
     <div class="col-12 d-flex flex-column gap-2">
-        <MudTextField ValueChanged="(string i) => SettingsService.SaveSettingChanges(x => x.GeneralFolderPath = i, NotificationService)" Value="Setting.GeneralFolderPath" Label="Shopsystem Ordnerpfad" Variant="Variant.Text" Class="pl-4"
-                      Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseGeneralFolder"/>
+        <div class="settings-field-with-help">
+            <MudTextField ValueChanged="@(async (string i) => await DebounceGeneralFolderPath(i))" Value="Setting.GeneralFolderPath" Label="Shopsystem Ordnerpfad" Variant="Variant.Text" Class="pl-4 settings-field-grow" Immediate="true"
+                          Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.FolderOpen" OnAdornmentClick="ChooseGeneralFolder" />
+            <SettingsHelp PropertyName="@nameof(ToolboxSettings.GeneralFolderPath)" />
+        </div>
     </div>
     
     <div class="col-12 mt-3 d-flex gap-1 align-items-center justify-content-center">
         <MudText Class="fw-bold" Typo="Typo.body1">Updater</MudText>
         <MudDivider Class="w-auto"></MudDivider>
     </div>
-    <div class="col-12 d-flex align-items-center gap-2 pl-4">
+    <div class="col-12 d-flex flex-column gap-2 pl-4">
+        <MudCheckBox Class="p-0"
+                     ValueChanged="(bool i) => SettingsService.SaveSettingChanges(x => x.AllowBetaUpdates = i, NotificationService)"
+                     Value="Setting.AllowBetaUpdates"
+                     T="bool"
+                     Color="Color.Primary">
+            Beta-Versionen installieren
+            <SettingsHelp PropertyName="@nameof(ToolboxSettings.AllowBetaUpdates)" />
+        </MudCheckBox>
         <MudTooltip Text="Startet den Updater (Administratorrechte erforderlich).">
             <MudButton Variant="MudBlazor.Variant.Outlined"
                        Color="Color.Primary"
@@ -116,11 +196,19 @@
     private bool _startingUpdater;
     private readonly List<string> _themePaths = new();
     private readonly List<string> _extensionPaths = new();
+    private readonly List<string> _tfsProjectUrls = new();
+    private string _newTfsProjectUrl = string.Empty;
+    private bool _showTfsApiKey;
+    private InputType _tfsApiKeyInputType => _showTfsApiKey ? InputType.Text : InputType.Password;
+    private string _tfsApiKeyAdornment => _showTfsApiKey ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff;
+    private const int InputDebounceMs = 350;
+    private CancellationTokenSource? _generalFolderCts;
 
     protected override Task OnInitializedAsync()
     {
         _currentVersion = GetInformationalVersion();
         LoadPathLists();
+        LoadTfsProjectUrls();
         return Task.CompletedTask;
     }
 
@@ -131,6 +219,12 @@
 
         _extensionPaths.Clear();
         _extensionPaths.AddRange(Setting.GetExtensionRoots());
+    }
+
+    private void LoadTfsProjectUrls()
+    {
+        _tfsProjectUrls.Clear();
+        _tfsProjectUrls.AddRange(Setting.GetTfsProjectUrls());
     }
 
     private void AddThemePath()
@@ -174,6 +268,34 @@
         RemovePath(path, _extensionPaths, paths => SettingsService.SaveSettingChanges(x => x.SetExtensionRoots(paths), NotificationService));
     }
 
+    private void AddTfsProjectUrl()
+    {
+        var url = _newTfsProjectUrl?.Trim();
+        if (string.IsNullOrWhiteSpace(url))
+            return;
+
+        if (_tfsProjectUrls.Any(p => string.Equals(p, url, StringComparison.OrdinalIgnoreCase)))
+        {
+            Snackbar.Add("Projekt-Link ist bereits hinterlegt.", Severity.Info);
+            return;
+        }
+
+        _tfsProjectUrls.Add(url);
+        SettingsService.SaveSettingChanges(x => x.SetTfsProjectUrls(_tfsProjectUrls), NotificationService);
+        _newTfsProjectUrl = string.Empty;
+        LoadTfsProjectUrls();
+    }
+
+    private void RemoveTfsProjectUrl(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return;
+
+        _tfsProjectUrls.RemoveAll(p => string.Equals(p, url, StringComparison.OrdinalIgnoreCase));
+        SettingsService.SaveSettingChanges(x => x.SetTfsProjectUrls(_tfsProjectUrls), NotificationService);
+        LoadTfsProjectUrls();
+    }
+
     private void RemovePath(string path, List<string> target, Action<IEnumerable<string>> saveAction)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -192,6 +314,24 @@
             Setting.GeneralFolderPath = path;
         }
     }
+
+    private async Task DebounceGeneralFolderPath(string value)
+    {
+        _generalFolderCts?.Cancel();
+        _generalFolderCts = new CancellationTokenSource();
+        var token = _generalFolderCts.Token;
+
+        try
+        {
+            await Task.Delay(InputDebounceMs, token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        SettingsService.SaveSettingChanges(x => x.GeneralFolderPath = value, NotificationService);
+    }
     
     private async Task RunUpdaterAsync()
     {
@@ -199,7 +339,7 @@
         _startingUpdater = true;
         try
         {
-            var ok = await UpdaterSvc.TryLaunchUpdaterAsync();
+            var ok = await UpdaterSvc.TryLaunchUpdaterAsync(Setting.AllowBetaUpdates);
             if (ok)
                 Snackbar.Add("Updater gestartet.", Severity.Success, cfg => cfg.VisibleStateDuration = 1500);
             else
@@ -227,7 +367,7 @@
             var v = attr?.InformationalVersion ?? asm.GetName().Version?.ToString();
             if (!string.IsNullOrEmpty(v))
             {
-                var idx = v.IndexOfAny(new[] { '+', '-' });
+                var idx = v.IndexOf('+');
                 if (idx > 0) v = v.Substring(0, idx);
             }
 

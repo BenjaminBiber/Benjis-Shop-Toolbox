@@ -13,6 +13,7 @@ public class InternalAppDbContext : DbContext
     public DbSet<AppInfo> AppInfos => Set<AppInfo>();
     public DbSet<ShopSetting> ShopSettings => Set<ShopSetting>();
     public DbSet<DatabaseConnection> ShopDatabaseConnections => Set<DatabaseConnection>();
+    public DbSet<VmCustomerMapping> VmCustomerMappings => Set<VmCustomerMapping>();
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -37,6 +38,10 @@ public class InternalAppDbContext : DbContext
         
         var databaseConnection = modelBuilder.Entity<DatabaseConnection>();
         databaseConnection.HasKey(x => x.Id);
+
+        var vmMapping = modelBuilder.Entity<VmCustomerMapping>();
+        vmMapping.HasKey(x => x.Id);
+        vmMapping.HasIndex(x => x.VmName);
     }
 }
 
