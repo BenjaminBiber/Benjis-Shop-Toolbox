@@ -98,25 +98,35 @@ public class SettingsService : ISettingsService
         SaveSettings();
     }
     
-    public void FillShopPathSettings(SiteCollection siteCollection)
+    public void FillShopPathSettings()
     {
-        var siteIdByYamlPath = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-        foreach (var site in siteCollection)
+        SiteCollection? siteCollection = null;
+        try
         {
-            if (site == null) continue;
-            var physicalPath = site.GetSitePath();
-            if (string.IsNullOrWhiteSpace(physicalPath)) continue;
+            siteCollection = new ServerManager().Sites;
+        }
+        catch (Exception) { }
 
-            var yamlUpper = NormalizePath(Path.Combine(physicalPath, "Shop.yaml"));
-            var yamlLower = NormalizePath(Path.Combine(physicalPath, "shop.yaml"));
+        var siteIdByYamlPath = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        if (siteCollection != null)
+        {
+            foreach (var site in siteCollection)
+            {
+                if (site == null) continue;
+                var physicalPath = site.GetSitePath();
+                if (string.IsNullOrWhiteSpace(physicalPath)) continue;
 
-            if (!string.IsNullOrWhiteSpace(yamlUpper) && !siteIdByYamlPath.ContainsKey(yamlUpper))
-            {
-                siteIdByYamlPath[yamlUpper] = site.Id;
-            }
-            if (!string.IsNullOrWhiteSpace(yamlLower) && !siteIdByYamlPath.ContainsKey(yamlLower))
-            {
-                siteIdByYamlPath[yamlLower] = site.Id;
+                var yamlUpper = NormalizePath(Path.Combine(physicalPath, "Shop.yaml"));
+                var yamlLower = NormalizePath(Path.Combine(physicalPath, "shop.yaml"));
+
+                if (!string.IsNullOrWhiteSpace(yamlUpper) && !siteIdByYamlPath.ContainsKey(yamlUpper))
+                {
+                    siteIdByYamlPath[yamlUpper] = site.Id;
+                }
+                if (!string.IsNullOrWhiteSpace(yamlLower) && !siteIdByYamlPath.ContainsKey(yamlLower))
+                {
+                    siteIdByYamlPath[yamlLower] = site.Id;
+                }
             }
         }
 
@@ -194,7 +204,7 @@ public class SettingsService : ISettingsService
         }
 
         // 2) Then augment with IIS sites (if any) for paths not already present
-        foreach (var site in siteCollection)
+        foreach (var site in siteCollection ?? Enumerable.Empty<Site>())
         {
             if (site == null) continue;
 
@@ -301,7 +311,7 @@ public class SettingsService : ISettingsService
         public long SiteId { get; init; }
     }
     
-    public bool AreThereAllShopPathSettings(SiteCollection siteCollection)
+    public bool AreThereAllShopPathSettings()
     {
         Load();
         // Als 'gefüllt' gilt bereits, wenn mindestens ein ShopSetting existiert.

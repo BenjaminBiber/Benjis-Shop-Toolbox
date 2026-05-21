@@ -14,7 +14,6 @@ using Toolbox.Services;
 using Toolbox.Data.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Web.Administration;
 using Toolbox.Data.DataContexts;
 using Toolbox.Data.Models;
 using Toolbox.Data.Models.Interfaces;
@@ -118,8 +117,7 @@ using (var scope = app.Services.CreateScope())
     await appInfoService.SetStartTimeAsync(DateTime.Now);
     
     var settingService = scope.ServiceProvider.GetRequiredService<SettingsService>();
-    var manager = new ServerManager();
-    settingService.FillShopPathSettings(manager.Sites);
+    settingService.FillShopPathSettings();
     var databaseConnectionService = scope.ServiceProvider.GetRequiredService<DatabaseConnectionService>();
     databaseConnectionService.FillDataBaseConnections();
 }
